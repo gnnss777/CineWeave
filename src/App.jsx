@@ -5,10 +5,13 @@ import BrainstormTab from './components/BrainstormTab';
 import MindMapTab from './components/MindMapTab';
 import ScreenplayTab from './components/ScreenplayTab';
 import EncyclopediaTab from './components/EncyclopediaTab';
+import CorkboardTab from './components/CorkboardTab';
+import ScriptBrowser from './components/ScriptBrowser';
+import CoverageReport from './components/CoverageReport';
 import InstallPrompt from './components/InstallPrompt';
 import LoginModal from './components/LoginModal';
 import OnboardingOverlay from './components/OnboardingOverlay';
-import { Radio, Compass, FileText, BookOpen, Film, Plus, Trash2, HelpCircle } from 'lucide-react';
+import { Radio, Compass, FileText, BookOpen, Columns, Film, Plus, Trash2, HelpCircle, Book, BarChart3 } from 'lucide-react';
 
 function HelpButton() {
   const { startTour, hasCompleted } = useOnboarding();
@@ -89,7 +92,10 @@ function CineWeaveShell() {
       case 'brainstorm': return <BrainstormTab />;
       case 'mindmap': return <MindMapTab />;
       case 'screenplay': return <ScreenplayTab />;
+      case 'corkboard': return <CorkboardTab />;
       case 'encyclopedia': return <EncyclopediaTab />;
+      case 'scripts': return <ScriptBrowser />;
+      case 'coverage': return <CoverageReport />;
       default: return <BrainstormTab />;
     }
   };
@@ -132,6 +138,27 @@ function CineWeaveShell() {
           >
             <BookOpen size={16} />
             Fichas
+          </button>
+          <button 
+            onClick={() => setActiveTab('corkboard')} 
+            style={{ color: activeTab === 'corkboard' ? '#ccee00' : '#ffffff', background: activeTab === 'corkboard' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'corkboard' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
+          >
+            <Columns size={16} />
+            Mural
+          </button>
+          <button 
+            onClick={() => setActiveTab('scripts')} 
+            style={{ color: activeTab === 'scripts' ? '#ccee00' : '#ffffff', background: activeTab === 'scripts' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'scripts' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
+          >
+            <Book size={16} />
+            Roteiros
+          </button>
+          <button 
+            onClick={() => setActiveTab('coverage')} 
+            style={{ color: activeTab === 'coverage' ? '#ccee00' : '#ffffff', background: activeTab === 'coverage' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'coverage' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
+          >
+            <BarChart3 size={16} />
+            Coverage
           </button>
         </div>
 

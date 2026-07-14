@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { syncProjectToSupabase, loadProjectsFromSupabase, isConfigured as isSupabaseConfigured, isLoggedIn } from '../lib/sync';
+import { ensureEntities, updateEntity as updateEntityInProject, deleteEntity as deleteEntityFromProject } from '../lib/migration';
 
 const ProjectContext = createContext();
 
@@ -231,34 +232,33 @@ const initialProjects = [
 export const ProjectProvider = ({ children }) => {
   const [projects, setProjects] = useState(() => {
     const saved = localStorage.getItem('cineweave_projects');
-    if (!saved) return initialProjects;
+    if (!saved) return initialProjects.map(ensureEntities);
     try {
       const savedList = JSON.parse(saved);
-      const mergedList = [...savedList];
+      // Apply migration to all projects
+      const migratedList = savedList.map(p => ensureEntities(p));
+      // Merge initial projects with migration
+      const mergedList = [...migratedList];
       initialProjects.forEach(initP => {
-        const index = mergedList.findIndex(p => p.id === initP.id);
+        const migrated = ensureEntities(initP);
+        const index = mergedList.findIndex(p => p.id === migrated.id);
         if (index === -1) {
-          mergedList.push(initP);
-        } else {
-          // Preserve user changes, fill missing data from mock
-          const saved = mergedList[index];
-          
-          // Migrate brainstormData.characters -> project.characters (old format compat)
+          } else {
+            // Preserve user changes, fill missing data from mock
+            const saved = mergedList[index];
           let savedChars = saved.characters || [];
           let savedBD = saved.brainstormData || {};
           if (!savedChars.length && savedBD.characters?.length) {
             savedChars = savedBD.characters;
           }
-          // Strip characters from brainstormData (now lives in project.characters)
           if (savedBD && typeof savedBD === 'object') {
             delete savedBD.characters;
           }
           const hasBD = savedBD && Object.keys(savedBD).length > 0;
           
           mergedList[index] = {
-            ...initP,       // mock fills all fields
-            ...saved,       // user changes override
-            // Arrays: preserve user state, only use mock if user has empty
+            ...initP,
+            ...saved,
             characters: savedChars.length > 0 ? savedChars : initP.characters,
             locations: saved.locations?.length > 0 ? saved.locations : initP.locations,
             objects: saved.objects?.length > 0 ? saved.objects : initP.objects,
@@ -274,7 +274,6 @@ export const ProjectProvider = ({ children }) => {
           };
         }
       });
-      // Migration pass for user-created projects that didn't match any initialProject
       for (let i = 0; i < mergedList.length; i++) {
         const p = mergedList[i];
         if (!p.characters?.length && p.brainstormData?.characters?.length) {
@@ -282,9 +281,9 @@ export const ProjectProvider = ({ children }) => {
           delete mergedList[i].brainstormData.characters;
         }
       }
-      return mergedList;
+      return mergedList.map(ensureEntities);
     } catch (e) {
-      return initialProjects;
+      return initialProjects.map(ensureEntities);
     }
   });
   
@@ -330,9 +329,8 @@ export const ProjectProvider = ({ children }) => {
           for (const sbProj of sbProjects) {
             const existingIdx = merged.findIndex(p => p.title === sbProj.title);
             if (existingIdx >= 0) {
-              // Merge: prefer Supabase (source of truth), keep local id
               const local = merged[existingIdx];
-              merged[existingIdx] = {
+              merged[existingIdx] = ensureEntities({
                 ...local,
                 ...sbProj,
                 id: local.id,
@@ -351,9 +349,9 @@ export const ProjectProvider = ({ children }) => {
                     plot_points: [], scenes: [], dialogues: [], world_elements: [], themes: []
                   });
                 })(),
-              };
+              });
             } else {
-              merged.push(sbProj);
+              merged.push(ensureEntities(sbProj));
             }
           }
           return merged;
@@ -595,6 +593,21 @@ export const ProjectProvider = ({ children }) => {
     proj.objects = proj.objects.filter(o => o.id !== id);
     proj.mindMapNodes = proj.mindMapNodes.filter(node => node.id !== `n-${id}` && node.id !== id);
     updateProject(proj);
+  };
+
+  // ── ENTITIES CRUD (centralized) ──────────────────────────────
+  const saveEntity = (type, entity) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return updateEntity(p, type, entity);
+    }));
+  };
+
+  const deleteEntityById = (type, entityId) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== currentProjectId) return p;
+      return deleteEntityFromProject(p, type, entityId);
+    }));
   };
 
   // ── IDEAS ─────────────────────────────────────────────────────
@@ -1231,6 +1244,8 @@ export const ProjectProvider = ({ children }) => {
       deleteLocation,
       saveObject,
       deleteObject,
+      saveEntity,
+      deleteEntityById,
       saveIdea,
       deleteIdea,
       updateIdea,

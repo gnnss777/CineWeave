@@ -1,280 +1,154 @@
 import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { Plus, Edit3, Trash2, Shield, Eye, BookOpen, Compass, Paperclip, ArrowLeft } from 'lucide-react';
+import FichaModal from './FichaModal';
+import { Plus, Edit3, Trash2, BookOpen, Compass, Paperclip, ArrowLeft, FileText, Target, Feather, Layers } from 'lucide-react';
+
+const ENTITY_TYPE_MAP = {
+  characters: 'character',
+  locations: 'location',
+  objects: 'object',
+  scenes: 'scene',
+  plot_points: 'plot_point',
+  themes: 'theme',
+  acts: 'act',
+};
 
 export default function EncyclopediaTab() {
-  const { 
-    currentProject, 
-    saveCharacter, 
-    deleteCharacter, 
-    saveLocation, 
-    deleteLocation, 
-    saveObject, 
+  const {
+    currentProject,
+    saveCharacter,
+    deleteCharacter,
+    saveLocation,
+    deleteLocation,
+    saveObject,
     deleteObject,
+    saveEntity,
+    deleteEntityById,
     tabNavigation,
     navigateTo
   } = useProject();
 
   const [activeTab, setActiveTab] = useState('characters');
-  const [editingItem, setEditingItem] = useState(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [fichaModal, setFichaModal] = useState(null);
 
-  // Form Field States
-  // 1. Character fields
-  const [charName, setCharName] = useState('');
-  const [charRole, setCharRole] = useState('Protagonista');
-  const [charDescription, setCharDescription] = useState('');
-  const [charTraits, setCharTraits] = useState('');
-  const [charBackstory, setCharBackstory] = useState('');
-  const [charNotes, setCharNotes] = useState('');
-  const [charAvatar, setCharAvatar] = useState('amber');
-
-  // 2. Location fields
-  const [locName, setLocName] = useState('');
-  const [locType, setLocType] = useState('INT.');
-  const [locDescription, setLocDescription] = useState('');
-  const [locTimeOfDay, setLocTimeOfDay] = useState('NOITE');
-  const [locMood, setLocMood] = useState('');
-  const [locGroup, setLocGroup] = useState('');
-
-  // 3. Object fields
-  const [objName, setObjName] = useState('');
-  const [objSignificance, setObjSignificance] = useState('');
-  const [objDescription, setObjDescription] = useState('');
-  const [objGroup, setObjGroup] = useState('');
-
-  // Cross-tab navigation: open ficha for target item
   useEffect(() => {
     if (!tabNavigation || tabNavigation.tab !== 'encyclopedia' || !tabNavigation.targetId) return;
     const target = tabNavigation.targetId;
-    const openDirectly = (tab, fields) => {
-      // Clear all fields first
-      setCharName(''); setCharRole('Protagonista'); setCharDescription(''); setCharTraits(''); setCharBackstory(''); setCharNotes(''); setCharAvatar('amber');
-      setLocName(''); setLocType('INT.'); setLocDescription(''); setLocTimeOfDay('NOITE'); setLocMood(''); setLocGroup('');
-      setObjName(''); setObjSignificance(''); setObjDescription(''); setObjGroup('');
-      // Set active tab and populate fields
-      setActiveTab(tab);
-      setEditingItem(fields);
-      setIsFormOpen(true);
-      if (tab === 'characters' && fields) {
-        setCharName(fields.name || '');
-        setCharRole(fields.role || 'Protagonista');
-        setCharDescription(fields.description || '');
-        setCharTraits(fields.traits ? fields.traits.join(', ') : '');
-        setCharBackstory(fields.backstory || '');
-        setCharNotes(fields.notes || '');
-        setCharAvatar(fields.avatar || 'amber');
-      } else if (tab === 'locations' && fields) {
-        setLocName(fields.name || '');
-        setLocType(fields.type || 'INT.');
-        setLocDescription(fields.description || '');
-        setLocTimeOfDay(fields.timeOfDay || 'NOITE');
-        setLocMood(fields.mood || '');
-        setLocGroup(fields.group || '');
-        setTimeout(() => {}, 0);
-      } else if (tab === 'objects' && fields) {
-        setObjName(fields.name || '');
-        setObjSignificance(fields.significance || '');
-        setObjDescription(fields.description || '');
-        setObjGroup(fields.group || '');
-      }
-    };
-    const char = (currentProject?.characters || []).find(c => c.name === target);
-    if (char) { openDirectly('characters', char); return; }
-    const loc = (currentProject?.locations || []).find(l => l.name === target);
-    if (loc) { openDirectly('locations', loc); return; }
-    const obj = (currentProject?.objects || []).find(o => o.name === target);
-    if (obj) { openDirectly('objects', obj); }
+    const entities = currentProject?.entities;
+    const searchInEntities = (type, key) => (entities?.[type] || []).find(e => e[key] === target || e.id === target);
+    const match = searchInEntities('characters', 'name') || (currentProject?.characters || []).find(c => c.name === target);
+    if (match) { setActiveTab('characters'); setFichaModal({ item: match, type: 'character', mode: 'view' }); return; }
+    const loc = searchInEntities('locations', 'name') || (currentProject?.locations || []).find(l => l.name === target);
+    if (loc) { setActiveTab('locations'); setFichaModal({ item: loc, type: 'location', mode: 'view' }); return; }
+    const obj = searchInEntities('objects', 'name') || (currentProject?.objects || []).find(o => o.name === target);
+    if (obj) { setActiveTab('objects'); setFichaModal({ item: obj, type: 'object', mode: 'view' }); return; }
+    const scene = searchInEntities('scenes', 'title');
+    if (scene) { setActiveTab('scenes'); setFichaModal({ item: scene, type: 'scene', mode: 'view' }); return; }
+    const pp = searchInEntities('plot_points', 'title');
+    if (pp) { setActiveTab('plot_points'); setFichaModal({ item: pp, type: 'plot_point', mode: 'view' }); return; }
+    const theme = searchInEntities('themes', 'statement');
+    if (theme) { setActiveTab('themes'); setFichaModal({ item: theme, type: 'theme', mode: 'view' }); return; }
+    const act = searchInEntities('acts', 'name');
+    if (act) { setActiveTab('acts'); setFichaModal({ item: act, type: 'act', mode: 'view' }); }
   }, [tabNavigation]);
 
-  const openAddForm = () => {
-    setEditingItem(null);
-    setIsFormOpen(true);
-    
-    // Clear forms
-    setCharName('');
-    setCharRole('Protagonista');
-    setCharDescription('');
-    setCharTraits('');
-    setCharBackstory('');
-    setCharNotes('');
-    setCharAvatar('amber');
-
-    setLocName('');
-    setLocType('INT.');
-    setLocDescription('');
-    setLocTimeOfDay('NOITE');
-    setLocMood('');
-    setLocGroup('');
-
-    setObjName('');
-    setObjSignificance('');
-    setObjDescription('');
-    setObjGroup('');
+  const handleFichaSave = (data) => {
+    const t = fichaModal.type;
+    if (t === 'character') saveCharacter(data);
+    else if (t === 'location') saveLocation(data);
+    else if (t === 'object') saveObject(data);
+    else saveEntity(t + 's', data);
+    setFichaModal(null);
   };
 
-  const openEditForm = (item) => {
-    setEditingItem(item);
-    setIsFormOpen(true);
-
-    if (activeTab === 'characters') {
-      setCharName(item.name || '');
-      setCharRole(item.role || 'Protagonista');
-      setCharDescription(item.description || '');
-      setCharTraits(item.traits ? item.traits.join(', ') : '');
-      setCharBackstory(item.backstory || '');
-      setCharNotes(item.notes || '');
-      setCharAvatar(item.avatar || 'amber');
-    } else if (activeTab === 'locations') {
-      setLocName(item.name || '');
-      setLocType(item.type || 'INT.');
-      setLocDescription(item.description || '');
-      setLocTimeOfDay(item.timeOfDay || 'NOITE');
-      setLocMood(item.mood || '');
-      setLocGroup(item.group || '');
-    } else if (activeTab === 'objects') {
-      setObjName(item.name || '');
-      setObjSignificance(item.significance || '');
-      setObjDescription(item.description || '');
-      setObjGroup(item.group || '');
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (activeTab === 'characters') {
-      const traitsArray = charTraits.split(',').map(t => t.trim()).filter(t => t.length > 0);
-      const character = {
-        id: editingItem?.id,
-        name: charName,
-        role: charRole,
-        description: charDescription,
-        traits: traitsArray,
-        backstory: charBackstory,
-        notes: charNotes,
-        avatar: charAvatar
-      };
-      saveCharacter(character);
-    } else if (activeTab === 'locations') {
-      const location = {
-        id: editingItem?.id,
-        name: locName,
-        type: locType,
-        group: locGroup,
-        description: locDescription,
-        timeOfDay: locTimeOfDay,
-        mood: locMood
-      };
-      saveLocation(location);
-    } else if (activeTab === 'objects') {
-      const object = {
-        id: editingItem?.id,
-        name: objName,
-        group: objGroup,
-        significance: objSignificance,
-        description: objDescription
-      };
-      saveObject(object);
-    }
-
-    setIsFormOpen(false);
-    setEditingItem(null);
-  };
-
-  const handleDelete = (id) => {
+  const handleFichaDelete = (id) => {
     if (!window.confirm('Tem certeza que deseja excluir esta ficha?')) return;
-    
-    if (activeTab === 'characters') {
-      deleteCharacter(id);
-    } else if (activeTab === 'locations') {
-      deleteLocation(id);
-    } else if (activeTab === 'objects') {
-      deleteObject(id);
+    const t = fichaModal.type;
+    if (t === 'character') deleteCharacter(id);
+    else if (t === 'location') deleteLocation(id);
+    else if (t === 'object') deleteObject(id);
+    else deleteEntityById(t + 's', id);
+    setFichaModal(null);
+  };
+
+  const openAddForm = () => {
+    const t = ENTITY_TYPE_MAP[activeTab];
+    const empty = {
+      characters: { name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' },
+      locations: { name: '', type: 'INT.', description: '', timeOfDay: 'DIA', mood: '', group: '' },
+      objects: { name: '', description: '', significance: '', group: '' },
+      scenes: { title: '', synopsis: '', actId: '', order: 0, status: 'draft' },
+      plot_points: { title: '', description: '', actId: '', tags: [] },
+      themes: { statement: '', evidence: '', relevance: 'Central' },
+      acts: { name: '', order: 0, description: '', color: '#ccee00' },
+    }[activeTab] || { name: '' };
+    setFichaModal({ item: empty, type: t, mode: 'edit' });
+  };
+
+  const openEditForm = (item, tab) => {
+    const targetTab = tab || activeTab;
+    if (tab) setActiveTab(tab);
+    const t = ENTITY_TYPE_MAP[targetTab];
+    setFichaModal({ item, type: t, mode: 'view' });
+  };
+
+  const getList = () => {
+    const e = currentProject?.entities || {};
+    switch (activeTab) {
+      case 'characters': return currentProject?.characters || [];
+      case 'locations': return currentProject?.locations || [];
+      case 'objects': return currentProject?.objects || [];
+      case 'scenes': return e.scenes || [];
+      case 'plot_points': return e.plot_points || [];
+      case 'themes': return e.themes || [];
+      case 'acts': return e.acts || [];
+      default: return [];
     }
   };
+
+  const list = getList();
 
   return (
     <div className="encyclopedia-container">
       <style>{`
         .encyclopedia-container {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          width: 100%;
-          overflow: hidden;
-          background-color: var(--bg-darkest);
-          padding: 1rem;
+          display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;
+          background-color: var(--bg-darkest); padding: 1rem;
         }
         .encyclopedia-layout {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          max-width: 1200px;
-          margin: 0 auto;
-          width: 100%;
+          flex: 1; display: flex; flex-direction: column; overflow: hidden;
+          max-width: 1200px; margin: 0 auto; width: 100%;
         }
         .tab-bar {
-          display: flex;
-          border-bottom: 1px solid var(--border-color);
-          margin-bottom: 1.5rem;
-          gap: 0.5rem;
+          display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; gap: 0.5rem;
         }
         .tab-btn {
-          background: none;
-          border: none;
-          color: var(--text-secondary);
-          font-weight: 600;
-          padding: 0.75rem 1.2rem;
-          cursor: pointer;
-          border-bottom: 2px solid transparent;
-          transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
+          background: none; border: none; color: var(--text-secondary); font-weight: 600;
+          padding: 0.75rem 1.2rem; cursor: pointer; border-bottom: 2px solid transparent;
+          transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem;
         }
-        .tab-btn.active {
-          color: var(--primary-gold);
-          border-bottom-color: var(--primary-gold);
-          background: rgba(212, 163, 89, 0.03);
-        }
+        .tab-btn.active { color: var(--primary-gold); border-bottom-color: var(--primary-gold); background: rgba(212, 163, 89, 0.03); }
         .card-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 1.2rem;
-          overflow-y: auto;
-          padding-bottom: 2rem;
-          flex-1;
+          display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 1.2rem; overflow-y: auto; padding-bottom: 2rem; flex: 1;
         }
         .ficha-card {
-          border-radius: 12px;
-          padding: 1.2rem;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          height: 240px;
+          border-radius: 12px; padding: 1.2rem; display: flex; flex-direction: column;
+          justify-content: space-between; height: 240px;
         }
         .ficha-avatar-lg {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 16px;
+          width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center;
+          justify-content: center; font-weight: bold; font-size: 16px;
         }
         .avatar-amber { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; }
         .avatar-purple { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; border: 1px solid #8b5cf6; }
         .avatar-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
         .avatar-green { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
-        
       `}</style>
 
       <div className="encyclopedia-layout">
         <div className="flex justify-between items-center mb-2">
-          <div className="tab-bar flex-1">
+          <div className="tab-bar flex-1" style={{ display: 'flex', flexWrap: 'wrap' }}>
             <button onClick={() => setActiveTab('characters')} className={`tab-btn text-sm ${activeTab === 'characters' ? 'active' : ''}`}>
               <BookOpen size={16} /> Personagens
             </button>
@@ -284,383 +158,202 @@ export default function EncyclopediaTab() {
             <button onClick={() => setActiveTab('objects')} className={`tab-btn text-sm ${activeTab === 'objects' ? 'active' : ''}`}>
               <Paperclip size={16} /> Objetos
             </button>
+            <button onClick={() => setActiveTab('scenes')} className={`tab-btn text-sm ${activeTab === 'scenes' ? 'active' : ''}`}>
+              <FileText size={16} /> Cenas
+            </button>
+            <button onClick={() => setActiveTab('plot_points')} className={`tab-btn text-sm ${activeTab === 'plot_points' ? 'active' : ''}`}>
+              <Target size={16} /> Plot Points
+            </button>
+            <button onClick={() => setActiveTab('themes')} className={`tab-btn text-sm ${activeTab === 'themes' ? 'active' : ''}`}>
+              <Feather size={16} /> Temas
+            </button>
+            <button onClick={() => setActiveTab('acts')} className={`tab-btn text-sm ${activeTab === 'acts' ? 'active' : ''}`}>
+              <Layers size={16} /> Atos
+            </button>
           </div>
-          
           <button onClick={openAddForm} className="btn-primary py-2 px-3 text-xs flex items-center gap-1">
             <Plus size={14} /> Adicionar Ficha
           </button>
         </div>
 
-        {/* Catalog Grid */}
         <div className="card-grid">
-          {activeTab === 'characters' && (
-            currentProject.characters.length === 0 ? (
-              <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum personagem cadastrado.</p>
-            ) : (
-              currentProject.characters.map(char => (
-                <div key={char.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(char)} style={{ cursor: 'pointer' }}>
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
-                        <div className={`ficha-avatar-lg avatar-${char.avatar || 'amber'}`}>
-                          {char.name[0]}
-                        </div>
-                        <div>
-                          <h4 className="text-base font-bold text-white leading-tight">{char.name}</h4>
-                          <span className="text-[10px] text-yellow-500 uppercase tracking-widest font-semibold">{char.role}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-4 leading-relaxed">
-                      {char.description}
-                    </p>
-                  </div>
-
-                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-800/60">
-                    <span className="text-[10px] text-gray-500 italic truncate max-w-[150px]">
-                      {char.traits && char.traits.length > 0 ? char.traits.join(', ') : 'Sem traços marcantes'}
-                    </span>
-                    <div className="flex gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); openEditForm(char); }} className="text-gray-400 hover:text-white p-1" title="Editar">
-                        <Edit3 size={14} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )
-          )}
-
-          {activeTab === 'locations' && (
-            currentProject.locations.length === 0 ? (
-              <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhuma locação cadastrada.</p>
-            ) : (
-              currentProject.locations.map(loc => (
-                <div key={loc.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(loc)} style={{ cursor: 'pointer' }}>
-                  <div>
-                    <div className="flex justify-between items-start">
+          {activeTab === 'characters' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum personagem cadastrado.</p>
+          ) : (
+            list.map(char => (
+              <div key={char.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(char)} style={{ cursor: 'pointer' }}>
+                <div>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className={`ficha-avatar-lg avatar-${char.avatar || 'amber'}`}>{char.name[0]}</div>
                       <div>
-                        <h4 className="text-base font-bold text-white">{loc.name}</h4>
-                        <span className="text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 px-1.5 py-0.5 rounded font-mono font-bold mt-1 inline-block">
-                          {loc.type}
-                        </span>
+                        <h4 className="text-base font-bold text-white leading-tight">{char.name}</h4>
+                        <span className="text-[10px] text-yellow-500 uppercase tracking-widest font-semibold">{char.role}</span>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-4 leading-relaxed">
-                      {loc.description}
-                    </p>
                   </div>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-4 leading-relaxed">{char.description}</p>
+                </div>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-800/60">
+                  <span className="text-[10px] text-gray-500 italic truncate max-w-[150px]">
+                    {char.traits && char.traits.length > 0 ? char.traits.join(', ') : 'Sem traços marcantes'}
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); openEditForm(char); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setFichaModal({ item: char, type: 'character', mode: 'view' }); handleFichaDelete(char.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ))}
 
-                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-800/60">
-                    <span className="text-[10px] text-gray-500 font-mono">
-                      {loc.timeOfDay} • {loc.mood || 'Sem tom'}
-                    </span>
-                    <div className="flex gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); openEditForm(loc); }} className="text-gray-400 hover:text-white p-1" title="Editar">
-                        <Edit3 size={14} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(loc.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir">
-                        <Trash2 size={14} />
-                      </button>
+          {activeTab === 'locations' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhuma locação cadastrada.</p>
+          ) : (
+            list.map(loc => (
+              <div key={loc.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(loc)} style={{ cursor: 'pointer' }}>
+                <div>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-base font-bold text-white">{loc.name}</h4>
+                      <span className="text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 px-1.5 py-0.5 rounded font-mono font-bold mt-1 inline-block">{loc.type}</span>
                     </div>
                   </div>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-4 leading-relaxed">{loc.description}</p>
                 </div>
-              ))
-            )
-          )}
-
-          {activeTab === 'objects' && (
-            currentProject.objects.length === 0 ? (
-              <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum objeto cadastrado.</p>
-            ) : (
-              currentProject.objects.map(obj => (
-                <div key={obj.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(obj)} style={{ cursor: 'pointer' }}>
-                  <div>
-                    <h4 className="text-base font-bold text-white">{obj.name}</h4>
-                    <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-5 leading-relaxed">
-                      {obj.significance}
-                    </p>
-                    {obj.description && (
-                      <p className="text-[10px] text-gray-500 italic font-sans mt-2">
-                        Aparência: {obj.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
-                    <button onClick={(e) => { e.stopPropagation(); openEditForm(obj); }} className="text-gray-400 hover:text-white p-1" title="Editar">
-                      <Edit3 size={14} />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(obj.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir">
-                      <Trash2 size={14} />
-                    </button>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-800/60">
+                  <span className="text-[10px] text-gray-500 font-mono">{loc.timeOfDay} • {loc.mood || 'Sem tom'}</span>
+                  <div className="flex gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); openEditForm(loc); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setFichaModal({ item: loc, type: 'location', mode: 'view' }); handleFichaDelete(loc.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
                   </div>
                 </div>
-              ))
-            )
-          )}
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'objects' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum objeto cadastrado.</p>
+          ) : (
+            list.map(obj => (
+              <div key={obj.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(obj)} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-base font-bold text-white">{obj.name}</h4>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-5 leading-relaxed">{obj.significance}</p>
+                  {obj.description && <p className="text-[10px] text-gray-500 italic font-sans mt-2">Aparência: {obj.description}</p>}
+                </div>
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
+                  <button onClick={(e) => { e.stopPropagation(); openEditForm(obj); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setFichaModal({ item: obj, type: 'object', mode: 'view' }); handleFichaDelete(obj.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'scenes' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhuma cena cadastrada.</p>
+          ) : (
+            list.map(scene => (
+              <div key={scene.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(scene, 'scenes')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-base font-bold text-white leading-tight">{scene.title}</h4>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-3 leading-relaxed">{scene.synopsis}</p>
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    <span className="text-[10px] bg-yellow-900/30 text-yellow-400 border border-yellow-800/30 px-1.5 py-0.5 rounded font-mono font-bold">
+                      {scene.actId ? (currentProject.entities?.acts || []).find(a => a.id === scene.actId)?.name || 'Sem ato' : 'Sem ato'}
+                    </span>
+                    <span className="text-[10px] bg-blue-900/30 text-blue-400 border border-blue-800/30 px-1.5 py-0.5 rounded font-mono">
+                      {scene.characterIds?.length || 0} personagens
+                    </span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-800/60">
+                  <span className="text-[10px] text-gray-500">{scene.status}</span>
+                  <div className="flex gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); openEditForm(scene, 'scenes'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(scene.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'plot_points' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum plot point cadastrado.</p>
+          ) : (
+            list.map(pp => (
+              <div key={pp.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(pp, 'plot_points')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-base font-bold text-white leading-tight">{pp.title}</h4>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-3 leading-relaxed">{pp.description}</p>
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {(pp.tags || []).map(t => (
+                      <span key={t} className="text-[10px] bg-purple-900/30 text-purple-400 border border-purple-800/30 px-1.5 py-0.5 rounded font-mono">{t}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
+                  <button onClick={(e) => { e.stopPropagation(); openEditForm(pp, 'plot_points'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(pp.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'themes' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum tema cadastrado.</p>
+          ) : (
+            list.map(theme => (
+              <div key={theme.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(theme, 'themes')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-xs font-bold text-yellow-400 mb-1">TEMA</h4>
+                  <p className="text-sm italic text-white leading-relaxed">"{theme.statement}"</p>
+                  <p className="text-xs text-gray-400 mt-2 font-sans line-clamp-2">{theme.evidence}</p>
+                </div>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-800/60">
+                  <span className="text-[10px] text-gray-500 font-mono">{theme.relevance}</span>
+                  <div className="flex gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); openEditForm(theme, 'themes'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(theme.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'acts' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum ato cadastrado.</p>
+          ) : (
+            list.map(act => (
+              <div key={act.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(act, 'acts')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-base font-bold text-white leading-tight">{act.name}</h4>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-3 leading-relaxed">{act.description}</p>
+                  <div className="flex gap-1 mt-2">
+                    <span className="text-[10px] text-gray-500">Ordem: {act.order + 1}</span>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
+                  <button onClick={(e) => { e.stopPropagation(); openEditForm(act, 'acts'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(act.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))
+          ))}
         </div>
       </div>
 
-      {/* Modal Add / Edit Form */}
-      {isFormOpen && (
-        <div className="modal-overlay" onClick={() => { setIsFormOpen(false); setEditingItem(null); }}>
-          <form onSubmit={handleSubmit} className="form-modal glass bg-black/95" onClick={(e) => e.stopPropagation()}>
-            {/* Header bar (ir e voltar no mobile / titulo no desktop) */}
-            <div className="form-modal-header">
-              <button 
-                type="button" 
-                onClick={() => setIsFormOpen(false)} 
-                className="flex items-center gap-1 font-bold"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center' }}
-              >
-                <ArrowLeft size={20} />
-                <span>Voltar</span>
-              </button>
-              <h3 className="text-lg font-bold text-white font-ui" style={{ margin: 0 }}>
-                {editingItem ? 'Editar Ficha' : 'Adicionar Nova Ficha'}
-              </h3>
-              <button 
-                type="submit" 
-                className="btn-primary"
-                style={{ padding: '6px 16px', fontSize: '13px', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                Salvar
-              </button>
-            </div>
-
-            {/* Scrollable Form Body */}
-            <div className="form-body-scroll">
-              {activeTab === 'characters' && (
-                <div className="form-grid-cols">
-                  {/* Left Column */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label>Nome do Personagem:</label>
-                      <input 
-                        type="text" 
-                        value={charName} 
-                        onChange={(e) => setCharName(e.target.value)}
-                        required
-                        placeholder="Ex: Detetive Max Santos"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <div className="flex-1 flex flex-col gap-1">
-                        <label>Papel:</label>
-                        <select 
-                          value={charRole} 
-                          onChange={(e) => setCharRole(e.target.value)}
-                        >
-                          <option value="Protagonista">Protagonista</option>
-                          <option value="Antagonista">Antagonista</option>
-                          <option value="Coadjuvante">Coadjuvante</option>
-                          <option value="Mentor">Mentor</option>
-                          <option value="Vítima">Vítima</option>
-                        </select>
-                      </div>
-                      <div className="flex-1 flex flex-col gap-1">
-                        <label>Cor do Avatar:</label>
-                        <select 
-                          value={charAvatar} 
-                          onChange={(e) => setCharAvatar(e.target.value)}
-                        >
-                          <option value="amber">Dourado (Max)</option>
-                          <option value="purple">Roxo (Elisa)</option>
-                          <option value="red">Vermelho (Kaelen)</option>
-                          <option value="green">Verde (Shinoda)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label>Características / Traços (separados por vírgula):</label>
-                      <input 
-                        type="text" 
-                        value={charTraits} 
-                        onChange={(e) => setCharTraits(e.target.value)}
-                        placeholder="Ex: Cínico, Rápido, Paranóico"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label>Descrição Física:</label>
-                      <textarea 
-                        value={charDescription} 
-                        onChange={(e) => setCharDescription(e.target.value)}
-                        style={{ minHeight: '110px' }}
-                        placeholder="Escreva a descrição do visual do personagem..."
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label>Passado / Backstory:</label>
-                      <textarea 
-                        value={charBackstory} 
-                        onChange={(e) => setCharBackstory(e.target.value)}
-                        style={{ minHeight: '130px' }}
-                        placeholder="Conte o passado relevante deste personagem..."
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label>Notas de Produção:</label>
-                      <textarea 
-                        value={charNotes} 
-                        onChange={(e) => setCharNotes(e.target.value)}
-                        style={{ minHeight: '110px' }}
-                        placeholder="Hábitos, manias, ou observações..."
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'locations' && (
-                <div className="form-grid-cols">
-                  {/* Left Column */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label>Nome da Locação:</label>
-                      <input 
-                        type="text" 
-                        value={locName} 
-                        onChange={(e) => setLocName(e.target.value)}
-                        required
-                        placeholder="Ex: Copan Noir Bar"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <div className="flex-1 flex flex-col gap-1">
-                        <label>Tipo:</label>
-                        <select 
-                          value={locType} 
-                          onChange={(e) => setLocType(e.target.value)}
-                        >
-                          <option value="INT.">INT. (Interior)</option>
-                          <option value="EXT.">EXT. (Exterior)</option>
-                        </select>
-                      </div>
-                      <div className="flex-1 flex flex-col gap-1">
-                        <label>Horário:</label>
-                        <select 
-                          value={locTimeOfDay} 
-                          onChange={(e) => setLocTimeOfDay(e.target.value)}
-                        >
-                          <option value="DIA">DIA</option>
-                          <option value="NOITE">NOITE</option>
-                          <option value="AMBOS">AMBOS</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label>Clima / Mood:</label>
-                      <input 
-                        type="text" 
-                        value={locMood} 
-                        onChange={(e) => setLocMood(e.target.value)}
-                        placeholder="Ex: Escuro, chuvoso, neblina"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label>Grupo / Categoria:</label>
-                      <input 
-                        type="text" 
-                        value={locGroup} 
-                        onChange={(e) => setLocGroup(e.target.value)}
-                        placeholder="Ex: Investigação, Zenith Corp, Zonas de Perigo..."
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label>Descrição Visual / Espacial:</label>
-                      <textarea 
-                        value={locDescription} 
-                        onChange={(e) => setLocDescription(e.target.value)}
-                        style={{ minHeight: '220px' }}
-                        placeholder="Descreva o que vemos e ouvimos neste cenário..."
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'objects' && (
-                <div className="form-grid-cols">
-                  {/* Left Column */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label>Nome do Objeto:</label>
-                      <input 
-                        type="text" 
-                        value={objName} 
-                        onChange={(e) => setObjName(e.target.value)}
-                        required
-                        placeholder="Ex: O Gravador de Almas"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label>Grupo / Categoria:</label>
-                      <input 
-                        type="text" 
-                        value={objGroup} 
-                        onChange={(e) => setObjGroup(e.target.value)}
-                        placeholder="Ex: Pistas, Itens Pessoais, Armas..."
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label>Descrição Física:</label>
-                      <textarea 
-                        value={objDescription} 
-                        onChange={(e) => setObjDescription(e.target.value)}
-                        style={{ minHeight: '220px' }}
-                        placeholder="Como ele se parece visualmente..."
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label>Significado na Trama:</label>
-                      <textarea 
-                        value={objSignificance} 
-                        onChange={(e) => setObjSignificance(e.target.value)}
-                        style={{ minHeight: '220px' }}
-                        placeholder="Por que este objeto é importante? Quem o quer?"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Desktop only bottom footer buttons */}
-            <div className="flex gap-2 justify-end pt-3 border-t border-gray-800/60" style={{ display: 'flex' }}>
-              <button 
-                type="button" 
-                onClick={() => setIsFormOpen(false)} 
-                className="btn-secondary"
-                style={{ padding: '8px 20px', fontSize: '14px', cursor: 'pointer' }}
-              >
-                Cancelar
-              </button>
-              <button 
-                type="submit" 
-                className="btn-primary"
-                style={{ padding: '8px 20px', fontSize: '14px', cursor: 'pointer' }}
-              >
-                Salvar Ficha
-              </button>
-            </div>
-          </form>
-        </div>
+      {fichaModal && (
+        <FichaModal
+          item={fichaModal.item}
+          type={fichaModal.type}
+          mode={fichaModal.mode}
+          acts={currentProject?.entities?.acts || []}
+          onSave={handleFichaSave}
+          onDelete={handleFichaDelete}
+          onClose={() => setFichaModal(null)}
+          onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+        />
       )}
     </div>
   );

@@ -1,11 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { User, MapPin, FileText, Sparkle, Target, Film, MessageSquare, Globe, Heart, Search, Edit, Trash2, Send, Compass, Plus, X } from 'lucide-react';
+import { User, MapPin, FileText, Sparkle, Target, Film, MessageSquare, Globe, Heart, Layers, Search, Edit, Trash2, Send, Compass, Plus, X } from 'lucide-react';
 
 const SIDEBAR_TABS = {
   characters: { label: 'Personagens', icon: User },
   locations: { label: 'Locacoes', icon: MapPin },
   objects: { label: 'Objetos', icon: FileText },
   brainstorm: { label: 'Brainstorm', icon: Sparkle },
+  scenes: { label: 'Cenas', icon: Film },
+  plot_points: { label: 'Plot Points', icon: Target },
+  themes: { label: 'Temas', icon: Heart },
+  acts: { label: 'Atos', icon: Layers },
   outliner: { label: 'Cenas', icon: Film },
 };
 
@@ -47,21 +51,21 @@ function AvatarCircle({ item, type, size = 32 }) {
 
 function SidebarCard({ item, type, tags, secondary, actions, onClick }) {
   return (
-    <div className="sidebar-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      <div className="sidebar-card-left">
-        <AvatarCircle item={item} type={type} />
-        <div className="sidebar-card-info">
-          <span className="sidebar-card-name">{item.name || item.title || item.statement || item.label || 'Sem nome'}</span>
-          {secondary && <span className="sidebar-card-secondary">{secondary}</span>}
+    <div className="sidebar-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '6px 8px', minHeight: 0 }}>
+      <div className="sidebar-card-left" style={{ gap: 8 }}>
+        <AvatarCircle item={item} type={type} size={24} />
+        <div className="sidebar-card-info" style={{ minWidth: 0 }}>
+          <span className="sidebar-card-name" style={{ fontSize: 11, lineHeight: 1.2 }}>{item.name || item.title || item.statement || item.label || 'Sem nome'}</span>
+          {secondary && <span className="sidebar-card-secondary" style={{ fontSize: 9, lineHeight: 1.2, marginTop: 1 }}>{typeof secondary === 'string' ? secondary.substring(0, 60) : secondary}</span>}
           {tags && tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-0.5">
-              {tags.slice(0, 3).map((t, i) => <TagChip key={i} tag={t} />)}
-              {tags.length > 3 && <span className="trait-tag text-[10px] px-1.5 py-0.5">+{tags.length - 3}</span>}
+              {tags.slice(0, 2).map((t, i) => <TagChip key={i} tag={t} />)}
+              {tags.length > 2 && <span className="trait-tag text-[10px] px-1.5 py-0.5">+{tags.length - 2}</span>}
             </div>
           )}
         </div>
       </div>
-      <div className="sidebar-card-actions" onClick={(e) => e.stopPropagation()}>
+      <div className="sidebar-card-actions" onClick={(e) => e.stopPropagation()} style={{ gap: 1 }}>
         {actions}
       </div>
     </div>
@@ -86,7 +90,11 @@ export default function SharedSidebar({
   const [search, setSearch] = useState('');
   const [bsCat, setBsCat] = useState('all');
 
-  const baseKeys = tabContext === 'screenplay' ? ['characters', 'locations', 'objects', 'brainstorm', 'outliner'] : tabContext === 'encyclopedia' ? ['characters', 'locations', 'objects'] : ['characters', 'locations', 'objects', 'brainstorm'];
+  const baseKeys = tabContext === 'screenplay' 
+    ? ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts', 'brainstorm', 'outliner'] 
+    : tabContext === 'encyclopedia' 
+    ? ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts'] 
+    : ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts', 'brainstorm'];
   const tabKeys = [...baseKeys, ...(extraTabs || []).map(t => t.id)];
 
   const characters = currentProject?.characters || [];
@@ -94,6 +102,11 @@ export default function SharedSidebar({
   const objects = currentProject?.objects || [];
   const brainstormData = currentProject?.brainstormData || {};
   const screenplay = currentProject?.screenplay || [];
+  const entities = currentProject?.entities || {};
+  const allScenes = entities.scenes || [];
+  const allPlotPoints = entities.plot_points || [];
+  const allThemes = entities.themes || [];
+  const allActs = entities.acts || [];
 
   const brainstormItems = useMemo(() => {
     if (bsCat === 'all') {
@@ -121,6 +134,30 @@ export default function SharedSidebar({
     const q = search.toLowerCase();
     return objects.filter(o => o.name?.toLowerCase().includes(q) || o.description?.toLowerCase().includes(q));
   }, [objects, search]);
+
+  const filteredScenes = useMemo(() => {
+    if (!search) return allScenes;
+    const q = search.toLowerCase();
+    return allScenes.filter(s => s.title?.toLowerCase().includes(q) || s.synopsis?.toLowerCase().includes(q));
+  }, [allScenes, search]);
+
+  const filteredPlotPoints = useMemo(() => {
+    if (!search) return allPlotPoints;
+    const q = search.toLowerCase();
+    return allPlotPoints.filter(p => p.name?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+  }, [allPlotPoints, search]);
+
+  const filteredThemes = useMemo(() => {
+    if (!search) return allThemes;
+    const q = search.toLowerCase();
+    return allThemes.filter(t => t.name?.toLowerCase().includes(q) || t.statement?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q));
+  }, [allThemes, search]);
+
+  const filteredActs = useMemo(() => {
+    if (!search) return allActs;
+    const q = search.toLowerCase();
+    return allActs.filter(a => a.name?.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q));
+  }, [allActs, search]);
 
   const filteredBrainstorm = useMemo(() => {
     if (!search) return brainstormItems;
@@ -246,6 +283,74 @@ export default function SharedSidebar({
             </div>
           </div>
         ));
+      case 'scenes':
+        return filteredScenes.map(scene => (
+          <SidebarCard
+            key={scene.id}
+            item={scene}
+            type="scene"
+            tags={[]}
+            secondary={scene.synopsis ? scene.synopsis.substring(0, 60) : ''}
+            onClick={() => onSelectItem?.(scene, 'scene')}
+            actions={
+              <>
+                <button className="sidebar-action-btn" onClick={() => onEdit?.(scene, 'scene')} title="Editar"><Edit size={13} /></button>
+                <button className="sidebar-action-btn text-red-400" onClick={() => onDelete?.(scene, 'scene')} title="Excluir"><Trash2 size={13} /></button>
+              </>
+            }
+          />
+        ));
+      case 'plot_points':
+        return filteredPlotPoints.map(pp => (
+          <SidebarCard
+            key={pp.id}
+            item={pp}
+            type="plot_point"
+            tags={pp.tags || []}
+            secondary={pp.description ? pp.description.substring(0, 60) : ''}
+            onClick={() => onSelectItem?.(pp, 'plot_point')}
+            actions={
+              <>
+                <button className="sidebar-action-btn" onClick={() => onEdit?.(pp, 'plot_point')} title="Editar"><Edit size={13} /></button>
+                <button className="sidebar-action-btn text-red-400" onClick={() => onDelete?.(pp, 'plot_point')} title="Excluir"><Trash2 size={13} /></button>
+              </>
+            }
+          />
+        ));
+      case 'themes':
+        return filteredThemes.map(theme => (
+          <SidebarCard
+            key={theme.id}
+            item={theme}
+            type="theme"
+            tags={theme.tags || []}
+            secondary={theme.statement ? theme.statement.substring(0, 60) : ''}
+            onClick={() => onSelectItem?.(theme, 'theme')}
+            actions={
+              <>
+                <button className="sidebar-action-btn" onClick={() => onEdit?.(theme, 'theme')} title="Editar"><Edit size={13} /></button>
+                <button className="sidebar-action-btn text-red-400" onClick={() => onDelete?.(theme, 'theme')} title="Excluir"><Trash2 size={13} /></button>
+              </>
+            }
+          />
+        ));
+      case 'acts':
+        return filteredActs.map(act => (
+          <SidebarCard
+            key={act.id}
+            item={act}
+            type="act"
+            tags={[]}
+            secondary={act.description ? act.description.substring(0, 60) : ''}
+            onClick={() => onSelectItem?.(act, 'act')}
+            actions={
+              <>
+                <button className="sidebar-action-btn" onClick={() => onEdit?.(act, 'act')} title="Editar"><Edit size={13} /></button>
+                <button className="sidebar-action-btn text-red-400" onClick={() => onDelete?.(act, 'act')} title="Excluir"><Trash2 size={13} /></button>
+              </>
+            }
+          />
+        ));
       default: {
         const extra = (extraTabs || []).find(t => t.id === activeTab);
         if (extra) return extra.render?.(extraTabData);
@@ -255,9 +360,9 @@ export default function SharedSidebar({
   };
 
   return (
-    <div className="reference-sidebar open" style={{ width: '340px', minWidth: '340px', borderLeft: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div className="reference-sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="reference-tabs" style={{ display: 'flex', gap: '2px', overflow: 'auto', flex: 1 }}>
+    <div className="reference-sidebar open" style={{ width: '300px', minWidth: '300px', borderLeft: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div className="reference-sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div className="reference-tabs" style={{ display: 'flex', gap: '1px', overflow: 'auto', flex: 1 }}>
           {tabKeys.map(key => {
             const tab = SIDEBAR_TABS[key];
             const extra = (extraTabs || []).find(t => t.id === key);
@@ -267,47 +372,34 @@ export default function SharedSidebar({
             const isActive = activeTab === key;
             return (
               <button key={key} onClick={() => onTabChange(key)} className={`reference-tab ${isActive ? 'active' : ''}`}
-                style={{ whiteSpace: 'nowrap', padding: '4px 8px', fontSize: '11px', fontWeight: isActive ? 700 : 500, borderRadius: '4px', border: 'none', background: isActive ? 'rgba(204, 238, 0, 0.15)' : 'transparent', color: isActive ? '#ccee00' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <Icon size={12} />
+                style={{ whiteSpace: 'nowrap', padding: '3px 6px', fontSize: '10px', fontWeight: isActive ? 700 : 500, borderRadius: '3px', border: 'none', background: isActive ? 'rgba(204, 238, 0, 0.15)' : 'transparent', color: isActive ? '#ccee00' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <Icon size={10} />
                   <span>{label}</span>
               </button>
             );
           })}
         </div>
-        <button onClick={onToggle} className="reference-toggle-close" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px' }} title="Fechar painel">
-          <X size={14} />
+        <button onClick={onToggle} className="reference-toggle-close" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px', flexShrink: 0 }} title="Fechar painel">
+          <X size={12} />
         </button>
       </div>
 
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ padding: '4px 8px', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
         <div style={{ position: 'relative' }}>
-          <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="w-full bg-black/40 border border-white/10 rounded text-xs text-white py-1.5 pl-7 pr-2 focus:outline-none focus:border-yellow-600" />
+          <Search size={10} style={{ position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="w-full bg-black/40 border border-white/10 rounded text-xs text-white py-1 pl-6 pr-2 focus:outline-none focus:border-yellow-600" style={{ fontSize: 10 }} />
         </div>
       </div>
 
-      <div className="reference-sidebar-list" style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+      <div className="reference-sidebar-list" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '2px 0' }}>
         {listItems()}
       </div>
 
-      {activeTab === 'characters' && (
-        <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={() => onEdit?.(null, 'character')} className="btn-primary w-full py-1.5 text-xs font-bold flex items-center justify-center gap-1">
-            <Plus size={12} /> Novo Personagem
-          </button>
-        </div>
-      )}
-      {activeTab === 'locations' && (
-        <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={() => onEdit?.(null, 'location')} className="btn-primary w-full py-1.5 text-xs font-bold flex items-center justify-center gap-1">
-            <Plus size={12} /> Nova Locação
-          </button>
-        </div>
-      )}
-      {activeTab === 'objects' && (
-        <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={() => onEdit?.(null, 'object')} className="btn-primary w-full py-1.5 text-xs font-bold flex items-center justify-center gap-1">
-            <Plus size={12} /> Novo Objeto
+      {['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts'].includes(activeTab) && (
+        <div style={{ padding: '4px 8px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+          <button onClick={() => onEdit?.(null, activeTab === 'characters' ? 'character' : activeTab === 'locations' ? 'location' : activeTab === 'objects' ? 'object' : activeTab === 'scenes' ? 'scene' : activeTab === 'plot_points' ? 'plot_point' : activeTab === 'themes' ? 'theme' : 'act')}
+            className="btn-primary w-full py-1 text-xs font-bold flex items-center justify-center gap-1" style={{ fontSize: 10 }}>
+            <Plus size={10} /> Novo
           </button>
         </div>
       )}

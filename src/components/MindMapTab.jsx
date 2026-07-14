@@ -3,6 +3,7 @@ import { useProject } from '../context/ProjectContext';
 import { ZoomIn, ZoomOut, Maximize, Plus, Link, Trash, Edit, X, Unlink, User, MapPin, FileText, Edit3, Clock, ArrowLeft, Layout, RefreshCw, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import SharedSidebar from './SharedSidebar';
 import FichaModal from './FichaModal';
+import { resolveNodeDisplay, createNodeWithEntity, getColorForNodeType } from '../lib/mindMapUtils';
 
 export default function MindMapTab() {
   const { 
@@ -11,10 +12,13 @@ export default function MindMapTab() {
     saveCharacter, 
     saveLocation, 
     saveObject,
+    saveEntity,
+    deleteEntityById,
     updateProject,
     saveVersion,
     restoreVersion,
-    tabNavigation
+    tabNavigation,
+    navigateTo
   } = useProject();
 
   const [nodes, setNodes] = useState([]);
@@ -446,6 +450,7 @@ export default function MindMapTab() {
     if (type === 'character') return nodes.find(n => n.type === 'character' && n.label === item.name);
     if (type === 'location') return nodes.find(n => n.type === 'location' && n.label === item.name);
     if (type === 'object') return nodes.find(n => n.type === 'object' && n.label === item.name);
+    if (type === 'act') return nodes.find(n => n.type === 'act' && n.label === item.name);
     return null;
   };
 
@@ -460,6 +465,18 @@ export default function MindMapTab() {
       } else if (type === 'object') {
         const newObj = { id: `obj-${Date.now()}`, name: 'Novo Objeto', description: '', significance: '', group: '' };
         setFichaModal({ item: newObj, type: 'object', mode: 'edit' });
+      } else if (type === 'scene') {
+        const newScene = { id: `scene-${Date.now()}`, title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' };
+        setFichaModal({ item: newScene, type: 'scene', mode: 'edit' });
+      } else if (type === 'plot_point') {
+        const newPp = { id: `pp-${Date.now()}`, name: 'Novo Plot Point', description: '', impact: '', storyArc: '' };
+        setFichaModal({ item: newPp, type: 'plot_point', mode: 'edit' });
+      } else if (type === 'theme') {
+        const newTheme = { id: `theme-${Date.now()}`, name: 'Novo Tema', statement: '', description: '', tags: [] };
+        setFichaModal({ item: newTheme, type: 'theme', mode: 'edit' });
+      } else if (type === 'act') {
+        const newAct = { id: `act-${Date.now()}`, name: 'Novo Ato', description: '', color: '#ccee00', order: 0 };
+        setFichaModal({ item: newAct, type: 'act', mode: 'edit' });
       }
       return;
     }
@@ -490,6 +507,14 @@ export default function MindMapTab() {
       deleteObject(item.id);
       const node = getNodeForEntity(item, type);
       if (node) handleDeleteNode(node.id);
+    } else if (type === 'scene') {
+      deleteEntityById('scenes', item.id);
+    } else if (type === 'plot_point') {
+      deleteEntityById('plot_points', item.id);
+    } else if (type === 'theme') {
+      deleteEntityById('themes', item.id);
+    } else if (type === 'act') {
+      deleteEntityById('acts', item.id);
     }
   };
 
@@ -536,21 +561,27 @@ export default function MindMapTab() {
   };
 
   const handleSaveFicha = (data) => {
-    if (fichaModal.type === 'character') {
-      saveCharacter(data);
-    } else if (fichaModal.type === 'location') {
-      saveLocation(data);
-    } else if (fichaModal.type === 'object') {
-      saveObject(data);
-    }
+    const t = fichaModal.type;
+    if (t === 'character') saveCharacter(data);
+    else if (t === 'location') saveLocation(data);
+    else if (t === 'object') saveObject(data);
+    else if (t === 'scene') saveEntity('scenes', data);
+    else if (t === 'plot_point') saveEntity('plot_points', data);
+    else if (t === 'theme') saveEntity('themes', data);
+    else if (t === 'act') saveEntity('acts', data);
     setFichaModal(null);
   };
 
   const handleDeleteFicha = (id) => {
     if (!window.confirm('Excluir esta ficha?')) return;
-    if (fichaModal.type === 'character') deleteCharacter(id);
-    else if (fichaModal.type === 'location') deleteLocation(id);
-    else if (fichaModal.type === 'object') deleteObject(id);
+    const t = fichaModal.type;
+    if (t === 'character') deleteCharacter(id);
+    else if (t === 'location') deleteLocation(id);
+    else if (t === 'object') deleteObject(id);
+    else if (t === 'scene') deleteEntityById('scenes', id);
+    else if (t === 'plot_point') deleteEntityById('plot_points', id);
+    else if (t === 'theme') deleteEntityById('themes', id);
+    else if (t === 'act') deleteEntityById('acts', id);
     setFichaModal(null);
   };
 
@@ -589,16 +620,8 @@ export default function MindMapTab() {
     setTempLinkPos(null);
   };
 
-  // Color mapping
   const getNodeColor = (type) => {
-    switch (type) {
-      case 'act': return 'var(--color-act)';
-      case 'scene': return 'var(--color-scene)';
-      case 'character': return 'var(--color-character)';
-      case 'location': return 'var(--color-location)';
-      case 'object': return 'var(--color-object)';
-      default: return '#718096';
-    }
+    return getColorForNodeType(type);
   };
 
   const groupedLocations = currentProject?.locations ? currentProject.locations.reduce((acc, loc) => {
@@ -627,7 +650,8 @@ export default function MindMapTab() {
           background-color: var(--bg-darkest);
         }
         .canvas-svg {
-          width: 100%;
+          flex: 1;
+          min-width: 0;
           height: 100%;
           cursor: grab;
         }
@@ -1289,13 +1313,52 @@ export default function MindMapTab() {
             });
           })()}
 
+          {/* Act background strips */}
+          {currentProject.entities?.acts?.map(act => {
+            const actNodes = nodes.filter(n => {
+              const resolved = resolveNodeDisplay(n, currentProject);
+              return resolved.entity?.actId === act.id || n.entityId === act.id;
+            });
+            if (actNodes.length === 0) return null;
+            const minX = Math.min(...actNodes.map(n => n.x)) - 80;
+            const maxX = Math.max(...actNodes.map(n => n.x)) + 80;
+            const stripWidth = maxX - minX;
+            const svgHeight = 2000;
+            return (
+              <g key={act.id}>
+                <rect
+                  x={minX}
+                  y={-100}
+                  width={stripWidth}
+                  height={svgHeight}
+                  fill={act.color}
+                  opacity={0.03}
+                  rx={8}
+                />
+                <text
+                  x={minX + 12}
+                  y={-60}
+                  fill={act.color}
+                  opacity={0.4}
+                  fontSize="20"
+                  fontWeight="bold"
+                  fontFamily="sans-serif"
+                >
+                  {act.name}
+                </text>
+              </g>
+            );
+          })}
+
           {/* Node Render Loop */}
           {nodes.map((node) => {
             const isSelected = node.id === selectedNodeId;
             const isLinkingSource = node.id === linkSourceId;
             const isHovered = node.id === hoveredNodeId;
-            const nodeColor = getNodeColor(node.type);
-            const nodeRadius = node.type === 'act' ? 28 : 22;
+            const display = resolveNodeDisplay(node, currentProject);
+            const nodeColor = display.color;
+            const displayType = display.type;
+            const nodeRadius = displayType === 'act' ? 28 : 22;
             const connectorRadius = 6;
 
             return (
@@ -1340,9 +1403,9 @@ export default function MindMapTab() {
                 <text
                   className="node-text"
                   textAnchor="middle"
-                  y={node.type === 'act' ? 42 : 36}
+                  y={displayType === 'act' ? 42 : 36}
                 >
-                  {node.label}
+                  {display.label}
                 </text>
 
                 {/* Connector handle for drag-to-connect */}
@@ -1485,46 +1548,33 @@ export default function MindMapTab() {
         tabContext="mindmap"
         open={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        extraTabs={[{ id: 'acts', label: 'Atos', icon: Clock, render: () => (
-          nodes.filter(n => n.type === 'act').length === 0 ? (
-            <p className="empty-state text-xs text-gray-500 px-3 py-4 text-center">Nenhum ato catalogado.</p>
-          ) : (
-            nodes.filter(n => n.type === 'act').sort((a, b) => {
-              const aIdx = parseInt(a.id.replace(/\D/g, '')) || 0;
-              const bIdx = parseInt(b.id.replace(/\D/g, '')) || 0;
-              return aIdx - bIdx;
-            }).map(act => (
-              <div key={act.id} className="sidebar-card" onClick={() => setSelectedNodeId(act.id)} style={{ cursor: 'pointer' }}>
-                <div className="sidebar-card-left">
-                  <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#000', flexShrink: 0 }}>
-                    {act.label[0]}
-                  </div>
-                  <div className="sidebar-card-info">
-                    <span className="sidebar-card-name">{act.label}</span>
-                    <span className="sidebar-card-secondary">{act.details}</span>
-                  </div>
-                </div>
-              </div>
-            ))
-          )
-        )}]}
-        extraTabData={{ nodes }}
       />
 
       {/* ── Mobile: Floating action bar ── */}
-      {selectedNode && (
-        <div className="mobile-node-actions">
-          <button onClick={() => handleSidebarEdit(selectedNode, 'node')} className="mobile-action-btn primary" title="Editar Ficha">
-            <Edit size={16} />
-          </button>
-          <button onClick={() => handleDeleteNode(selectedNode.id)} className="mobile-action-btn danger" title="Excluir nó">
-            <Trash size={16} />
-          </button>
-          <button onClick={() => setSelectedNodeId(null)} className="mobile-action-btn" title="Fechar">
-            <X size={16} />
-          </button>
-        </div>
-      )}
+      {selectedNode && (() => {
+        const sd = resolveNodeDisplay(selectedNode, currentProject);
+        return (
+          <div className="mobile-node-actions">
+            {sd.entity && (
+              <button
+                onClick={() => setFichaModal({ item: sd.entity, type: sd.entityType === 'characters' ? 'character' : sd.entityType === 'locations' ? 'location' : sd.entityType === 'objects' ? 'object' : sd.entityType === 'scenes' ? 'scene' : sd.entityType === 'plot_points' ? 'plot_point' : sd.entityType === 'themes' ? 'theme' : sd.entityType === 'acts' ? 'act' : 'character', mode: 'view' })}
+                className="mobile-action-btn" title="Ver Ficha"
+              >
+                <FileText size={16} />
+              </button>
+            )}
+            <button onClick={() => handleSidebarEdit(selectedNode, 'node')} className="mobile-action-btn primary" title="Editar Rótulo">
+              <Edit size={16} />
+            </button>
+            <button onClick={() => handleDeleteNode(selectedNode.id)} className="mobile-action-btn danger" title="Excluir nó">
+              <Trash size={16} />
+            </button>
+            <button onClick={() => setSelectedNodeId(null)} className="mobile-action-btn" title="Fechar">
+              <X size={16} />
+            </button>
+          </div>
+        );
+      })()}
 
       {pendingNodeData && isPlacingNode && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-500/90 backdrop-blur-sm px-4 py-2 rounded-lg text-black text-sm font-medium flex items-center gap-2 animate-pulse">
@@ -1541,9 +1591,11 @@ export default function MindMapTab() {
           item={fichaModal.item}
           type={fichaModal.type}
           mode={fichaModal.mode}
+          acts={currentProject?.entities?.acts || []}
           onSave={handleSaveFicha}
           onDelete={handleDeleteFicha}
           onClose={() => setFichaModal(null)}
+          onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
         />
       )}
 

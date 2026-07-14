@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { getLLMApiKey } from '../lib/llm';
+import { exportFountain, downloadFountain } from '../lib/fountainExport';
+import { parseFountain } from '../lib/fountainImport';
+import { exportScreenplayPDF } from '../lib/pdfExport';
+import FichaModal from './FichaModal';
 import { 
   User, MapPin, Columns, FileText, Edit3,
-  Sparkles, Printer, Plus, 
+  Sparkles, Printer, Plus, Download, Upload,
   X, HelpCircle, BookOpen, Minimize2, 
   Trash2, BarChart2, Cpu, Grid, Layers,
-  Compass, ShieldAlert, Award
+  Compass, ShieldAlert, Award, Target, Heart
 } from 'lucide-react';
 
 /* ── Beat‑compatible 8‑level Production Revision System ── */
@@ -47,6 +51,9 @@ export default function ScreenplayTab() {
     deleteCharacter,
     deleteLocation,
     deleteObject,
+    saveEntity,
+    deleteEntityById,
+    navigateTo,
     tabNavigation
   } = useProject();
 
@@ -57,9 +64,7 @@ export default function ScreenplayTab() {
   const [zenMode, setZenMode] = useState(false);
   const [paperTheme, setPaperTheme] = useState('dark');
   
-  const [activeDetail, setActiveDetail] = useState(null);
-  const [detailType, setDetailType] = useState(null);
-  const [isEditingFicha, setIsEditingFicha] = useState(false);
+  const [fichaModal, setFichaModal] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [aiTone, setAiTone] = useState('dramatico');
@@ -89,7 +94,30 @@ export default function ScreenplayTab() {
   const autocompleteRef = useRef(null);
   const blockTexts = useRef({});
   const ceInitSet = useRef(new Set());
+  const fountainInputRef = useRef(null);
   const [pendingAutoTypes, setPendingAutoTypes] = useState({});
+
+  const handleFountainExport = () => {
+    const content = exportFountain(currentProject);
+    downloadFountain(content, currentProject.title);
+  };
+
+  const handlePDFExport = () => {
+    exportScreenplayPDF(currentProject);
+  };
+
+  const handleFountainImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const fountainText = ev.target.result;
+      const imported = parseFountain(fountainText);
+      saveScreenplay(imported);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   /* Load BEAT metadata on init */
   useEffect(() => {
@@ -104,6 +132,32 @@ export default function ScreenplayTab() {
   }, [currentProject]);
 
   const saveScreenplay = (updatedElements) => {
+    const entities = currentProject.entities;
+    const withoutMeta = updatedElements.filter(el => el.type !== 'beat-metadata');
+
+    const linked = withoutMeta.map(el => {
+      if (el.entityId) return el;
+      if (el.type === 'scene-heading') {
+        const text = el.text.toUpperCase().trim();
+        const matchingScene = entities?.scenes?.find(s =>
+          s.title.toUpperCase() === text
+        );
+        if (matchingScene) return { ...el, entityId: matchingScene.id };
+        const loc = entities?.locations?.find(l =>
+          l.name.toUpperCase() === text || `${l.type} ${l.name}`.toUpperCase() === text
+        );
+        if (loc) return { ...el, entityId: loc.id };
+      }
+      if (el.type === 'character') {
+        const charName = el.text.trim().toUpperCase();
+        const matchingChar = entities?.characters?.find(c =>
+          c.name.toUpperCase() === charName
+        );
+        if (matchingChar) return { ...el, entityId: matchingChar.id };
+      }
+      return el;
+    });
+
     const meta = {
       'Revision Level': revisionGeneration,
       'Revision Mode': revisionMode,
@@ -117,9 +171,8 @@ export default function ScreenplayTab() {
       'DocumentStyle': novelMode ? 'novel' : 'screenplay'
     };
     const metaBlock = { id: 'beat-metadata', type: 'beat-metadata', text: generateBeatBlock(meta) };
-    const withoutMeta = updatedElements.filter(el => el.type !== 'beat-metadata');
-    setElements([...withoutMeta, metaBlock]);
-    updateScreenplay([...withoutMeta, metaBlock]);
+    setElements([...linked, metaBlock]);
+    updateScreenplay([...linked, metaBlock]);
   };
 
   useEffect(() => {
@@ -617,6 +670,26 @@ export default function ScreenplayTab() {
     finally { setAiLoading(false); }
   };
 
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const handleAIFeedback = async () => {
+    const key = getLLMApiKey();
+    if (!key) { alert('Configure sua chave de API NVIDIA primeiro.'); return; }
+    setAiLoading(true); setAiError(''); setAiFeedback(null);
+    try {
+      const text = elements.filter(el => el.type !== 'beat-metadata').map(el => `${el.type.toUpperCase()}: ${el.text}`).join('\n');
+      const systemPrompt = 'Você é um analista de roteiros profissional. Analise o roteiro abaixo e forneça feedback sobre: estrutura, ritmo, diálogo, personagens, formatação. Seja específico e construtivo. Responda em português.';
+      const res = await fetch('/api/nvidia/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: 'meta/llama-3.1-70b-instruct', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: text }], temperature: 0.5, max_tokens: 800 })
+      });
+      if (!res.ok) throw new Error('AI Error code ' + res.status);
+      const data = await res.json();
+      setAiFeedback(data.choices?.[0]?.message?.content || 'Sem retorno.');
+    } catch (err) { console.error(err); setAiError('Erro ao obter feedback.'); }
+    finally { setAiLoading(false); }
+  };
+
   /* ── Page estimator & scene list ── */
   const paginatedElements = useMemo(() => {
     let currentPage = 1;
@@ -924,25 +997,48 @@ export default function ScreenplayTab() {
   /* ── Helper to get active revision gen ── */
   const activeGen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
 
-  /* ── Ficha detail handlers ── */
-  const openDetail = (item, type, editMode) => { setActiveDetail(item); setDetailType(type); setIsEditingFicha(editMode); };
-  const handleCreateNewFicha = (type) => {
-    const templates = { character: { id: '', name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, location: { id: '', name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, object: { id: '', name: '', description: '', significance: '' } };
-    setActiveDetail(templates[type]); setDetailType(type); setIsEditingFicha(true);
+  /* ── FichaModal handlers + Beat integration ── */
+  const openFicha = (item, type, mode = 'view') => {
+    setFichaModal({ item, type, mode });
   };
-  const handleSaveFicha = (e) => {
-    e.preventDefault();
-    if (!activeDetail) return;
-    if (detailType === 'character') saveCharacter(activeDetail);
-    else if (detailType === 'location') saveLocation(activeDetail);
-    else if (detailType === 'object') saveObject(activeDetail);
-    setActiveDetail(null);
+  const handleFichaSave = (data) => {
+    const t = fichaModal.type;
+    if (t === 'character') saveCharacter(data);
+    else if (t === 'location') saveLocation(data);
+    else if (t === 'object') saveObject(data);
+    else saveEntity(t + 's', data);
+
+    if (revisionMode && data.id && elements) {
+      const linkedIds = elements.filter(el => el.entityId === data.id).map(el => el.id);
+      if (linkedIds.length > 0) {
+        setRevisions(prev => [...new Set([...prev, ...linkedIds])]);
+      }
+    }
+    setFichaModal(null);
   };
-  const handleDeleteFicha = (id, type) => {
-    if (type === 'character') deleteCharacter(id);
-    else if (type === 'location') deleteLocation(id);
-    else if (type === 'object') deleteObject(id);
-    setActiveDetail(null);
+  const handleFichaDelete = (id) => {
+    const t = fichaModal.type;
+    if (t === 'character') deleteCharacter(id);
+    else if (t === 'location') deleteLocation(id);
+    else if (t === 'object') deleteObject(id);
+    else deleteEntityById(t + 's', id);
+    setFichaModal(null);
+  };
+
+  /* ── Entity matching helpers for Ficha badges ── */
+  const findMatchingScene = (text) => {
+    if (!text || !currentProject?.entities?.scenes) return null;
+    const clean = text.trim().toUpperCase();
+    return currentProject.entities.scenes.find(s => s.title.toUpperCase() === clean);
+  };
+  const findMatchingLocationFromHeading = (text) => {
+    if (!text) return null;
+    const clean = text.trim().toUpperCase();
+    const all = [...(currentProject?.entities?.locations || []), ...(currentProject?.locations || [])];
+    return all.find(l =>
+      l.name.toUpperCase() === clean ||
+      `${l.type || 'INT.'} ${l.name}`.toUpperCase() === clean
+    );
   };
 
   return (
@@ -1067,6 +1163,10 @@ export default function ScreenplayTab() {
           <button onClick={() => setSidebarTab('characters')} className={`sidebar-tab-btn ${sidebarTab === 'characters' ? 'active' : ''}`} title="Personagens"><User size={16} /><span>Personas</span></button>
           <button onClick={() => setSidebarTab('locations')} className={`sidebar-tab-btn ${sidebarTab === 'locations' ? 'active' : ''}`} title="Locacoes"><MapPin size={16} /><span>Locacoes</span></button>
           <button onClick={() => setSidebarTab('objects')} className={`sidebar-tab-btn ${sidebarTab === 'objects' ? 'active' : ''}`} title="Objetos de Cena"><FileText size={16} /><span>Objetos</span></button>
+          <button onClick={() => setSidebarTab('scenes')} className={`sidebar-tab-btn ${sidebarTab === 'scenes' ? 'active' : ''}`} title="Cenas"><BookOpen size={16} /><span>Cenas</span></button>
+          <button onClick={() => setSidebarTab('plot_points')} className={`sidebar-tab-btn ${sidebarTab === 'plot_points' ? 'active' : ''}`} title="Plot Points"><Target size={16} /><span>Plot Points</span></button>
+          <button onClick={() => setSidebarTab('themes')} className={`sidebar-tab-btn ${sidebarTab === 'themes' ? 'active' : ''}`} title="Temas"><Heart size={16} /><span>Temas</span></button>
+          <button onClick={() => setSidebarTab('acts')} className={`sidebar-tab-btn ${sidebarTab === 'acts' ? 'active' : ''}`} title="Atos"><Layers size={16} /><span>Atos</span></button>
           <button onClick={() => setSidebarTab('boneyard')} className={`sidebar-tab-btn ${sidebarTab === 'boneyard' ? 'active' : ''}`} title="Pilha de Descartes"><Trash2 size={16} /><span>Boneyard</span></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1087,9 +1187,9 @@ export default function ScreenplayTab() {
           )}
           {sidebarTab === 'characters' && (
             <>
-              <button onClick={() => handleCreateNewFicha('character')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Personagem</button>
+              <button onClick={() => openFicha({ name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, 'character', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Personagem</button>
               {currentProject.characters.map(char => (
-                <div key={char.id} onClick={() => openDetail(char, 'character', false)} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={char.id} onClick={() => openFicha(char, 'character')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.15)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>{char.name ? char.name[0].toUpperCase() : '?'}</div>
                     <div>
@@ -1097,16 +1197,16 @@ export default function ScreenplayTab() {
                       <p style={{ fontSize: '10px', color: '#7c7c82' }}>{char.role}</p>
                     </div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); openDetail(char, 'character', true); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); openFicha(char, 'character', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
                 </div>
               ))}
             </>
           )}
           {sidebarTab === 'locations' && (
             <>
-              <button onClick={() => handleCreateNewFicha('location')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Nova Locacao</button>
+              <button onClick={() => openFicha({ name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, 'location', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Nova Locacao</button>
               {currentProject.locations.map(loc => (
-                <div key={loc.id} onClick={() => openDetail(loc, 'location', false)} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={loc.id} onClick={() => openFicha(loc, 'location')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MapPin size={12} /></div>
                     <div>
@@ -1114,21 +1214,21 @@ export default function ScreenplayTab() {
                       <p style={{ fontSize: '10px', color: '#7c7c82' }}>{loc.type} • {loc.timeOfDay}</p>
                     </div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); openDetail(loc, 'location', true); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); openFicha(loc, 'location', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
                 </div>
               ))}
             </>
           )}
           {sidebarTab === 'objects' && (
             <>
-              <button onClick={() => handleCreateNewFicha('object')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Objeto</button>
+              <button onClick={() => openFicha({ name: '', description: '', significance: '' }, 'object', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Objeto</button>
               {currentProject.objects.map(obj => (
-                <div key={obj.id} onClick={() => openDetail(obj, 'object', false)} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={obj.id} onClick={() => openFicha(obj, 'object')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FileText size={12} /></div>
                     <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{obj.name}</h4>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); openDetail(obj, 'object', true); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); openFicha(obj, 'object', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
                 </div>
               ))}
             </>
@@ -1138,6 +1238,74 @@ export default function ScreenplayTab() {
               <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Boneyard Ativo</span>
               <p style={{ fontSize: '11px', color: '#7c7c82', lineHeight: '15px' }}>Adicione seoes ou linhas como <code># Boneyard</code> para listar fragmentos de descartes aqui.</p>
             </div>
+          )}
+          {sidebarTab === 'scenes' && (
+            <>
+              <button onClick={() => openFicha({ title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' }, 'scene', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Nova Cena</button>
+              {(currentProject?.entities?.scenes || []).map(scene => (
+                <div key={scene.id} onClick={() => openFicha(scene, 'scene')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BookOpen size={12} /></div>
+                    <div>
+                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{scene.title}</h4>
+                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{scene.synopsis ? scene.synopsis.substring(0, 50) : 'Sem sinopse'}</p>
+                    </div>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); openFicha(scene, 'scene', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
+                </div>
+              ))}
+            </>
+          )}
+          {sidebarTab === 'plot_points' && (
+            <>
+              <button onClick={() => openFicha({ name: 'Novo Plot Point', description: '', impact: '', storyArc: '' }, 'plot_point', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Plot Point</button>
+              {(currentProject?.entities?.plot_points || []).map(pp => (
+                <div key={pp.id} onClick={() => openFicha(pp, 'plot_point')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Target size={12} /></div>
+                    <div>
+                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{pp.name}</h4>
+                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{pp.description ? pp.description.substring(0, 50) : ''}</p>
+                    </div>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); openFicha(pp, 'plot_point', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
+                </div>
+              ))}
+            </>
+          )}
+          {sidebarTab === 'themes' && (
+            <>
+              <button onClick={() => openFicha({ name: 'Novo Tema', statement: '', description: '', tags: [] }, 'theme', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Tema</button>
+              {(currentProject?.entities?.themes || []).map(theme => (
+                <div key={theme.id} onClick={() => openFicha(theme, 'theme')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Heart size={12} /></div>
+                    <div>
+                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{theme.name}</h4>
+                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{theme.statement ? theme.statement.substring(0, 50) : ''}</p>
+                    </div>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); openFicha(theme, 'theme', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
+                </div>
+              ))}
+            </>
+          )}
+          {sidebarTab === 'acts' && (
+            <>
+              <button onClick={() => openFicha({ name: 'Novo Ato', description: '', color: '#ccee00', order: 0 }, 'act', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Ato</button>
+              {(currentProject?.entities?.acts || []).map(act => (
+                <div key={act.id} onClick={() => openFicha(act, 'act')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Layers size={12} /></div>
+                    <div>
+                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{act.name}</h4>
+                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{act.description ? act.description.substring(0, 50) : ''}</p>
+                    </div>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); openFicha(act, 'act', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
+                </div>
+              ))}
+            </>
           )}
         </div>
       </div>
@@ -1157,8 +1325,18 @@ export default function ScreenplayTab() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              ref={fountainInputRef}
+              type="file"
+              accept=".fountain,.txt"
+              onChange={handleFountainImport}
+              style={{ display: 'none' }}
+            />
+            <button onClick={() => fountainInputRef.current.click()} className="toolbar-tab-btn" title="Importar .fountain"><Upload size={14} /><span>Importar</span></button>
+            <button onClick={handleFountainExport} className="toolbar-tab-btn" title="Exportar .fountain"><Download size={14} /><span>Exportar</span></button>
+            <button onClick={handlePDFExport} className="toolbar-tab-btn" title="Exportar PDF"><Printer size={14} /></button>
+            <button onClick={handleAIFeedback} disabled={aiLoading} className="toolbar-tab-btn" title="Feedback da IA"><Award size={14} /><span>Feedback IA</span></button>
             <button onClick={() => setShowCompileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(204,238,0,0.1)', border: '1px solid rgba(204,238,0,0.3)', color: '#ccee00', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}><Sparkles size={12} /><span>Compilar</span></button>
-            <button onClick={handlePrint} className="toolbar-tab-btn" title="Imprimir / Exportar PDF"><Printer size={14} /></button>
             <button onClick={() => setZenMode(!zenMode)} className={`toolbar-tab-btn ${zenMode ? 'active' : ''}`} title="Modo Zen Distracao Zero"><Minimize2 size={14} /></button>
           </div>
         </div>
@@ -1224,7 +1402,7 @@ export default function ScreenplayTab() {
                           ref={ref => {
                             if (ref) {
                               elementRefs.current[el.id] = ref;
-                              if (!ceInitSet.current.has(el.id)) {
+                              if (!ceInitSet.current.has(el.id) || !ref.innerText.trim()) {
                                 ref.innerText = el.text;
                                 ceInitSet.current.add(el.id);
                               }
@@ -1249,8 +1427,18 @@ export default function ScreenplayTab() {
                         </div>
                         <div onClick={(e) => handleGripClick(e, el.id, item.originalIndex)} style={{ position: 'absolute', left: '-24px', top: '8px', cursor: 'pointer', color: '#444', fontSize: '12px', userSelect: 'none' }} title="Acoes do Bloco">⠿</div>
                         {(pendingAutoTypes[el.id] || el.type) === 'character' && findMatchingCharacter(el.text) && (
-                          <span onClick={() => openDetail(findMatchingCharacter(el.text), 'character', false)} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(204,238,0,0.12)', color: '#ccee00', border: '1px solid rgba(204,238,0,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
+                          <span onClick={() => openFicha(findMatchingCharacter(el.text), 'character')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(204,238,0,0.12)', color: '#ccee00', border: '1px solid rgba(204,238,0,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
                             Ficha
+                          </span>
+                        )}
+                        {(pendingAutoTypes[el.id] || el.type) === 'scene-heading' && findMatchingScene(el.text) && (
+                          <span onClick={() => openFicha(findMatchingScene(el.text), 'scene')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
+                            Cena
+                          </span>
+                        )}
+                        {(pendingAutoTypes[el.id] || el.type) === 'scene-heading' && !findMatchingScene(el.text) && findMatchingLocationFromHeading(el.text) && (
+                          <span onClick={() => openFicha(findMatchingLocationFromHeading(el.text), 'location')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
+                            Loc
                           </span>
                         )}
                       </div>
@@ -1267,6 +1455,18 @@ export default function ScreenplayTab() {
                 </div>
               </div>
             )
+          )}
+
+          {aiFeedback && (
+            <div style={{ maxWidth: '816px', margin: '20px auto', background: 'rgba(10,10,14,0.8)', border: '1px solid rgba(204,238,0,0.15)', borderRadius: '12px', padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: '#ccee00', margin: 0 }}>Feedback da IA</h3>
+                <button onClick={() => setAiFeedback(null)} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer', fontSize: '12px' }}>Fechar</button>
+              </div>
+              <div style={{ fontSize: '12px', color: '#c8c8d0', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                {aiFeedback}
+              </div>
+            </div>
           )}
 
           {/* ── B. CORKBOARD ── */}
@@ -1593,56 +1793,18 @@ export default function ScreenplayTab() {
         </div>
       )}
 
-      {/* ── Ficha Detail ── */}
-      {activeDetail && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <form onSubmit={handleSaveFicha} style={{ width: '540px', padding: '24px', background: '#0a0a0d', border: '1px solid #1d1d24', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #141419', paddingBottom: '10px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>Ficha de {detailType === 'character' ? 'Personagem' : detailType === 'location' ? 'Locacao' : 'Objeto'}</h3>
-              <button type="button" onClick={() => setActiveDetail(null)} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><X size={16} /></button>
-            </div>
-            {isEditingFicha ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#7c7c82' }}>Nome</label>
-                  <input type="text" value={activeDetail.name || ''} onChange={e => setActiveDetail({ ...activeDetail, name: e.target.value })} style={{ padding: '8px', background: '#020203', border: '1px solid #1d1d24', borderRadius: '6px', color: '#fff', outline: 'none' }} required />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#7c7c82' }}>Descricao</label>
-                  <textarea value={activeDetail.description || ''} onChange={e => setActiveDetail({ ...activeDetail, description: e.target.value })} style={{ padding: '8px', background: '#020203', border: '1px solid #1d1d24', borderRadius: '6px', color: '#fff', outline: 'none', height: '80px', resize: 'none' }} required />
-                </div>
-                {detailType === 'character' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontWeight: 'bold', color: '#7c7c82' }}>Papel</label>
-                    <select value={activeDetail.role || 'Protagonista'} onChange={e => setActiveDetail({ ...activeDetail, role: e.target.value })} style={{ padding: '8px', background: '#020203', border: '1px solid #1d1d24', borderRadius: '6px', color: '#fff' }}>
-                      <option value="Protagonista">Protagonista</option>
-                      <option value="Mentor">Mentor</option>
-                      <option value="Antagonista">Antagonista</option>
-                      <option value="Coadjuvante">Coadjuvante</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <h4 style={{ fontSize: '16px', fontWeight: 'bold', color: '#ccee00' }}>{activeDetail.name}</h4>
-                <p style={{ color: '#eaeaea', lineHeight: '18px' }}>{activeDetail.description || 'Nenhuma descricao detalhada.'}</p>
-                {detailType === 'character' && <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}><span style={{ padding: '4px 8px', background: 'rgba(204,238,0,0.1)', color: '#ccee00', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>{activeDetail.role}</span></div>}
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', borderTop: '1px solid #141419', paddingTop: '12px' }}>
-              {activeDetail.id ? <button type="button" onClick={() => handleDeleteFicha(activeDetail.id, detailType)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Excluir Ficha</button> : <div />}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" onClick={() => setActiveDetail(null)} style={{ padding: '6px 12px', background: '#121217', border: '1px solid #1d1d24', color: '#fff', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>Fechar</button>
-                {isEditingFicha ? (
-                  <button type="submit" style={{ padding: '6px 16px', background: '#ccee00', color: '#000', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Salvar</button>
-                ) : (
-                  <button type="button" onClick={() => setIsEditingFicha(true)} style={{ padding: '6px 16px', background: '#ccee00', color: '#000', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Editar</button>
-                )}
-              </div>
-            </div>
-          </form>
-        </div>
+      {/* ── FichaModal (unificado) ── */}
+      {fichaModal && (
+        <FichaModal
+          item={fichaModal.item}
+          type={fichaModal.type}
+          mode={fichaModal.mode}
+          acts={currentProject?.entities?.acts || []}
+          onSave={handleFichaSave}
+          onDelete={handleFichaDelete}
+          onClose={() => setFichaModal(null)}
+          onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+        />
       )}
 
     </div>
