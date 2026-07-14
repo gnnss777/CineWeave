@@ -64,7 +64,7 @@ export default function InstallPrompt() {
       bottom: 0,
       left: 0,
       right: 0,
-      zIndex: 9999,
+      zIndex: 'var(--z-toast)',
       padding: '16px 20px 20px',
       background: 'rgba(10, 10, 10, 0.97)',
       backdropFilter: 'blur(16px)',

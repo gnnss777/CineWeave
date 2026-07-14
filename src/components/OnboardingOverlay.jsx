@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
+import './OnboardingOverlay.css';
 
 export default function OnboardingOverlay({
   isActive,
@@ -213,17 +214,6 @@ export default function OnboardingOverlay({
         </div>
       </div>
 
-      <style>{`
-        @keyframes pulse-ring {
-          0%, 100% { box-shadow: 0 0 0 9999px rgba(0,0,0,0.7), 0 0 0 3px #ccee00, 0 0 20px 5px #ccee00; }
-          50% { box-shadow: 0 0 0 9999px rgba(0,0,0,0.7), 0 0 0 5px #ccee00, 0 0 30px 10px #ccee00; }
-        }
-        @keyframes slide-up {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
-      `}</style>
     </>
   );
 }

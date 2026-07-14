@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import FichaModal from './FichaModal';
+import ConfirmModal from './ConfirmModal';
+import './EncyclopediaTab.css';
 import { Plus, Edit3, Trash2, BookOpen, Compass, Paperclip, ArrowLeft, FileText, Target, Feather, Layers } from 'lucide-react';
 
 const ENTITY_TYPE_MAP = {
@@ -30,6 +32,7 @@ export default function EncyclopediaTab() {
 
   const [activeTab, setActiveTab] = useState('characters');
   const [fichaModal, setFichaModal] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
 
   useEffect(() => {
     if (!tabNavigation || tabNavigation.tab !== 'encyclopedia' || !tabNavigation.targetId) return;
@@ -62,7 +65,16 @@ export default function EncyclopediaTab() {
   };
 
   const handleFichaDelete = (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta ficha?')) return;
+    setConfirmModal({
+      title: 'Excluir Ficha',
+      message: 'Tem certeza que deseja excluir esta ficha?',
+      variant: 'danger',
+      confirmLabel: 'Excluir',
+      onConfirm: () => { performDeleteFicha(id); setConfirmModal(null); },
+      onCancel: () => setConfirmModal(null),
+    });
+  };
+  const performDeleteFicha = (id) => {
     const t = fichaModal.type;
     if (t === 'character') deleteCharacter(id);
     else if (t === 'location') deleteLocation(id);
@@ -110,41 +122,7 @@ export default function EncyclopediaTab() {
 
   return (
     <div className="encyclopedia-container">
-      <style>{`
-        .encyclopedia-container {
-          display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;
-          background-color: var(--bg-darkest); padding: 1rem;
-        }
-        .encyclopedia-layout {
-          flex: 1; display: flex; flex-direction: column; overflow: hidden;
-          max-width: 1200px; margin: 0 auto; width: 100%;
-        }
-        .tab-bar {
-          display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; gap: 0.5rem;
-        }
-        .tab-btn {
-          background: none; border: none; color: var(--text-secondary); font-weight: 600;
-          padding: 0.75rem 1.2rem; cursor: pointer; border-bottom: 2px solid transparent;
-          transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem;
-        }
-        .tab-btn.active { color: var(--primary-gold); border-bottom-color: var(--primary-gold); background: rgba(212, 163, 89, 0.03); }
-        .card-grid {
-          display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 1.2rem; overflow-y: auto; padding-bottom: 2rem; flex: 1;
-        }
-        .ficha-card {
-          border-radius: 12px; padding: 1.2rem; display: flex; flex-direction: column;
-          justify-content: space-between; height: 240px;
-        }
-        .ficha-avatar-lg {
-          width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center;
-          justify-content: center; font-weight: bold; font-size: 16px;
-        }
-        .avatar-amber { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; }
-        .avatar-purple { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; border: 1px solid #8b5cf6; }
-        .avatar-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
-        .avatar-green { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
-      `}</style>
+
 
       <div className="encyclopedia-layout">
         <div className="flex justify-between items-center mb-2">
@@ -355,6 +333,7 @@ export default function EncyclopediaTab() {
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
         />
       )}
+      {confirmModal && <ConfirmModal {...confirmModal} />}
     </div>
   );
 }

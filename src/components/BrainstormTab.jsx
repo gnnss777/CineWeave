@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useProject } from '../context/ProjectContext';
 import { extractStructureFromDocuments } from '../lib/llm';
 import { parseFiles } from '../lib/fileParser';
+import ConfirmModal from './ConfirmModal';
+import PromptModal from './PromptModal';
 import {
   Mic,
   MicOff,
@@ -180,6 +182,8 @@ export default function BrainstormTab() {
   const [expandedDoc, setExpandedDoc] = useState(null);
   const [manualNotes, setManualNotes] = useState('');
   const [manualNotesDocId, setManualNotesDocId] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [promptModal, setPromptModal] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -409,7 +413,7 @@ export default function BrainstormTab() {
     });
 
     if (supportedFiles.length === 0) {
-      alert('Nenhum arquivo suportado. Use PDF, DOCX, TXT ou MD.');
+      setConfirmModal({ title: 'Arquivo não suportado', message: 'Nenhum arquivo suportado. Use PDF, DOCX, TXT ou MD.', variant: 'alert', confirmLabel: 'OK', onConfirm: () => setConfirmModal(null), onCancel: () => setConfirmModal(null) });
       return;
     }
 
@@ -692,21 +696,13 @@ export default function BrainstormTab() {
     return date.toLocaleDateString('pt-BR');
   };
 
-  const handleEditItem = (item) => {
+  const commitEditItem = (item, newName, newDesc) => {
     const effectiveCat = item._category || 'plot_points';
-    const nameField = item.name || item.title || item.statement || '';
-    const descField = item.description || item.evidence || item.context || '';
-    const newName = prompt(`Editar ${effectiveCat}:`, nameField);
-    if (newName === null || newName.trim() === '') return;
-    const newDesc = prompt(`Descrição:`, descField);
-    if (newDesc === null) return;
-
     if (effectiveCat === 'characters') {
       const char = { ...item, name: newName.trim(), description: newDesc.trim() };
       saveCharacter(char);
       return;
     }
-
     const key = effectiveCat === 'all' ? 'plot_points' : effectiveCat;
     setExtractedData(prev => {
       if (!prev[key]) return prev;
@@ -718,7 +714,6 @@ export default function BrainstormTab() {
         })
       };
     });
-
     const proj = { ...currentProject };
     const bd = { ...(proj.brainstormData || {}) };
     if (bd[key]) {
@@ -730,8 +725,34 @@ export default function BrainstormTab() {
     }
   };
 
+  const handleEditItem = (item) => {
+    const nameField = item.name || item.title || item.statement || '';
+    const descField = item.description || item.evidence || item.context || '';
+    setPromptModal({
+      title: `Editar ${item._category || 'plot_points'}`,
+      message: 'Nome:',
+      initialValue: nameField,
+      onConfirm: (newName) => {
+        setPromptModal({
+          title: 'Descrição',
+          message: 'Descrição:',
+          initialValue: descField,
+          onConfirm: (newDesc) => {
+            commitEditItem(item, newName, newDesc);
+            setPromptModal(null);
+          },
+          onCancel: () => setPromptModal(null),
+        });
+      },
+      onCancel: () => setPromptModal(null),
+    });
+  };
+
   const handleDeleteItem = (catId, itemId) => {
-    if (!window.confirm('Excluir este item?')) return;
+    setConfirmModal({ title: 'Excluir Item', message: 'Excluir este item?', variant: 'danger', confirmLabel: 'Excluir', onConfirm: () => { performDeleteItem(catId, itemId); setConfirmModal(null); }, onCancel: () => setConfirmModal(null) });
+    return;
+  };
+  const performDeleteItem = (catId, itemId) => {
     const key = catId === 'all' || catId === 'characters' ? 'plot_points' : catId;
 
     if (catId === 'characters' || catId === 'all') {
@@ -1017,7 +1038,7 @@ export default function BrainstormTab() {
                 <button 
                   onClick={startRecording}
                   className="record-button-circle"
-                  style={{ backgroundColor: 'rgba(212, 163, 89, 0.1)', border: '2px solid var(--primary-gold)' }}
+                  style={{ backgroundColor: 'rgba(204, 238, 0, 0.1)', border: '2px solid var(--primary-gold)' }}
                 >
                   <Mic size={32} color="var(--primary-gold)" />
                 </button>
@@ -1299,6 +1320,8 @@ export default function BrainstormTab() {
         />
       )}
 
+      {confirmModal && <ConfirmModal {...confirmModal} />}
+      {promptModal && <PromptModal {...promptModal} />}
       <input
         ref={fileInputRef}
         type="file"
@@ -1666,7 +1689,7 @@ function RecordingModal({
                 <button 
                   onClick={onStartRecording}
                   className="record-button-circle"
-                  style={{ backgroundColor: 'rgba(212, 163, 89, 0.1)', border: '2px solid var(--primary-gold)' }}
+                  style={{ backgroundColor: 'rgba(204, 238, 0, 0.1)', border: '2px solid var(--primary-gold)' }}
                 >
                   <Mic size={32} color="var(--primary-gold)" />
                 </button>

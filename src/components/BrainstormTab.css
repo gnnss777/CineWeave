@@ -25,7 +25,7 @@
   padding: 0.75rem 1.5rem;
   height: 64px;
   flex-shrink: 0;
-  z-index: 10;
+  z-index: var(--z-header);
   gap: 1.5rem;
   background: var(--bg-card);
   backdrop-filter: blur(20px);
@@ -184,11 +184,6 @@
 
 .spinning {
   animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 /* ==========================================================================
@@ -630,7 +625,7 @@
 .doc-card.list.dragging {
   opacity: 0.5;
   transform: scale(1.01);
-  z-index: 100;
+  z-index: var(--z-tooltip);
 }
 
 .doc-card.list .doc-icon-wrapper {
@@ -1091,7 +1086,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
   padding: 1rem;
   animation: fadeIn 0.2s ease;
 }
@@ -1198,21 +1193,6 @@
 
 .record-button-circle.recording {
   animation: recordPulse 1.5s infinite;
-}
-
-@keyframes recordPulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
 }
 
 .recording-timer {
@@ -1679,13 +1659,6 @@
   margin: 0.5rem 0;
 }
 
-/* Recording pulse animation */
-@keyframes recordPulse {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { box-shadow: 0 0 0 16px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
 /* PANEL 2: DOCUMENTOS IMPORT */
 .documents-panel .panel-content {
   flex: 1;
@@ -2063,10 +2036,6 @@
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 /* Manual notes saved indicator animation */
 @keyframes fadeInOut {
   0% { opacity: 0; transform: translateY(4px); }
@@ -2084,7 +2053,7 @@
   position: absolute;
   background: transparent;
   cursor: col-resize;
-  z-index: 10;
+  z-index: var(--z-base);
   opacity: 0;
   transition: opacity 0.2s;
 }

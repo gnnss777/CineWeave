@@ -95,7 +95,7 @@ export default function LoginModal() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10000,
+        zIndex: 'var(--z-modal)',
         padding: '1rem',
       }}
       onClick={(e) => e.target === e.currentTarget && setShowModal(false)}

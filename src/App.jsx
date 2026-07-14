@@ -11,6 +11,7 @@ import CoverageReport from './components/CoverageReport';
 import InstallPrompt from './components/InstallPrompt';
 import LoginModal from './components/LoginModal';
 import OnboardingOverlay from './components/OnboardingOverlay';
+import ConfirmModal from './components/ConfirmModal';
 import { Radio, Compass, FileText, BookOpen, Columns, Film, Plus, Trash2, HelpCircle, Book, BarChart3 } from 'lucide-react';
 
 function HelpButton() {
@@ -47,6 +48,7 @@ function CineWeaveShell() {
   const [showProjectDrawer, setShowProjectDrawer] = useState(false);
   const [newProjTitle, setNewProjTitle] = useState('');
   const [newProjTagline, setNewProjTagline] = useState('');
+  const [confirmModal, setConfirmModal] = useState(null);
 
   // Cross-tab navigation: listen for navigateTo calls
   useEffect(() => {
@@ -81,9 +83,14 @@ function CineWeaveShell() {
 
   const handleDeleteProject = (id, e) => {
     e.stopPropagation();
-    if (window.confirm('Tem certeza que deseja apagar este projeto? Todos os roteiros e fichas serão excluídos.')) {
-      deleteProject(id);
-    }
+    setConfirmModal({
+      title: 'Excluir Projeto',
+      message: 'Tem certeza que deseja apagar este projeto? Todos os roteiros e fichas serão excluídos.',
+      variant: 'danger',
+      confirmLabel: 'Excluir',
+      onConfirm: () => { deleteProject(id); setConfirmModal(null); },
+      onCancel: () => setConfirmModal(null),
+    });
   };
 
   // Render proper tab content
@@ -104,61 +111,33 @@ function CineWeaveShell() {
     <div className="shell-container">
 
       {/* Header bar — Anti-AdBlock / Anti-CSS Override */}
-      <header id="main-top-area" style={{ background: '#111111', height: '60px', minHeight: '60px', borderBottom: '2px solid rgba(204, 238, 0, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 1.5rem', flexShrink: 0, position: 'relative', zIndex: 99999 }}>
+      <header id="main-top-area" className="header-bar" style={{ zIndex: 'var(--z-error)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Film size={20} style={{ color: '#ccee00' }} />
           <span style={{ color: '#ccee00', fontSize: '20px', margin: 0, fontWeight: 'bold', fontFamily: 'sans-serif' }}>CineWeave</span>
         </div>
 
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          <button 
-            onClick={() => setActiveTab('brainstorm')} 
-            style={{ color: activeTab === 'brainstorm' ? '#ccee00' : '#ffffff', background: activeTab === 'brainstorm' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'brainstorm' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
-          >
-            <Radio size={16} />
-            Brainstorm
+          <button onClick={() => setActiveTab('brainstorm')} className={`nav-item ${activeTab === 'brainstorm' ? 'active' : ''}`}>
+            <Radio size={16} /> Brainstorm
           </button>
-          <button 
-            onClick={() => setActiveTab('mindmap')} 
-            style={{ color: activeTab === 'mindmap' ? '#ccee00' : '#ffffff', background: activeTab === 'mindmap' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'mindmap' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
-          >
-            <Compass size={16} />
-            Mapa
+          <button onClick={() => setActiveTab('mindmap')} className={`nav-item ${activeTab === 'mindmap' ? 'active' : ''}`}>
+            <Compass size={16} /> Mapa
           </button>
-          <button 
-            onClick={() => setActiveTab('screenplay')} 
-            style={{ color: activeTab === 'screenplay' ? '#ccee00' : '#ffffff', background: activeTab === 'screenplay' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'screenplay' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
-          >
-            <FileText size={16} />
-            Roteiro
+          <button onClick={() => setActiveTab('screenplay')} className={`nav-item ${activeTab === 'screenplay' ? 'active' : ''}`}>
+            <FileText size={16} /> Roteiro
           </button>
-          <button 
-            onClick={() => setActiveTab('encyclopedia')} 
-            style={{ color: activeTab === 'encyclopedia' ? '#ccee00' : '#ffffff', background: activeTab === 'encyclopedia' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'encyclopedia' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
-          >
-            <BookOpen size={16} />
-            Fichas
+          <button onClick={() => setActiveTab('encyclopedia')} className={`nav-item ${activeTab === 'encyclopedia' ? 'active' : ''}`}>
+            <BookOpen size={16} /> Fichas
           </button>
-          <button 
-            onClick={() => setActiveTab('corkboard')} 
-            style={{ color: activeTab === 'corkboard' ? '#ccee00' : '#ffffff', background: activeTab === 'corkboard' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'corkboard' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
-          >
-            <Columns size={16} />
-            Mural
+          <button onClick={() => setActiveTab('corkboard')} className={`nav-item ${activeTab === 'corkboard' ? 'active' : ''}`}>
+            <Columns size={16} /> Mural
           </button>
-          <button 
-            onClick={() => setActiveTab('scripts')} 
-            style={{ color: activeTab === 'scripts' ? '#ccee00' : '#ffffff', background: activeTab === 'scripts' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'scripts' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
-          >
-            <Book size={16} />
-            Roteiros
+          <button onClick={() => setActiveTab('scripts')} className={`nav-item ${activeTab === 'scripts' ? 'active' : ''}`}>
+            <Book size={16} /> Roteiros
           </button>
-          <button 
-            onClick={() => setActiveTab('coverage')} 
-            style={{ color: activeTab === 'coverage' ? '#ccee00' : '#ffffff', background: activeTab === 'coverage' ? 'rgba(204, 238, 0, 0.08)' : 'transparent', border: activeTab === 'coverage' ? '1px solid #ccee00' : '1px solid #555', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '14px' }}
-          >
-            <BarChart3 size={16} />
-            Coverage
+          <button onClick={() => setActiveTab('coverage')} className={`nav-item ${activeTab === 'coverage' ? 'active' : ''}`}>
+            <BarChart3 size={16} /> Coverage
           </button>
         </div>
 
@@ -255,6 +234,7 @@ function CineWeaveShell() {
       </div>
 
       <InstallPrompt />
+      {confirmModal && <ConfirmModal {...confirmModal} />}
     </div>
   );
 }
@@ -276,7 +256,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ color: '#fff', background: '#990000', padding: '40px', fontSize: '20px', fontFamily: 'sans-serif', minHeight: '100vh', zIndex: 999999, position: 'relative' }}>
+        <div style={{ color: '#fff', background: '#990000', padding: '40px', fontSize: '20px', fontFamily: 'sans-serif', minHeight: '100vh', zIndex: 'var(--z-error)', position: 'relative' }}>
           <h2>Algo deu errado (React Crash):</h2>
           <pre style={{ background: '#000', padding: '20px', overflow: 'auto', color: '#ffaaaa', fontSize: '14px' }}>
             {this.state.error && this.state.error.toString()}

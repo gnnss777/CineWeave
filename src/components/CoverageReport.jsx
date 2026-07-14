@@ -55,7 +55,7 @@ export default function CoverageReport() {
         </div>
         <div>
           <h1 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: 0 }}>Coverage</h1>
-          <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{currentProject?.title} · {screenplay.length} elementos</p>
+          <p style={{ fontSize: 12, color: '#666', margin: 0 }}>{currentProject?.title} · {screenplay.length} elementos</p>
         </div>
       </div>
 
@@ -85,7 +85,7 @@ export default function CoverageReport() {
             ].map(s => (
               <div key={s.label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
                 <div style={{ fontSize: 28, fontWeight: 700, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -105,11 +105,11 @@ export default function CoverageReport() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{c.label}</span>
-                        <span style={{ fontSize: 10, color: '#555' }}>{c.desc}</span>
+                        <span style={{ fontSize: 12, color: '#555' }}>{c.desc}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <ProgressBar value={val} max={10} color={color} />
-                        <span style={{ fontSize: 10, color: '#555', width: 40, textAlign: 'right' }}>peso {c.weight}</span>
+                        <span style={{ fontSize: 12, color: '#555', width: 40, textAlign: 'right' }}>peso {c.weight}</span>
                       </div>
                     </div>
                     <input
@@ -152,12 +152,12 @@ export default function CoverageReport() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {beats.map((beat, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <span style={{ fontSize: 10, color: '#555', fontFamily: 'monospace', width: 40, textAlign: 'right' }}>{beat.pct}%</span>
+                  <span style={{ fontSize: 12, color: '#555', fontFamily: 'monospace', width: 40, textAlign: 'right' }}>{beat.pct}%</span>
                   <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, position: 'relative', overflow: 'hidden' }}>
                     <div style={{ width: `${beat.pct}%`, height: '100%', background: `linear-gradient(90deg, ${i % 2 === 0 ? '#a78bfa' : '#60a5fa'}44, ${i % 2 === 0 ? '#a78bfa' : '#60a5fa'})`, borderRadius: 3 }} />
                   </div>
                   <span style={{ fontSize: 12, color: '#ddd', flex: 1 }}>{beat.name}</span>
-                  <span style={{ fontSize: 10, color: '#555', fontFamily: 'monospace' }}>~{beat.expectedLine}</span>
+                  <span style={{ fontSize: 12, color: '#555', fontFamily: 'monospace' }}>~{beat.expectedLine}</span>
                 </div>
               ))}
             </div>
@@ -169,7 +169,7 @@ export default function CoverageReport() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <Users size={16} style={{ color: '#34d399' }} />
                 <h2 style={{ fontSize: 13, fontWeight: 700, color: '#ccc', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Character Graph</h2>
-                <span style={{ fontSize: 10, color: '#555' }}>{charGraph.edges.length} arestas, {Object.keys(charGraph.centrality).length} personagens</span>
+                <span style={{ fontSize: 12, color: '#555' }}>{charGraph.edges.length} arestas, {Object.keys(charGraph.centrality).length} personagens</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {Object.entries(charGraph.centrality)
@@ -194,7 +194,7 @@ export default function CoverageReport() {
                         }}
                       >
                         <span>{name.replace(/^char-(\d+)/, 'P$1')}</span>
-                        <span style={{ fontSize: 10, color: '#34d399' }}>{weight}</span>
+                        <span style={{ fontSize: 12, color: '#34d399' }}>{weight}</span>
                       </div>
                     );
                   })}

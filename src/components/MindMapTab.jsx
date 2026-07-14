@@ -3,7 +3,10 @@ import { useProject } from '../context/ProjectContext';
 import { ZoomIn, ZoomOut, Maximize, Plus, Link, Trash, Edit, X, Unlink, User, MapPin, FileText, Edit3, Clock, ArrowLeft, Layout, RefreshCw, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import SharedSidebar from './SharedSidebar';
 import FichaModal from './FichaModal';
+import ConfirmModal from './ConfirmModal';
+import PromptModal from './PromptModal';
 import { resolveNodeDisplay, createNodeWithEntity, getColorForNodeType } from '../lib/mindMapUtils';
+import './MindMapTab.css';
 
 export default function MindMapTab() {
   const { 
@@ -94,6 +97,8 @@ export default function MindMapTab() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sharedSidebarTab, setSharedSidebarTab] = useState('characters');
   const [fichaModal, setFichaModal] = useState(null); // { item, type, mode }
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [promptModal, setPromptModal] = useState(null);
   const [activeFichaTab, setActiveFichaTab] = useState('characters');
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -481,12 +486,8 @@ export default function MindMapTab() {
       return;
     }
     if (type === 'node' && item) {
-      const newLabel = prompt('Rótulo do nó:', item.label || '');
-      if (newLabel === null || newLabel.trim() === '') return;
-      const newDetails = prompt('Detalhes:', item.details || '');
-      const updated = nodes.map(n => n.id === item.id ? { ...n, label: newLabel.trim(), details: newDetails || '' } : n);
-      setNodes(updated);
-      setTimeout(() => updateMindMap(updated, links), 50);
+      setPromptModal({ title: 'Editar Nó', message: 'Rótulo do nó:', initialValue: item.label || '', onConfirm: (newLabel) => { setPromptModal({ title: 'Editar Nó', message: 'Detalhes:', initialValue: item.details || '', onConfirm: (newDetails) => { const updated = nodes.map(n => n.id === item.id ? { ...n, label: newLabel.trim(), details: newDetails || '' } : n); setNodes(updated); setTimeout(() => updateMindMap(updated, links), 50); setPromptModal(null); }, onCancel: () => setPromptModal(null) }); }, onCancel: () => setPromptModal(null) });
+      return;
     } else {
       setFichaModal({ item, type, mode: 'edit' });
     }
@@ -494,7 +495,9 @@ export default function MindMapTab() {
 
   const handleSidebarDelete = (item, type) => {
     if (!item?.id) return;
-    if (!window.confirm(`Excluir ${type} "${item.name}"?`)) return;
+    setConfirmModal({ title: 'Excluir', message: `Excluir ${type} "${item.name}"?`, variant: 'danger', confirmLabel: 'Excluir', onConfirm: () => { performSidebarDelete(item, type); setConfirmModal(null); }, onCancel: () => setConfirmModal(null) });
+  };
+  const performSidebarDelete = (item, type) => {
     if (type === 'character') {
       deleteCharacter(item.id);
       const node = getNodeForEntity(item, type);
@@ -573,7 +576,10 @@ export default function MindMapTab() {
   };
 
   const handleDeleteFicha = (id) => {
-    if (!window.confirm('Excluir esta ficha?')) return;
+    setConfirmModal({ title: 'Excluir Ficha', message: 'Excluir esta ficha?', variant: 'danger', confirmLabel: 'Excluir', onConfirm: () => { performDeleteFicha(id); setConfirmModal(null); }, onCancel: () => setConfirmModal(null) });
+    return;
+  };
+  const performDeleteFicha = (id) => {
     const t = fichaModal.type;
     if (t === 'character') deleteCharacter(id);
     else if (t === 'location') deleteLocation(id);
@@ -640,524 +646,16 @@ export default function MindMapTab() {
 
   return (
     <div className="mindmap-container">
-      <style>{`
-        .mindmap-container {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          display: flex;
-          overflow: hidden;
-          background-color: var(--bg-darkest);
-        }
-        .canvas-svg {
-          flex: 1;
-          min-width: 0;
-          height: 100%;
-          cursor: grab;
-        }
-        .canvas-svg:active {
-          cursor: grabbing;
-        }
-        .node-circle {
-          cursor: pointer;
-          transition: r 0.2s ease, filter 0.2s ease;
-        }
-        .node-circle:hover {
-          filter: brightness(1.2) drop-shadow(0 0 8px rgba(255,255,255,0.4));
-        }
-        .node-text {
-          fill: #fff;
-          font-weight: 500;
-          pointer-events: none;
-          font-size: 11px;
-          text-shadow: 0 1px 4px #000;
-        }
-        .canvas-controls {
-          position: absolute;
-          bottom: 5rem;
-          left: 1.5rem;
-          display: flex;
-          gap: 0.4rem;
-          z-index: 10;
-        }
-        .canvas-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          background: rgba(15, 15, 20, 0.92);
-          border: 1px solid rgba(255,255,255,0.15);
-          color: #d1d5db;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-          transition: all 0.15s ease;
-        }
-        .canvas-btn:hover {
-          background: rgba(30, 30, 40, 0.95);
-          border-color: rgba(255,255,255,0.25);
-          color: #fff;
-          transform: scale(1.05);
-        }
-        .canvas-btn:active {
-          transform: scale(0.95);
-        }
-        .canvas-btn.accent {
-          background: rgba(204, 238, 0, 0.12);
-          border-color: rgba(204, 238, 0, 0.3);
-          color: var(--primary-gold);
-        }
-        .canvas-btn.accent:hover {
-          background: rgba(204, 238, 0, 0.2);
-          border-color: rgba(204, 238, 0, 0.5);
-          color: var(--primary-gold);
-        }
-        .canvas-btn-divider {
-          width: 1px;
-          height: 40px;
-          background: rgba(255,255,255,0.1);
-          margin: 0 0.2rem;
-        }
-        .add-node-btn {
-          position: absolute;
-          top: 1.5rem;
-          left: 1.5rem;
-          z-index: 10;
-        }
-        .reference-sidebar {
-          width: 380px;
-          height: 100%;
-          border-left: 1px solid var(--border-color);
-          display: flex;
-          flex-direction: column;
-          background: rgba(10, 10, 14, 0.97);
-          transition: all 0.3s ease;
-          z-index: 20;
-        }
-        .reference-sidebar.closed {
-          width: 0;
-          border-left: none;
-          overflow: hidden;
-        }
-        .sidebar-tabs {
-          display: flex;
-          flex-wrap: wrap;
-          border-bottom: 1px solid var(--border-color);
-          flex-shrink: 0;
-        }
-        .sidebar-tab {
-          flex: 1;
-          min-width: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.25rem;
-          padding: 0.6rem 0.2rem;
-          background: none;
-          border: none;
-          border-bottom: 2px solid transparent;
-          color: var(--text-secondary);
-          font-size: 10px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .sidebar-tab:hover {
-          color: var(--text-primary);
-          background: rgba(255,255,255,0.02);
-        }
-        .sidebar-tab.active {
-          color: var(--primary-gold);
-          border-bottom-color: var(--primary-gold);
-          background: rgba(204, 238, 0, 0.04);
-        }
-        .sidebar-count {
-          font-size: 9px;
-          background: rgba(255,255,255,0.06);
-          color: var(--text-muted);
-          padding: 1px 5px;
-          border-radius: 8px;
-          font-weight: 700;
-        }
-        .sidebar-tab.active .sidebar-count {
-          background: rgba(204, 238, 0, 0.12);
-          color: var(--primary-gold);
-        }
-        .sidebar-list {
-          flex: 1;
-          overflow-y: auto;
-          padding: 0.75rem;
-          display: flex;
-          flex-direction: column;
-          gap: 0.6rem;
-        }
-        .sidebar-card {
-          padding: 0.75rem;
-          border-radius: 10px;
-          background: rgba(255,255,255,0.02);
-          border: 1px solid rgba(255,255,255,0.04);
-          cursor: pointer;
-          transition: all 0.2s ease;
-          display: flex;
-          flex-direction: column;
-          gap: 0.4rem;
-        }
-        .sidebar-card:hover {
-          background: rgba(255,255,255,0.05);
-          border-color: rgba(255,255,255,0.1);
-          transform: translateX(2px);
-        }
-        .sidebar-card.active {
-          border-color: rgba(204, 238, 0, 0.3);
-          background: rgba(204, 238, 0, 0.04);
-          box-shadow: 0 0 12px rgba(204, 238, 0, 0.06);
-        }
-        .sidebar-card-header {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-        }
-        .sidebar-avatar {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          font-size: 12px;
-          flex-shrink: 0;
-        }
-        .avatar-amber { background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.35); }
-        .avatar-purple { background: rgba(139,92,246,0.2); color: #8b5cf6; border: 1px solid rgba(139,92,246,0.35); }
-        .avatar-red { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.35); }
-        .avatar-green { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.35); }
-        .avatar-location { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
-        .avatar-object { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
-        .sidebar-card-info {
-          flex: 1;
-          min-width: 0;
-        }
-        .sidebar-card-name {
-          font-size: 12px;
-          font-weight: 700;
-          color: #fff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .sidebar-card-role {
-          font-size: 9px;
-          text-transform: uppercase;
-          color: var(--primary-gold);
-          font-weight: 600;
-          letter-spacing: 0.05em;
-        }
-        .sidebar-card-type {
-          font-size: 9px;
-          font-family: monospace;
-          color: #10b981;
-          font-weight: 700;
-        }
-        .sidebar-edit-btn {
-          background: none;
-          border: 1px solid transparent;
-          color: var(--text-muted);
-          cursor: pointer;
-          padding: 4px;
-          border-radius: 6px;
-          transition: all 0.2s;
-          flex-shrink: 0;
-          opacity: 0;
-        }
-        .sidebar-card:hover .sidebar-edit-btn {
-          opacity: 1;
-        }
-        .sidebar-edit-btn:hover {
-          color: var(--primary-gold);
-          border-color: rgba(204, 238, 0, 0.2);
-          background: rgba(204, 238, 0, 0.08);
-        }
-        .sidebar-card-desc {
-          font-size: 10px;
-          color: var(--text-muted);
-          line-height: 1.4;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .sidebar-traits {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 3px;
-        }
-        .trait-tag {
-          font-size: 9px;
-          padding: 1px 6px;
-          border-radius: 4px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.06);
-          color: #9ca3af;
-        }
-        .trait-tag.more {
-          background: rgba(204, 238, 0, 0.06);
-          border-color: rgba(204, 238, 0, 0.15);
-          color: var(--primary-gold);
-        }
-        .sidebar-meta {
-          display: flex;
-          gap: 0.5rem;
-          font-size: 9px;
-          color: var(--text-muted);
-          align-items: center;
-        }
-        .empty-state {
-          text-align: center;
-          color: var(--text-muted);
-          font-size: 12px;
-          padding: 2rem 0;
-        }
-        .modal-overlay {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.8);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 30;
-          padding: 1rem;
-        }
-        .ficha-form {
-          width: 100%;
-          max-width: 500px;
-          padding: 1.5rem;
-          border-radius: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-        .grid-line {
-          stroke: rgba(255, 255, 255, 0.03);
-          stroke-width: 1;
-        }
-        .connector-handle {
-          cursor: crosshair;
-          transition: r 0.15s ease;
-        }
-        .connector-handle:hover {
-          r: 8;
-        }
-        .linking-active {
-          cursor: crosshair !important;
-        }
-        .link-path {
-          transition: d 0.2s ease, stroke 0.15s ease, stroke-width 0.15s ease;
-        }
-        .view-grid {
-          display: grid;
-          grid-template-columns: auto 1fr;
-          gap: 0.5rem 1rem;
-          align-items: center;
-        }
-        .view-grid .label {
-          color: var(--text-muted);
-          font-weight: 600;
-          font-size: 13px;
-        }
-        .view-grid .value {
-          color: #e5e7eb;
-          font-weight: 700;
-          font-size: 14px;
-        }
-        .trait-tag {
-          font-size: 9px;
-          padding: 1px 6px;
-          border-radius: 4px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.06);
-          color: #9ca3af;
-        }
-        .mobile-node-actions {
-          position: absolute;
-          bottom: 1.5rem;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 25;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: rgba(10,10,14,0.95);
-          border: 1px solid var(--border-color);
-          border-radius: 30px;
-          padding: 0.4rem 0.8rem;
-          backdrop-filter: blur(12px);
-          box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-        }
-        .mobile-action-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.08);
-          color: var(--text-secondary);
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .mobile-action-btn:hover {
-          background: rgba(255,255,255,0.1);
-          color: #fff;
-        }
-        .mobile-action-btn.primary {
-          background: rgba(204,238,0,0.12);
-          border-color: rgba(204,238,0,0.25);
-          color: var(--primary-gold);
-        }
-        .mobile-action-btn.danger {
-          color: #ef4444;
-        }
-        .mobile-action-btn.danger:hover {
-          background: rgba(239,68,68,0.15);
-          border-color: rgba(239,68,68,0.3);
-        }
-        .mobile-action-btn.active {
-          background: rgba(204,238,0,0.15);
-          border-color: var(--border-color-active);
-          color: var(--primary-gold);
-        }
 
-        /* Placing Node Mode */
-        .canvas-svg.placing-node {
-          cursor: crosshair !important;
-        }
-        .canvas-svg.placing-node #grid-background {
-          cursor: crosshair !important;
-        }
-        .canvas-svg.placing-node .node-group {
-          pointer-events: none;
-        }
-        .canvas-svg.placing-node .node-group .node-circle {
-          opacity: 0.5;
-        }
-        .canvas-svg.placing-node .node-group .connector {
-          display: none;
-        }
-        @media(max-width: 768px) {
-          .reference-sidebar {
-            display: none !important;
-          }
-          .mobile-node-actions {
-            display: flex !important;
-          }
-        }
-
-        /* ── Modal refinements (ScreenplayTab pattern) ── */
-        .back-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-          background: none;
-          border: none;
-          color: var(--primary-gold);
-          font-weight: 700;
-          font-size: 14px;
-          cursor: pointer;
-          padding: 4px 8px;
-          border-radius: 6px;
-          transition: background 0.2s;
-        }
-        .back-btn:hover {
-          background: rgba(204, 238, 0, 0.08);
-        }
-        .modal-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: #fff;
-          text-align: center;
-          flex: 1;
-        }
-        .form-modal-header {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 1rem 1.5rem;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          flex-shrink: 0;
-        }
-        .form-body-scroll {
-          flex: 1;
-          overflow-y: auto;
-          padding: 1.5rem;
-        }
-        .form-grid-cols {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-        .form-footer {
-          display: flex;
-          gap: 0.5rem;
-          justify-content: flex-end;
-          padding: 1rem 1.5rem;
-          border-top: 1px solid rgba(255,255,255,0.06);
-          flex-shrink: 0;
-        }
-        .field-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
-        }
-        .field-group label {
-          font-size: 11px;
-          color: var(--text-secondary);
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-        .field-group input,
-        .field-group select,
-        .field-group textarea {
-          padding: 0.6rem 0.8rem;
-          font-size: 14px;
-          border-radius: 6px;
-          background: var(--bg-input);
-          border: 1px solid rgba(255,255,255,0.1);
-          color: #fff;
-          transition: border-color 0.2s;
-          width: 100%;
-        }
-        .field-group input:focus,
-        .field-group select:focus,
-        .field-group textarea:focus {
-          outline: none;
-          border-color: var(--primary-gold);
-          box-shadow: 0 0 0 2px rgba(204,238,0,0.12);
-        }
-        .field-group textarea {
-          resize: vertical;
-          font-family: var(--font-ui);
-          line-height: 1.5;
-        }
-        .field-row {
-          display: flex;
-          gap: 0.75rem;
-        }
-        .form-modal {
-          width: 100%;
-          max-width: 700px;
-          max-height: 90vh;
-          border-radius: 16px;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-      `}</style>
+      {/* Shared Sidebar — left side */}
+      <SharedSidebar
+        currentProject={currentProject}
+        onEdit={handleSidebarEdit}
+        onDelete={handleSidebarDelete}
+        onSelectItem={handleSidebarSelect}
+        open={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
 
       {/* SVG Drawing Canvas */}
 <svg
@@ -1175,15 +673,15 @@ export default function MindMapTab() {
         {/* Infinite Grid Background */}
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(212, 163, 89, 0.04)" strokeWidth="1" />
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(204, 238, 0, 0.04)" strokeWidth="1" />
           </pattern>
         </defs>
         <defs>
           <marker id="arrow-dim" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 Z" fill="rgba(212, 163, 89, 0.35)" />
+            <path d="M0,0 L8,4 L0,8 Z" fill="rgba(204, 238, 0, 0.35)" />
           </marker>
           <marker id="arrow-hover" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 Z" fill="rgba(212, 163, 89, 0.7)" />
+            <path d="M0,0 L8,4 L0,8 Z" fill="rgba(204, 238, 0, 0.7)" />
           </marker>
           <marker id="arrow-selected" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill="#ef4444" />
@@ -1277,9 +775,9 @@ export default function MindMapTab() {
                     fill="none"
                     stroke={
                       isSelected ? '#ef4444' : 
-                      isHovered ? 'rgba(212, 163, 89, 0.8)' : 
+                      isHovered ? 'rgba(204, 238, 0, 0.8)' : 
                       link.type === 'relationship' ? 'rgba(139, 92, 246, 0.6)' : 
-                      'rgba(212, 163, 89, 0.55)'
+                      'rgba(204, 238, 0, 0.55)'
                     }
                     strokeWidth={isSelected ? 4 / zoom : isHovered ? 4 / zoom : link.type === 'relationship' ? 2.5 / zoom : 3.5 / zoom}
                     strokeDasharray={isSelected ? "none" : link.type === 'relationship' ? "3 3" : "none"}
@@ -1416,7 +914,7 @@ export default function MindMapTab() {
                   >
                     <circle
                       r={connectorRadius}
-                      fill={linkSourceId ? 'rgba(239, 68, 68, 0.9)' : 'rgba(212, 163, 89, 0.9)'}
+                      fill={linkSourceId ? 'rgba(239, 68, 68, 0.9)' : 'rgba(204, 238, 0, 0.9)'}
                       stroke="#fff"
                       strokeWidth="1.5"
                       style={{ transition: 'fill 0.15s, r 0.15s' }}
@@ -1455,7 +953,7 @@ export default function MindMapTab() {
                 <path
                   d={`M ${sourceNode.x} ${sourceNode.y} Q ${cx} ${cy} ${tempLinkPos.x} ${tempLinkPos.y}`}
                   fill="none"
-                  stroke="rgba(212, 163, 89, 0.6)"
+                  stroke="rgba(204, 238, 0, 0.6)"
                   strokeWidth={3 / zoom}
                   strokeDasharray="6 3"
                   style={{ pointerEvents: 'none' }}
@@ -1534,21 +1032,6 @@ export default function MindMapTab() {
       >
         <Plus size={14} /> Novo Nó
       </button>
-
-      {/* Shared Sidebar */}
-      <SharedSidebar
-        currentProject={currentProject}
-        activeTab={sharedSidebarTab}
-        onTabChange={setSharedSidebarTab}
-        onEdit={handleSidebarEdit}
-        onDelete={handleSidebarDelete}
-        onSelectItem={handleSidebarSelect}
-        onSendToScript={handleSidebarSendToScript}
-        onSendToMap={handleSidebarSendToMap}
-        tabContext="mindmap"
-        open={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
 
       {/* ── Mobile: Floating action bar ── */}
       {selectedNode && (() => {
@@ -1653,12 +1136,7 @@ export default function MindMapTab() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (window.confirm(`Tem certeza que deseja restaurar a versão "${v.name}"? O estado atual será salvo como um backup.`)) {
-                            restoreVersion(v.id);
-                            setShowHistoryModal(false);
-                          }
-                        }}
+                        onClick={() => setConfirmModal({ title: 'Restaurar Versão', message: `Tem certeza que deseja restaurar a versão "${v.name}"? O estado atual será salvo como um backup.`, variant: 'danger', confirmLabel: 'Restaurar', onConfirm: () => { restoreVersion(v.id); setShowHistoryModal(false); setConfirmModal(null); }, onCancel: () => setConfirmModal(null) })}
                         className="btn-secondary py-1 px-2.5 text-[10px] font-bold rounded border-yellow-500/20 text-yellow-500 hover:bg-yellow-500/10"
                       >
                         Restaurar
@@ -1676,6 +1154,8 @@ export default function MindMapTab() {
         </div>
       )}
 
+      {confirmModal && <ConfirmModal {...confirmModal} />}
+      {promptModal && <PromptModal {...promptModal} />}
     </div>
   );
 }

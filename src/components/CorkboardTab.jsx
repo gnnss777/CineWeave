@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { useEntities } from '../context/useEntities';
 import FichaModal from './FichaModal';
+import ConfirmModal from './ConfirmModal';
+import './CorkboardTab.css';
 import { ExternalLink, FileText, User, MapPin, Target, Heart, Plus } from 'lucide-react';
 
 export default function CorkboardTab() {
@@ -10,6 +12,7 @@ export default function CorkboardTab() {
   const [collapsedActs, setCollapsedActs] = useState({});
   const [showRibbon, setShowRibbon] = useState(true);
   const [fichaModal, setFichaModal] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
 
   const scenesByAct = acts.map(act => ({
     act,
@@ -50,7 +53,17 @@ export default function CorkboardTab() {
     setFichaModal(null);
   };
   const handleDeleteFicha = (id) => {
-    if (!window.confirm('Excluir esta ficha?')) return;
+    setConfirmModal({
+      title: 'Excluir Ficha',
+      message: 'Excluir esta ficha?',
+      variant: 'danger',
+      confirmLabel: 'Excluir',
+      onConfirm: () => { performDeleteFicha(id); setConfirmModal(null); },
+      onCancel: () => setConfirmModal(null),
+    });
+  };
+  const performDeleteFicha = (id) => {
+    if (!fichaModal?.type) return;
     const t = fichaModal.type;
     if (t === 'character') deleteEntityById('characters', id);
     else if (t === 'location') deleteEntityById('locations', id);
@@ -87,7 +100,7 @@ export default function CorkboardTab() {
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); navigateTo('screenplay', scene.id); }}
-          style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9px' }}
+          style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}
           title="Ir para o Roteiro"
         >
           <ExternalLink size={10} /> Roteiro
@@ -98,91 +111,13 @@ export default function CorkboardTab() {
 
   return (
     <div style={{ padding: '24px', height: '100%', overflowY: 'auto', background: '#030304' }}>
-      <style>{`
-        .corkboard-columns {
-          display: flex;
-          gap: 20px;
-          overflow-x: auto;
-          min-height: 400px;
-          padding-bottom: 20px;
-        }
-        .corkboard-column {
-          min-width: 260px;
-          max-width: 300px;
-          flex-shrink: 0;
-          border-radius: 12px;
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          background: rgba(10,10,14,0.6);
-          border: 1px solid rgba(255,255,255,0.06);
-          transition: all 0.2s;
-        }
-        .corkboard-column.drag-over {
-          border-color: #ccee00;
-          background: rgba(204,238,0,0.04);
-        }
-        .corkboard-card {
-          background: rgba(20,20,26,0.8);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 8px;
-          padding: 12px;
-          cursor: grab;
-          transition: all 0.2s;
-        }
-        .corkboard-card:hover {
-          border-color: rgba(204,238,0,0.3);
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-        .corkboard-card:active {
-          cursor: grabbing;
-        }
-        .card-headline {
-          font-size: 11px;
-          font-weight: 700;
-          color: #fff;
-          font-family: 'Courier Prime', monospace;
-          margin-bottom: 6px;
-        }
-        .card-synopsis {
-          font-size: 10px;
-          color: #8e8e96;
-          line-height: 1.4;
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .card-meta {
-          font-size: 9px;
-          color: #6b7280;
-        }
-        .act-title {
-          font-size: 13px;
-          font-weight: 800;
-          color: #ccee00;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          margin: 0 0 12px 0;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .act-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-      `}</style>
+
 
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', margin: 0 }}>
           Corkboard — Mural de Cenas
         </h2>
-        <p style={{ fontSize: '11px', color: '#7c7c82', marginTop: '4px' }}>
+        <p style={{ fontSize: '12px', color: '#7c7c82', marginTop: '4px' }}>
           Arraste cenas entre atos para reestruturar seu roteiro. Clique no ícone de ficha para ver detalhes.
         </p>
       </div>
@@ -192,7 +127,7 @@ export default function CorkboardTab() {
           <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <FileText size={13} /> Outras Fichas
           </h3>
-          <button onClick={() => setShowRibbon(!showRibbon)} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer', fontSize: '10px' }}>
+          <button onClick={() => setShowRibbon(!showRibbon)} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer', fontSize: '11px' }}>
             {showRibbon ? 'Recolher' : 'Expandir'}
           </button>
         </div>
@@ -207,7 +142,7 @@ export default function CorkboardTab() {
             ].map(section => (
               <div key={section.type} style={{ minWidth: '180px', maxWidth: '220px', background: 'rgba(10,10,14,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: section.color, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: section.color, display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <section.icon size={11} /> {section.label}
                   </span>
                   <button onClick={(e) => { e.stopPropagation(); setFichaModal({ item: section.newDefaults, type: section.type, mode: 'edit' }); }} style={{ background: 'none', border: 'none', color: '#ccee00', cursor: 'pointer', padding: '2px' }} title={`Novo ${section.label}`}>
@@ -215,10 +150,10 @@ export default function CorkboardTab() {
                   </button>
                 </div>
                 {section.items.length === 0 ? (
-                  <p style={{ fontSize: '9px', color: '#6b7280', fontStyle: 'italic', textAlign: 'center', padding: '8px 0' }}>{section.emptyText}</p>
+                  <p style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic', textAlign: 'center', padding: '8px 0' }}>{section.emptyText}</p>
                 ) : (
                   section.items.slice(0, 5).map(item => (
-                    <div key={item.id} onClick={() => setFichaModal({ item, type: section.type, mode: 'view' })} style={{ padding: '6px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#d1d1d6', transition: 'background 0.15s' }}
+                    <div key={item.id} onClick={() => setFichaModal({ item, type: section.type, mode: 'view' })} style={{ padding: '6px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#d1d1d6', transition: 'background 0.15s' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                     >
@@ -228,7 +163,7 @@ export default function CorkboardTab() {
                   ))
                 )}
                 {section.items.length > 5 && (
-                  <p style={{ fontSize: '8px', color: '#6b7280', textAlign: 'center', marginTop: '4px' }}>+{section.items.length - 5} mais</p>
+                  <p style={{ fontSize: '10px', color: '#6b7280', textAlign: 'center', marginTop: '4px' }}>+{section.items.length - 5} mais</p>
                 )}
               </div>
             ))}
@@ -268,7 +203,7 @@ export default function CorkboardTab() {
 
             {!collapsedActs[act.id] && (
               actScenes.length === 0 ? (
-                <p style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
+                <p style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
                   Arraste cenas para este ato
                 </p>
               ) : (
@@ -301,6 +236,7 @@ export default function CorkboardTab() {
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
         />
       )}
+      {confirmModal && <ConfirmModal {...confirmModal} />}
     </div>
   );
 }

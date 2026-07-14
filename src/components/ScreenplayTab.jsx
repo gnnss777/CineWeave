@@ -5,6 +5,8 @@ import { exportFountain, downloadFountain } from '../lib/fountainExport';
 import { parseFountain } from '../lib/fountainImport';
 import { exportScreenplayPDF } from '../lib/pdfExport';
 import FichaModal from './FichaModal';
+import SharedSidebar from './SharedSidebar';
+import ConfirmModal from './ConfirmModal';
 import { 
   User, MapPin, Columns, FileText, Edit3,
   Sparkles, Printer, Plus, Download, Upload,
@@ -12,6 +14,7 @@ import {
   Trash2, BarChart2, Cpu, Grid, Layers,
   Compass, ShieldAlert, Award, Target, Heart
 } from 'lucide-react';
+import './ScreenplayTab.css';
 
 /* ── Beat‑compatible 8‑level Production Revision System ── */
 const REVISION_GENERATIONS = [
@@ -60,16 +63,15 @@ export default function ScreenplayTab() {
   const [elements, setElements] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState('outliner');
   const [zenMode, setZenMode] = useState(false);
   const [paperTheme, setPaperTheme] = useState('dark');
   
   const [fichaModal, setFichaModal] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
-  const [aiTone, setAiTone] = useState('dramatico');
   const [showCompileModal, setShowCompileModal] = useState(false);
-  const [outlinerSearch, setOutlinerSearch] = useState('');
+  const [aiTone, setAiTone] = useState('dramatico');
 
   /* ── Beat‑compatible Revision Mode ── */
   const [revisionMode, setRevisionMode] = useState(false);
@@ -617,7 +619,7 @@ export default function ScreenplayTab() {
 
   const handleAIAutoComplete = async (blockId) => {
     const key = getLLMApiKey();
-    if (!key) { alert('Por favor, configure sua chave de API nas configurações do CineWeave para usar a IA.'); return; }
+    if (!key) { setConfirmModal({ title: 'API não configurada', message: 'Por favor, configure sua chave de API nas configurações do CineWeave para usar a IA.', variant: 'alert', confirmLabel: 'OK', onConfirm: () => setConfirmModal(null), onCancel: () => setConfirmModal(null) }); return; }
     setAiLoading(true); setAiError('');
     try {
       const currentIdx = elements.findIndex(el => el.id === blockId);
@@ -649,7 +651,7 @@ export default function ScreenplayTab() {
 
   const handleAIImproveBlock = async (blockId) => {
     const key = getLLMApiKey();
-    if (!key) { alert('Chave de API NVIDIA não configurada.'); return; }
+    if (!key) { setConfirmModal({ title: 'API não configurada', message: 'Chave de API NVIDIA não configurada.', variant: 'alert', confirmLabel: 'OK', onConfirm: () => setConfirmModal(null), onCancel: () => setConfirmModal(null) }); return; }
     const block = elements.find(el => el.id === blockId);
     if (!block || !block.text.trim()) return;
     setAiLoading(true); setAiError('');
@@ -673,7 +675,7 @@ export default function ScreenplayTab() {
   const [aiFeedback, setAiFeedback] = useState(null);
   const handleAIFeedback = async () => {
     const key = getLLMApiKey();
-    if (!key) { alert('Configure sua chave de API NVIDIA primeiro.'); return; }
+    if (!key) { setConfirmModal({ title: 'API não configurada', message: 'Configure sua chave de API NVIDIA primeiro.', variant: 'alert', confirmLabel: 'OK', onConfirm: () => setConfirmModal(null), onCancel: () => setConfirmModal(null) }); return; }
     setAiLoading(true); setAiError(''); setAiFeedback(null);
     try {
       const text = elements.filter(el => el.type !== 'beat-metadata').map(el => `${el.type.toUpperCase()}: ${el.text}`).join('\n');
@@ -924,7 +926,7 @@ export default function ScreenplayTab() {
         });
         saveScreenplay(compiledElements);
         setActiveTab('editor');
-        alert('Compilação concluída com sucesso! Seu roteiro foi estruturado em blocos.');
+        setConfirmModal({ title: 'Compilação Concluída', message: 'Compilação concluída com sucesso! Seu roteiro foi estruturado em blocos.', variant: 'alert', confirmLabel: 'OK', onConfirm: () => setConfirmModal(null), onCancel: () => setConfirmModal(null) });
       } catch (err) { console.error(err); setAiError('Falha ao compilar roteiro.'); }
       finally { setAiLoading(false); }
     }, 1200);
@@ -932,11 +934,7 @@ export default function ScreenplayTab() {
 
   const handlePrint = () => { window.print(); };
 
-  const outlinerFilteredScenes = useMemo(() => {
-    if (!outlinerSearch) return sceneHeadingsList;
-    const q = outlinerSearch.toLowerCase();
-    return sceneHeadingsList.filter(s => s.cleanText.toLowerCase().includes(q));
-  }, [sceneHeadingsList, outlinerSearch]);
+  // outlinerFilteredScenes removed — using sceneHeadingsList directly via SharedSidebar
 
   const getTypeLabel = (type) => {
     switch (type) {
@@ -1043,272 +1041,31 @@ export default function ScreenplayTab() {
 
   return (
     <div className={`screenplay-layout-container ${zenMode ? 'zen-active' : ''}`} style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#050505', color: '#fff' }}>
-      <style>{`
-        .sidebar-panel {
-          width: 320px;
-          border-right: 1px solid #141419;
-          background-color: #08080a;
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          flex-shrink: 0;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .sidebar-panel.collapsed { width: 0; overflow: hidden; border-right: none; }
-        .sidebar-tabs { display: flex; background: #020203; border-bottom: 1px solid #141419; }
-        .sidebar-tab-btn {
-          flex: 1; padding: 10px 4px; font-size: 10px; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.05em; color: #7c7c82;
-          background: none; border: none; border-bottom: 2px solid transparent;
-          cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all 0.2s;
-        }
-        .sidebar-tab-btn:hover { color: #fff; background: rgba(255,255,255,0.02); }
-        .sidebar-tab-btn.active { color: #ccee00; border-bottom-color: #ccee00; background: rgba(204,238,0,0.05); }
-        .workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; background-color: #030303; position: relative; }
-        .toolbar {
-          height: 54px; border-bottom: 1px solid #141419; background-color: #08080a;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 16px; flex-shrink: 0;
-        }
-        .toolbar-tabs { display: flex; gap: 4px; }
-        .toolbar-tab-btn {
-          padding: 6px 14px; font-size: 11px; font-weight: 600; color: #8c8c94;
-          background: none; border: 1px solid transparent; border-radius: 6px;
-          cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;
-        }
-        .toolbar-tab-btn:hover { color: #fff; background-color: rgba(255,255,255,0.04); }
-        .toolbar-tab-btn.active { color: #000; background-color: #ccee00; font-weight: 700; }
-        .editor-container {
-          flex: 1; position: relative; display: flex; flex-direction: column;
-          overflow-y: auto; background: #050507; align-items: center; padding: 2rem 1rem 4rem 1rem;
-        }
-        .format-badge {
-          font-family: var(--font-ui); font-size: 8px; font-weight: 800; letter-spacing: 0.1em;
-          padding: 2px 5px; border-radius: 4px; opacity: 0; transition: opacity 0.2s ease;
-          position: absolute; left: -95px; top: 8px; width: 90px; text-align: right;
-          background-color: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.08);
-        }
-        .script-element-wrapper { position: relative; width: 100%; }
-        .script-element-wrapper:hover .format-badge, .script-element-wrapper:focus-within .format-badge { opacity: 0.8; }
-        .script-element-actions-trigger {
-          position: absolute; right: -100px; top: 4px; display: flex; align-items: center; gap: 4px;
-          opacity: 0; transition: opacity 0.2s ease;
-        }
-        .script-element-wrapper:hover .script-element-actions-trigger, .script-element-wrapper:focus-within .script-element-actions-trigger { opacity: 1; }
-        .corkboard {
-          flex: 1; background-color: #030304; background-image: radial-gradient(#111 1px, transparent 1px);
-          background-size: 20px 20px; padding: 24px; overflow-y: auto;
-          display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; align-content: start; width: 100%;
-        }
-        .index-card {
-          background-color: #0a0a0d; border: 1px solid #1d1d24; border-radius: 8px;
-          box-shadow: 0 10px 20px rgba(0,0,0,0.4); display: flex; flex-direction: column;
-          height: 200px; position: relative; overflow: hidden; transition: transform 0.2s, border-color 0.2s;
-        }
-        .index-card:hover { transform: translateY(-2px); border-color: #ccee00; }
-        .index-card-header { height: 32px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #141419; font-weight: 700; font-size: 11px; }
-        .index-card-title { font-family: "Courier Prime", monospace; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 8px; }
-        .index-card-body { flex: 1; padding: 12px; font-size: 12px; color: #8e8e96; overflow-y: auto; font-style: italic; }
-        .index-card-synopsis-textarea { width: 100%; height: 100%; background: none; border: none; resize: none; color: #eaeaea; font-size: 11px; line-height: 15px; outline: none; }
-        .index-card-footer { height: 32px; padding: 0 12px; border-top: 1px solid #141419; display: flex; align-items: center; justify-content: space-between; }
-        .color-dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); }
-        .timeline-container { flex: 1; background: #050506; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; width: 100%; }
-        .timeline-track { display: flex; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid #141419; overflow-x: auto; }
-        .timeline-block { height: 60px; border-radius: 6px; padding: 8px; cursor: pointer; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; }
-        .timeline-block:hover { transform: translateY(-2px); filter: brightness(1.2); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 24px; }
-        .stats-card { background-color: #08080a; border: 1px solid #141419; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
-        .stats-number { font-size: 2.2rem; font-weight: 800; color: #ccee00; line-height: 1; }
-        .zen-active .sidebar-panel { display: none !important; }
-        .zen-active .toolbar { display: none !important; }
-        
-        /* Novel Mode Styles */
-        .novel-container { max-width: 650px; margin: 0 auto; padding: 3rem 2rem; color: #e5e7eb; font-family: 'Georgia', serif; line-height: 1.8; }
-        .novel-chapter-heading { font-size: 1.5rem; font-weight: bold; color: #ccee00; margin-top: 2.5rem; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(204,238,0,0.2); padding-bottom: 0.5rem; }
-        .novel-section-heading { font-size: 1.2rem; font-weight: bold; color: #ccee00; margin-top: 2rem; margin-bottom: 1rem; }
-        .novel-paragraph { margin-bottom: 1rem; text-indent: 1.5em; font-size: 1rem; color: #d1d5db; }
-        .novel-dialogue-text { margin-bottom: 0.5rem; margin-left: 1.5rem; color: #e5e7eb; }
-        .novel-speaker { font-weight: bold; color: #ccee00; font-style: normal; display: block; margin-top: 0.8rem; }
-        .novel-parenthetical { margin-bottom: 0.3rem; margin-left: 1.5rem; color: #9ca3af; font-size: 0.9rem; }
-        .novel-transition { text-align: center; font-style: italic; color: #6b7280; margin: 1.5rem 0; letter-spacing: 0.1em; }
-        .novel-synopsis { font-style: italic; color: #9ca3af; margin: 1rem 0; border-left: 2px solid rgba(204,238,0,0.2); padding-left: 1rem; }
-        
-        /* Revision Star Marker */
-        .revision-star {
-          position: absolute;
-          right: -28px;
-          top: 6px;
-          font-size: 14px;
-          line-height: 1;
-          font-weight: bold;
-          user-select: none;
-          pointer-events: none;
-          opacity: 0.7;
-        }
-        .revision-star-bar {
-          position: absolute;
-          right: -2px;
-          top: 0;
-          bottom: 0;
-          width: 3px;
-          border-radius: 2px;
-          opacity: 0.5;
-        }
-      `}</style>
 
-      {/* ── Sidebar ── */}
-      <div className={`sidebar-panel ${sidebarOpen ? '' : 'collapsed'}`}>
-        <div className="sidebar-tabs">
-          <button onClick={() => setSidebarTab('outliner')} className={`sidebar-tab-btn ${sidebarTab === 'outliner' ? 'active' : ''}`} title="Estrutura de Cenas"><Columns size={16} /><span>Outliner</span></button>
-          <button onClick={() => setSidebarTab('characters')} className={`sidebar-tab-btn ${sidebarTab === 'characters' ? 'active' : ''}`} title="Personagens"><User size={16} /><span>Personas</span></button>
-          <button onClick={() => setSidebarTab('locations')} className={`sidebar-tab-btn ${sidebarTab === 'locations' ? 'active' : ''}`} title="Locacoes"><MapPin size={16} /><span>Locacoes</span></button>
-          <button onClick={() => setSidebarTab('objects')} className={`sidebar-tab-btn ${sidebarTab === 'objects' ? 'active' : ''}`} title="Objetos de Cena"><FileText size={16} /><span>Objetos</span></button>
-          <button onClick={() => setSidebarTab('scenes')} className={`sidebar-tab-btn ${sidebarTab === 'scenes' ? 'active' : ''}`} title="Cenas"><BookOpen size={16} /><span>Cenas</span></button>
-          <button onClick={() => setSidebarTab('plot_points')} className={`sidebar-tab-btn ${sidebarTab === 'plot_points' ? 'active' : ''}`} title="Plot Points"><Target size={16} /><span>Plot Points</span></button>
-          <button onClick={() => setSidebarTab('themes')} className={`sidebar-tab-btn ${sidebarTab === 'themes' ? 'active' : ''}`} title="Temas"><Heart size={16} /><span>Temas</span></button>
-          <button onClick={() => setSidebarTab('acts')} className={`sidebar-tab-btn ${sidebarTab === 'acts' ? 'active' : ''}`} title="Atos"><Layers size={16} /><span>Atos</span></button>
-          <button onClick={() => setSidebarTab('boneyard')} className={`sidebar-tab-btn ${sidebarTab === 'boneyard' ? 'active' : ''}`} title="Pilha de Descartes"><Trash2 size={16} /><span>Boneyard</span></button>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {sidebarTab === 'outliner' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <input type="text" placeholder="Filtrar outliner..." value={outlinerSearch} onChange={e => setOutlinerSearch(e.target.value)} style={{ width: '100%', padding: '8px 12px', fontSize: '12px', background: '#020203', border: '1px solid #1d1d24', borderRadius: '6px', color: '#fff', outline: 'none' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {outlinerFilteredScenes.map((scene) => (
-                  <div key={scene.id} onClick={() => focusBlock(scene.id, 'start')} style={{ padding: '10px', borderRadius: '6px', background: '#0a0a0d', borderLeft: `3px solid ${scene.color}`, cursor: 'pointer', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                      <span style={{ fontSize: '9px', color: '#ccee00', fontWeight: 'bold' }}>CENA {scene.sceneNumber}</span>
-                      <span style={{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: '"Courier Prime", monospace' }}>{scene.cleanText}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {sidebarTab === 'characters' && (
-            <>
-              <button onClick={() => openFicha({ name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, 'character', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Personagem</button>
-              {currentProject.characters.map(char => (
-                <div key={char.id} onClick={() => openFicha(char, 'character')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.15)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>{char.name ? char.name[0].toUpperCase() : '?'}</div>
-                    <div>
-                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{char.name}</h4>
-                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{char.role}</p>
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); openFicha(char, 'character', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
-                </div>
-              ))}
-            </>
-          )}
-          {sidebarTab === 'locations' && (
-            <>
-              <button onClick={() => openFicha({ name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, 'location', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Nova Locacao</button>
-              {currentProject.locations.map(loc => (
-                <div key={loc.id} onClick={() => openFicha(loc, 'location')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MapPin size={12} /></div>
-                    <div>
-                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{loc.name}</h4>
-                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{loc.type} • {loc.timeOfDay}</p>
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); openFicha(loc, 'location', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
-                </div>
-              ))}
-            </>
-          )}
-          {sidebarTab === 'objects' && (
-            <>
-              <button onClick={() => openFicha({ name: '', description: '', significance: '' }, 'object', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Objeto</button>
-              {currentProject.objects.map(obj => (
-                <div key={obj.id} onClick={() => openFicha(obj, 'object')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FileText size={12} /></div>
-                    <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{obj.name}</h4>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); openFicha(obj, 'object', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
-                </div>
-              ))}
-            </>
-          )}
-          {sidebarTab === 'boneyard' && (
-            <div style={{ padding: '8px', background: 'rgba(255,0,0,0.03)', border: '1px solid rgba(255,0,0,0.1)', borderRadius: '8px' }}>
-              <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Boneyard Ativo</span>
-              <p style={{ fontSize: '11px', color: '#7c7c82', lineHeight: '15px' }}>Adicione seoes ou linhas como <code># Boneyard</code> para listar fragmentos de descartes aqui.</p>
-            </div>
-          )}
-          {sidebarTab === 'scenes' && (
-            <>
-              <button onClick={() => openFicha({ title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' }, 'scene', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Nova Cena</button>
-              {(currentProject?.entities?.scenes || []).map(scene => (
-                <div key={scene.id} onClick={() => openFicha(scene, 'scene')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BookOpen size={12} /></div>
-                    <div>
-                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{scene.title}</h4>
-                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{scene.synopsis ? scene.synopsis.substring(0, 50) : 'Sem sinopse'}</p>
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); openFicha(scene, 'scene', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
-                </div>
-              ))}
-            </>
-          )}
-          {sidebarTab === 'plot_points' && (
-            <>
-              <button onClick={() => openFicha({ name: 'Novo Plot Point', description: '', impact: '', storyArc: '' }, 'plot_point', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Plot Point</button>
-              {(currentProject?.entities?.plot_points || []).map(pp => (
-                <div key={pp.id} onClick={() => openFicha(pp, 'plot_point')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Target size={12} /></div>
-                    <div>
-                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{pp.name}</h4>
-                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{pp.description ? pp.description.substring(0, 50) : ''}</p>
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); openFicha(pp, 'plot_point', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
-                </div>
-              ))}
-            </>
-          )}
-          {sidebarTab === 'themes' && (
-            <>
-              <button onClick={() => openFicha({ name: 'Novo Tema', statement: '', description: '', tags: [] }, 'theme', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Tema</button>
-              {(currentProject?.entities?.themes || []).map(theme => (
-                <div key={theme.id} onClick={() => openFicha(theme, 'theme')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Heart size={12} /></div>
-                    <div>
-                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{theme.name}</h4>
-                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{theme.statement ? theme.statement.substring(0, 50) : ''}</p>
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); openFicha(theme, 'theme', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
-                </div>
-              ))}
-            </>
-          )}
-          {sidebarTab === 'acts' && (
-            <>
-              <button onClick={() => openFicha({ name: 'Novo Ato', description: '', color: '#ccee00', order: 0 }, 'act', 'edit')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', padding: '8px', fontSize: '11px', fontWeight: 'bold', background: 'rgba(204,238,0,0.08)', color: '#ccee00', border: '1px dashed rgba(204,238,0,0.3)', borderRadius: '6px', cursor: 'pointer' }}><Plus size={12} /> Novo Ato</button>
-              {(currentProject?.entities?.acts || []).map(act => (
-                <div key={act.id} onClick={() => openFicha(act, 'act')} style={{ padding: '12px', borderRadius: '8px', background: '#0a0a0d', border: '1px solid #141419', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(204,238,0,0.1)', color: '#ccee00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Layers size={12} /></div>
-                    <div>
-                      <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>{act.name}</h4>
-                      <p style={{ fontSize: '10px', color: '#7c7c82' }}>{act.description ? act.description.substring(0, 50) : ''}</p>
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); openFicha(act, 'act', 'edit'); }} style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer' }}><Edit3 size={12} /></button>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      </div>
+      <SharedSidebar
+        currentProject={currentProject}
+        onEdit={(item, type, mode) => {
+          if (!item) {
+            switch (type) {
+              case 'character': openFicha({ name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, 'character', 'edit'); break;
+              case 'location': openFicha({ name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, 'location', 'edit'); break;
+              case 'object': openFicha({ name: '', description: '', significance: '' }, 'object', 'edit'); break;
+              case 'scene': openFicha({ title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' }, 'scene', 'edit'); break;
+              case 'plot_point': openFicha({ name: 'Novo Plot Point', description: '', impact: '', storyArc: '' }, 'plot_point', 'edit'); break;
+              case 'theme': openFicha({ name: 'Novo Tema', statement: '', description: '', tags: [] }, 'theme', 'edit'); break;
+              case 'act': openFicha({ name: 'Novo Ato', description: '', color: '#ccee00', order: 0 }, 'act', 'edit'); break;
+              default: openFicha({ name: '' }, type, 'edit');
+            }
+          } else {
+            openFicha(item, type, mode || 'edit');
+          }
+        }}
+        onSelectItem={(item, type) => openFicha(item, type)}
+        open={sidebarOpen && !zenMode}
+        onToggle={() => { if (zenMode) setZenMode(false); setSidebarOpen(prev => !prev); }}
+        outlinerData={sceneHeadingsList}
+        onOutlinerSelect={(item) => focusBlock(item.id, 'start')}
+      />
 
       {/* ── Main workspace ── */}
       <div className="workspace">
@@ -1358,7 +1115,7 @@ export default function ScreenplayTab() {
                     return renderNovelText(el, index);
                   })
                 )}
-                <div style={{ position: 'fixed', bottom: '24px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '6px 16px', display: 'flex', gap: '8px', zIndex: 100, boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                <div style={{ position: 'fixed', bottom: '24px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '6px 16px', display: 'flex', gap: '8px', zIndex: 'var(--z-tooltip)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
                   <button onClick={() => addLineAtEnd('scene-heading')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Capitulo</button>
                   <button onClick={() => addLineAtEnd('action')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Paragrafo</button>
                   <button onClick={() => addLineAtEnd('character')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Fala</button>
@@ -1445,7 +1202,7 @@ export default function ScreenplayTab() {
                     );
                   })
                 )}
-                <div style={{ position: 'fixed', bottom: '24px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '6px 16px', display: 'flex', gap: '8px', zIndex: 100, boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                <div style={{ position: 'fixed', bottom: '24px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '6px 16px', display: 'flex', gap: '8px', zIndex: 'var(--z-tooltip)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
                   <button onClick={() => addLineAtEnd('scene-heading')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Cena</button>
                   <button onClick={() => addLineAtEnd('action')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Acao</button>
                   <button onClick={() => addLineAtEnd('character')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Persona</button>
@@ -1758,7 +1515,7 @@ export default function ScreenplayTab() {
 
       {/* ── Block Menu ── */}
       {activeBlockMenu.show && (
-        <div className="block-menu-dropdown" style={{ position: 'absolute', left: `${activeBlockMenu.x}px`, top: `${activeBlockMenu.y}px`, background: '#0a0a0d', border: '1px solid #1d1d24', borderRadius: '6px', padding: '4px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 8px 16px rgba(0,0,0,0.5)', width: '180px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="block-menu-dropdown" style={{ position: 'absolute', left: `${activeBlockMenu.x}px`, top: `${activeBlockMenu.y}px`, background: '#0a0a0d', border: '1px solid #1d1d24', borderRadius: '6px', padding: '4px', zIndex: 'var(--z-tooltip)', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 8px 16px rgba(0,0,0,0.5)', width: '180px' }} onClick={(e) => e.stopPropagation()}>
           <div onClick={() => moveBlockUp(activeBlockMenu.index)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><span>Mover para Cima</span></div>
           <div onClick={() => moveBlockDown(activeBlockMenu.index)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><span>Mover para Baixo</span></div>
           <div onClick={() => duplicateBlock(activeBlockMenu.index)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><span>Duplicar Bloco</span></div>
@@ -1773,7 +1530,7 @@ export default function ScreenplayTab() {
 
       {/* ── Compile Modal ── */}
       {showCompileModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)' }}>
           <div style={{ width: '480px', padding: '24px', background: '#0a0a0d', border: '1px solid #1d1d24', borderRadius: '12px', textAlign: 'center' }}>
             <Sparkles size={48} style={{ color: '#ccee00', margin: '0 auto 16px auto' }} />
             <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', marginBottom: '8px' }}>Compilar Assistente de Roteiro</h3>
@@ -1806,6 +1563,7 @@ export default function ScreenplayTab() {
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
         />
       )}
+      {confirmModal && <ConfirmModal {...confirmModal} />}
 
     </div>
   );
