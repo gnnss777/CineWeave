@@ -12,7 +12,8 @@ import InstallPrompt from './components/InstallPrompt';
 import LoginModal from './components/LoginModal';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import ConfirmModal from './components/ConfirmModal';
-import { Radio, Compass, FileText, BookOpen, Columns, Film, Plus, Trash2, HelpCircle, Book, BarChart3, Cloud } from 'lucide-react';
+import { Radio, Compass, FileText, BookOpen, Columns, Film, Plus, Trash2, HelpCircle, Book, BarChart3, Cloud, Loader2 } from 'lucide-react';
+import { isLoggedIn } from './lib/sync';
 
 function HelpButton() {
   const { startTour, hasCompleted } = useOnboarding();
@@ -50,6 +51,27 @@ function CineWeaveShell() {
   const [newProjTitle, setNewProjTitle] = useState('');
   const [newProjTagline, setNewProjTagline] = useState('');
   const [confirmModal, setConfirmModal] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+
+  const handleSyncAll = async () => {
+    const loggedIn = await isLoggedIn();
+    if (!loggedIn) {
+      setSyncMsg('Faça login no botão "Nuvem" do header primeiro');
+      setTimeout(() => setSyncMsg(''), 4000);
+      return;
+    }
+    setSyncing(true);
+    setSyncMsg('Enviando para a nuvem...');
+    try {
+      await syncAllToCloud();
+      setSyncMsg('Todos os projetos enviados para a nuvem!');
+    } catch {
+      setSyncMsg('Erro ao sincronizar. Veja o console.');
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncMsg(''), 4000);
+  };
 
   // Cross-tab navigation: listen for navigateTo calls
   useEffect(() => {
@@ -197,8 +219,8 @@ function CineWeaveShell() {
               ))}
             </div>
 
-            <button onClick={syncAllToCloud} style={{ width: '100%', padding: '8px', background: 'rgba(204,238,0,0.08)', border: '1px solid rgba(204,238,0,0.2)', borderRadius: '6px', color: '#ccee00', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} title="Enviar todos os projetos para a nuvem">
-              <Cloud size={12} /> Sincronizar Tudo na Nuvem
+            <button onClick={handleSyncAll} disabled={syncing} style={{ width: '100%', padding: '8px', background: syncMsg.includes('enviados') ? 'rgba(74,222,128,0.12)' : 'rgba(204,238,0,0.08)', border: '1px solid ' + (syncMsg.includes('enviados') ? 'rgba(74,222,128,0.3)' : syncMsg.includes('Faça') ? 'rgba(248,113,113,0.3)' : 'rgba(204,238,0,0.2)'), borderRadius: '6px', color: syncMsg.includes('enviados') ? '#4ade80' : syncMsg.includes('Faça') ? '#f87171' : '#ccee00', fontSize: '11px', fontWeight: 'bold', cursor: syncing ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} title="Enviar todos os projetos para a nuvem">
+              {syncing ? <Loader2 size={12} className="animate-spin" /> : <Cloud size={12} />} {syncMsg || 'Sincronizar Tudo na Nuvem'}
             </button>
 
             {/* Create new project form */}
