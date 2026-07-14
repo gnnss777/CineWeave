@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CineWeave | Screenplay Editor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&amp;family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline": "#909379",
+                    "secondary-fixed": "#6ffbbe",
+                    "on-primary-fixed-variant": "#404c00",
+                    "tertiary": "#f9fdff",
+                    "tertiary-fixed-dim": "#8dd1e5",
+                    "secondary": "#4edea3",
+                    "bg-input": "#151515",
+                    "on-secondary-fixed": "#002113",
+                    "surface-dim": "#121408",
+                    "on-surface-variant": "#c6c9ac",
+                    "accent-blue": "#3b82f6",
+                    "secondary-container": "#00a572",
+                    "secondary-fixed-dim": "#4edea3",
+                    "on-error": "#690005",
+                    "surface-tint": "#b5d400",
+                    "surface-container-highest": "#343628",
+                    "on-secondary-fixed-variant": "#005236",
+                    "on-background": "#e3e4cf",
+                    "error": "#ffb4ab",
+                    "on-tertiary-container": "#1f6b7d",
+                    "error-container": "#93000a",
+                    "text-muted": "#737373",
+                    "surface-container-lowest": "#0d0f05",
+                    "accent-amber": "#f59e0b",
+                    "primary-container": "#ccee00",
+                    "on-primary-fixed": "#181e00",
+                    "bg-darkest": "#050505",
+                    "inverse-on-surface": "#2f3224",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-high": "#292b1e",
+                    "inverse-surface": "#e3e4cf",
+                    "bg-card": "rgba(20, 20, 20, 0.75)",
+                    "surface-variant": "#343628",
+                    "tertiary-container": "#a6eaff",
+                    "on-surface": "#e3e4cf",
+                    "on-secondary-container": "#00311f",
+                    "on-primary": "#2b3400",
+                    "primary-fixed-dim": "#b5d400",
+                    "on-primary-container": "#596900",
+                    "text-secondary": "#a3a3a3",
+                    "inverse-primary": "#566500",
+                    "background": "#121408",
+                    "on-tertiary-fixed": "#001f27",
+                    "primary-fixed": "#cff10a",
+                    "primary": "#fbffdc",
+                    "on-secondary": "#003824",
+                    "accent-pink": "#ec4899",
+                    "bg-obsidian": "#0a0a0a",
+                    "on-tertiary-fixed-variant": "#004e5d",
+                    "surface-container-low": "#1b1d10",
+                    "on-tertiary": "#003641",
+                    "accent-red": "#ef4444",
+                    "tertiary-fixed": "#afecff",
+                    "surface": "#121408",
+                    "surface-container": "#1f2114",
+                    "surface-bright": "#383a2c",
+                    "outline-variant": "#454933"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-max": "1440px",
+                    "section-margin": "2rem",
+                    "grid-gap": "1rem",
+                    "header-height": "60px",
+                    "card-padding": "1.25rem"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Outfit"],
+                    "label-caps": ["Outfit"],
+                    "body-sm": ["Outfit"],
+                    "body-md": ["Outfit"],
+                    "script-text": ["Courier Prime"],
+                    "headline-md": ["Outfit"],
+                    "headline-xl": ["Outfit"],
+                    "body-lg": ["Outfit"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "script-text": ["16px", {"lineHeight": "1.2", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #050505;
+            color: #e3e4cf;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Glassmorphism Sidebar */
+        .sidebar-glass {
+            background: rgba(20, 20, 20, 0.75);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(204, 238, 0, 0.15);
+        }
+
+        /* Hollywood Standard Script Page */
+        .script-page {
+            width: 8.5in;
+            min-height: 11in;
+            padding: 1in 1in 1in 1.5in;
+            background: #ffffff;
+            color: #000000;
+            font-family: 'Courier Prime', monospace;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+            margin: 2rem auto;
+            position: relative;
+        }
+
+        .script-element {
+            position: relative;
+            margin-bottom: 1rem;
+            transition: background-color 0.2s ease;
+            padding: 2px 8px;
+        }
+
+        .script-element:hover {
+            background-color: rgba(204, 238, 0, 0.05);
+        }
+
+        .script-element .grip {
+            position: absolute;
+            left: -30px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            cursor: grab;
+            color: #737373;
+        }
+
+        .script-element:hover .grip {
+            opacity: 1;
+        }
+
+        .element-badge {
+            position: absolute;
+            left: -85px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Script Element Specifics */
+        .scene-heading { font-weight: 700; border-left: 4px solid #a855f7; }
+        .action { border-left: 4px solid transparent; }
+        .character { width: 50%; margin-left: 25%; text-align: center; border-left: 4px solid #f59e0b; }
+        .parenthetical { width: 40%; margin-left: 30%; font-style: italic; border-left: 4px solid #22c55e; }
+        .dialogue { width: 60%; margin-left: 20%; border-left: 4px solid #3b82f6; }
+        .transition { text-align: right; border-left: 4px solid #ef4444; }
+
+        .active-tab-glow {
+            box-shadow: 0 4px 10px -2px rgba(204, 238, 0, 0.5);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #343628; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ccee00; }
+    </style>
+</head>
+<body class="overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full h-[60px] bg-background dark:bg-bg-darkest z-50 border-b border-outline-variant">
+<div class="flex justify-between items-center px-section-margin max-w-container-max mx-auto h-full">
+<div class="flex items-center gap-8">
+<span class="font-headline-xl text-headline-xl font-black text-primary-container tracking-tighter">CineWeave</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200 font-body-md text-body-md" href="#">Dashboard</a>
+<a class="text-primary-container border-b-2 border-primary-container pb-1 active-tab-glow font-body-md text-body-md" href="#">Roteiro</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200 font-body-md text-body-md" href="#">Library</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200 font-body-md text-body-md" href="#">Collaborators</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative flex items-center bg-surface-container-highest rounded-full px-4 py-1.5 border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px] mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm text-on-surface w-40" placeholder="Pesquisar..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">settings</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border border-outline">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a creative director in a high-contrast dark studio setting. Minimalist, modern lighting with a subtle lime-yellow glow on one side. The background is deep obsidian, maintaining the CineWeave brand aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqLyV5X_5hDojYr8ZbivPft_VJ75n1LUzcGyndQWY18N6-RdkR6dHkES3-9bOpjd-0fV6rGLbJowaw6vdo6u59qmq1hI6cGNcyMbiTbnruL5ov66ZbHbpzNyAmSjSMn3fbf48NKV1bNfk1tCN8Z8InGlrh6HGVzBjLavv0Jc9FMWukA3jHqDjlb0_JfEtGIClXVb-NybrfNRZqrd55Eb5ugH43p-dkhW9OzcWRn9QuCkImoWYvCSOlpx4ajNkPcWcndaCNBRCjRxSt"/>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar (Right) -->
+<aside class="fixed right-0 top-[60px] h-[calc(100vh-60px)] w-64 sidebar-glass z-40 flex flex-col p-card-padding">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">movie_edit</span>
+</div>
+<div>
+<h3 class="font-headline-md text-[16px] text-primary leading-tight">Scene Navigator</h3>
+<p class="text-[10px] text-on-surface-variant font-label-caps opacity-70">Ato I: O Incidente</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<div class="bg-primary-container text-on-primary-container rounded-lg p-3 flex items-center gap-3 cursor-pointer">
+<span class="material-symbols-outlined">format_list_bulleted</span>
+<span class="font-label-caps text-label-caps">Cenas</span>
+</div>
+<div class="text-on-surface-variant hover:bg-surface-container-highest rounded-lg p-3 flex items-center gap-3 transition-all cursor-pointer">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-caps text-label-caps">Personagens</span>
+</div>
+<div class="text-on-surface-variant hover:bg-surface-container-highest rounded-lg p-3 flex items-center gap-3 transition-all cursor-pointer">
+<span class="material-symbols-outlined">location_on</span>
+<span class="font-label-caps text-label-caps">Locações</span>
+</div>
+<div class="text-on-surface-variant hover:bg-surface-container-highest rounded-lg p-3 flex items-center gap-3 transition-all cursor-pointer">
+<span class="material-symbols-outlined">category</span>
+<span class="font-label-caps text-label-caps">Objetos</span>
+</div>
+<div class="text-on-surface-variant hover:bg-surface-container-highest rounded-lg p-3 flex items-center gap-3 transition-all cursor-pointer">
+<span class="material-symbols-outlined">keyboard</span>
+<span class="font-label-caps text-label-caps">Atalhos</span>
+</div>
+</nav>
+<button class="mt-4 bg-primary-container text-on-primary-container py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:shadow-[0_4px_14px_rgba(204,238,0,0.25)] transition-all">
+<span class="material-symbols-outlined">add</span>
+            New Scene
+        </button>
+<div class="mt-8 border-t border-outline-variant pt-4 flex flex-col gap-2">
+<div class="text-on-surface-variant hover:text-primary p-2 flex items-center gap-2 transition-colors cursor-pointer">
+<span class="material-symbols-outlined">download</span>
+<span class="font-label-caps text-label-caps">Export</span>
+</div>
+<div class="text-on-surface-variant hover:text-primary p-2 flex items-center gap-2 transition-colors cursor-pointer">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-caps text-label-caps">History</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="pt-[60px] pr-64 min-h-screen relative">
+<!-- Sticky Toolbar -->
+<div class="sticky top-[60px] w-full bg-bg-darkest/80 backdrop-blur-md z-30 border-b border-outline-variant px-8 py-3 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<button class="bg-surface-container-high hover:bg-primary-container hover:text-on-primary-container text-on-surface-variant px-4 py-1.5 rounded-lg text-body-sm font-bold flex items-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[18px]">upload</span> Import
+                </button>
+<button class="bg-surface-container-high hover:bg-primary-container hover:text-on-primary-container text-on-surface-variant px-4 py-1.5 rounded-lg text-body-sm font-bold flex items-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[18px]">download</span> Export
+                </button>
+<button class="bg-surface-container-high hover:bg-primary-container hover:text-on-primary-container text-on-surface-variant px-4 py-1.5 rounded-lg text-body-sm font-bold flex items-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[18px]">print</span>
+</button>
+<div class="h-6 w-px bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3 text-on-surface-variant font-label-caps text-[11px]">
+<span class="bg-surface-container text-primary border border-outline-variant px-2 py-0.5 rounded">Pág. 12</span>
+<span class="bg-surface-container text-primary border border-outline-variant px-2 py-0.5 rounded">4.2k palavras</span>
+<span class="bg-surface-container text-primary border border-outline-variant px-2 py-0.5 rounded">78 min</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex bg-surface-container-highest rounded-full p-1 border border-outline-variant">
+<button class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">light_mode</span></button>
+<button class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg"><span class="material-symbols-outlined text-[18px]">dark_mode</span></button>
+</div>
+<button class="bg-surface-container-high hover:bg-primary-container hover:text-on-primary-container text-on-surface-variant px-4 py-1.5 rounded-full text-body-sm font-bold flex items-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[18px]">self_improvement</span> Zen Mode
+                </button>
+</div>
+</div>
+<!-- Workspace Wrapper -->
+<div class="flex flex-col items-center py-12 px-8 overflow-y-auto max-h-[calc(100vh-120px)]">
+<!-- Animated Shader Background (Subtle Atmospheric) -->
+
+<!-- The Script Page -->
+<div class="script-page" id="main-editor">
+<!-- Scene Heading -->
+<div class="script-element scene-heading">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-purple-500 text-white">SCENE</span>
+                    INT. HARBOR DOCKS - NIGHT
+                </div>
+<!-- Action -->
+<div class="script-element action">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+                    Rain hammers the corrugated iron roofs. A thick fog, tasting of salt and diesel, rolls off the black water.
+                </div>
+<div class="script-element action">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+                    A single streetlight flickers, casting long, jittery shadows against the rusted shipping containers.
+                </div>
+<div class="script-element action">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+                    ELIAS THORNE (40s, coat collar turned up against the chill) steps out of the gloom. He lights a cigarette. The match-flare reveals eyes that haven't slept since the Chrysler Building was a blueprint.
+                </div>
+<!-- Character -->
+<div class="script-element character">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-amber-500 text-black">CHAR</span>
+                    ELIAS
+                </div>
+<!-- Parenthetical -->
+<div class="script-element parenthetical">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-green-500 text-white">PAR</span>
+                    to himself
+                </div>
+<!-- Dialogue -->
+<div class="script-element dialogue">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-blue-500 text-white">DIAL</span>
+                    Dead men don't leave footprints. But they sure leave a hell of a mess.
+                </div>
+<!-- Action -->
+<div class="script-element action">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+                    He kicks a discarded tin can. It clatters across the wet cobblestones. From the darkness of Warehouse 14, a BOLT SLIDES back.
+                </div>
+<!-- Character -->
+<div class="script-element character">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-amber-500 text-black">CHAR</span>
+                    VOICE (O.S.)
+                </div>
+<!-- Dialogue -->
+<div class="script-element dialogue">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-blue-500 text-white">DIAL</span>
+                    You're late, Detective. The tide's already coming in.
+                </div>
+<!-- Transition -->
+<div class="script-element transition">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-red-500 text-white">TRANS</span>
+                    CUT TO:
+                </div>
+<!-- Scene Heading -->
+<div class="script-element scene-heading">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+<span class="element-badge bg-purple-500 text-white">SCENE</span>
+                    INT. WAREHOUSE 14 - CONTINUOUS
+                </div>
+<div class="script-element action">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+                    Elias pushes the heavy door open. The screech of metal on metal is the only welcome he gets.
+                </div>
+<div class="script-element action">
+<span class="grip material-symbols-outlined">drag_indicator</span>
+                    Inside, it smells like wet cardboard and gunpowder.
+                </div>
+</div>
+</div>
+</main>
+<!-- Floating UI for element selection (Contextual) -->
+<div class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-surface-container-highest/90 backdrop-blur-xl border border-primary-container/30 rounded-full px-6 py-3 flex items-center gap-6 shadow-2xl z-50 transition-transform duration-300" id="element-menu">
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[18px]">title</span>
+</div>
+<span class="text-[9px] font-label-caps uppercase text-on-surface-variant">Scene</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[18px]">subject</span>
+</div>
+<span class="text-[9px] font-label-caps uppercase text-on-surface-variant">Action</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[18px]">person</span>
+</div>
+<span class="text-[9px] font-label-caps uppercase text-on-surface-variant">Char</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+</div>
+<span class="text-[9px] font-label-caps uppercase text-on-surface-variant">Dial</span>
+</button>
+<button class="flex flex-col items-center gap-1 group">
+<div class="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[18px]">keyboard_double_arrow_right</span>
+</div>
+<span class="text-[9px] font-label-caps uppercase text-on-surface-variant">Trans</span>
+</button>
+</div>
+<script>
+        // Micro-interaction: Element selection highlight
+        const elements = document.querySelectorAll('.script-element');
+        elements.forEach(el => {
+            el.addEventListener('click', () => {
+                elements.forEach(e => e.classList.remove('bg-primary-container/5', 'ring-1', 'ring-primary-container/20'));
+                el.classList.add('bg-primary-container/5', 'ring-1', 'ring-primary-container/20');
+            });
+        });
+
+        // Hide/Show bottom menu on scroll
+        let lastScrollTop = 0;
+        const menu = document.getElementById('element-menu');
+        window.addEventListener('scroll', () => {
+            let st = window.pageYOffset || document.documentElement.scrollTop;
+            if (st > lastScrollTop) {
+                menu.style.transform = 'translate(-50%, 150%)';
+            } else {
+                menu.style.transform = 'translate(-50%, 0)';
+            }
+            lastScrollTop = st <= 0 ? 0 : st;
+        }, false);
+
+        // Zen Mode Toggle
+        const zenBtn = document.querySelector('button:has(.material-symbols-outlined:contains("self_improvement"))');
+        let zenMode = false;
+        zenBtn?.addEventListener('click', () => {
+            zenMode = !zenMode;
+            if (zenMode) {
+                document.querySelector('aside').style.transform = 'translateX(100%)';
+                document.querySelector('header').style.transform = 'translateY(-100%)';
+                document.querySelector('.sticky').style.opacity = '0.2';
+                zenBtn.classList.add('bg-primary-container', 'text-on-primary-container');
+            } else {
+                document.querySelector('aside').style.transform = 'translateX(0)';
+                document.querySelector('header').style.transform = 'translateY(0)';
+                document.querySelector('.sticky').style.opacity = '1';
+                zenBtn.classList.remove('bg-primary-container', 'text-on-primary-container');
+            }
+        });
+    </script>
+</body></html>

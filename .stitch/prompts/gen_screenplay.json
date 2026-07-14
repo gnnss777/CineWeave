@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 14,
+  "method": "tools/call",
+  "params": {
+    "name": "generate_screen_from_text",
+    "arguments": {
+      "projectId": "13500783605999863780",
+      "prompt": "Create a Hollywood screenplay editor for CineWeave. BACKGROUND: #050505. HEADER: TopNavBar with Roteiro (Active) tab having gold glow. Main area shows a white paper sheet (like physical script page) centered on dark background. The paper has proper Hollywood margins. Script elements formatted with specific styles: SCENE HEADING (bold, uppercase, purple border), ACTION (plain left-aligned), CHARACTER (centered uppercase, amber border), PARENTHETICAL (centered italic, green border), DIALOGUE (left-aligned 60% width, blue border), TRANSITION (right-aligned uppercase, red border). Each element has a small format badge on left and a block grip handle for context menu. TOOLBAR (sticky top): buttons for Export, Import, Print, page count, word count, estimated minutes. Paper theme toggle (light/dark). Zen mode toggle. Glassmorphism sidebar (right): tabs for Cenas (outline), Personagens, Locacoes, Objetos, Atalhos. Dark mode version also available. Use Cinematic Neon design system with #ccee00 accent.",
+      "deviceType": "DESKTOP"
+    }
+  }
+}

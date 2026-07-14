@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CineWeave | Mapa Interativo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&amp;family=Courier+Prime&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#8dd1e5",
+                        "primary-fixed": "#cff10a",
+                        "secondary-container": "#00a572",
+                        "on-primary": "#2b3400",
+                        "surface-dim": "#121408",
+                        "primary-container": "#ccee00",
+                        "inverse-surface": "#e3e4cf",
+                        "on-secondary": "#003824",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface-container-low": "#1b1d10",
+                        "text-secondary": "#a3a3a3",
+                        "error": "#ffb4ab",
+                        "tertiary-container": "#a6eaff",
+                        "on-secondary-container": "#00311f",
+                        "accent-blue": "#3b82f6",
+                        "on-tertiary-fixed": "#001f27",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-highest": "#343628",
+                        "primary-fixed-dim": "#b5d400",
+                        "on-tertiary-fixed-variant": "#004e5d",
+                        "secondary": "#4edea3",
+                        "outline-variant": "#454933",
+                        "outline": "#909379",
+                        "inverse-primary": "#566500",
+                        "tertiary-fixed": "#afecff",
+                        "on-secondary-fixed": "#002113",
+                        "text-muted": "#737373",
+                        "on-primary-fixed": "#181e00",
+                        "bg-card": "rgba(20, 20, 20, 0.75)",
+                        "surface-container-lowest": "#0d0f05",
+                        "surface-container-high": "#292b1e",
+                        "on-tertiary-container": "#1f6b7d",
+                        "on-primary-fixed-variant": "#404c00",
+                        "on-background": "#e3e4cf",
+                        "accent-pink": "#ec4899",
+                        "error-container": "#93000a",
+                        "bg-input": "#151515",
+                        "surface-bright": "#383a2c",
+                        "surface-container": "#1f2114",
+                        "surface-tint": "#b5d400",
+                        "on-surface-variant": "#c6c9ac",
+                        "surface": "#121408",
+                        "secondary-fixed-dim": "#4edea3",
+                        "accent-red": "#ef4444",
+                        "primary": "#fbffdc",
+                        "tertiary": "#f9fdff",
+                        "secondary-fixed": "#6ffbbe",
+                        "on-tertiary": "#003641",
+                        "on-error": "#690005",
+                        "accent-amber": "#f59e0b",
+                        "accent-purple": "#8b5cf6",
+                        "accent-green": "#10b981",
+                        "on-primary-container": "#596900",
+                        "background": "#121408",
+                        "on-surface": "#e3e4cf",
+                        "inverse-on-surface": "#2f3224",
+                        "surface-variant": "#343628",
+                        "bg-obsidian": "#0a0a0a",
+                        "bg-darkest": "#050505"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "section-margin": "2rem",
+                        "container-max": "1440px",
+                        "card-padding": "1.25rem",
+                        "header-height": "60px",
+                        "grid-gap": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Outfit"],
+                        "headline-xl": ["Outfit"],
+                        "body-lg": ["Outfit"],
+                        "headline-md": ["Outfit"],
+                        "script-text": ["Courier Prime"],
+                        "body-sm": ["Outfit"],
+                        "body-md": ["Outfit"],
+                        "label-caps": ["Outfit"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "script-text": ["16px", { "lineHeight": "1.2", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #050505;
+            background-image: radial-gradient(rgba(204, 238, 0, 0.05) 1px, transparent 1px);
+            background-size: 32px 32px;
+            overflow: hidden;
+            color: #e3e4cf;
+        }
+
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.75);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(204, 238, 0, 0.15);
+        }
+
+        .node-glow-blue { filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5)); }
+        .node-glow-purple { filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5)); }
+        .node-glow-amber { filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.5)); }
+        .node-glow-green { filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.5)); }
+        .node-glow-red { filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.5)); }
+
+        .canvas-container {
+            width: 100vw;
+            height: 100vh;
+            cursor: grab;
+            position: relative;
+        }
+        .canvas-container:active { cursor: grabbing; }
+
+        .node-container {
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .node-container:hover {
+            transform: scale(1.1);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(204, 238, 0, 0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(204, 238, 0, 0.4); }
+    </style>
+</head>
+<body class="font-body-md text-body-md">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full h-[60px] bg-background/75 backdrop-blur-xl border-b border-outline-variant/30 shadow-[0_4px_20px_rgba(204,238,0,0.05)] z-[100]">
+<div class="flex justify-between items-center h-full px-6 max-w-container-max mx-auto">
+<div class="font-headline-md text-headline-md font-bold text-primary-fixed tracking-tight">CineWeave</div>
+<nav class="hidden md:flex items-center gap-8 font-body-md text-body-md">
+<a class="text-on-surface-variant hover:text-on-surface transition-colors active:scale-95 duration-200" href="#">Brainstorm</a>
+<a class="text-primary-fixed border-b-2 border-primary-fixed pb-1 active:scale-95 duration-200" href="#">Mapa</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors active:scale-95 duration-200" href="#">Roteiro</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors active:scale-95 duration-200" href="#">Fichas</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-primary-container/10 p-2 rounded-full transition-all active:scale-95">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-primary-container/10 p-2 rounded-full transition-all active:scale-95">settings</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-primary-fixed/30">
+<img class="w-full h-full object-cover" data-alt="A professional cinematic headshot of a modern screenwriter in a dimly lit studio, wearing high-end headphones. The lighting is low-key with neon lime accents reflecting off their glasses, emphasizing a professional yet creative atmosphere. High contrast dark mode aesthetic with deep obsidian background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyYEXfmudezPXDX38qiIl4Rcluki4tARnKzEz2Du0RGG1sBREZLoIl3CKY6saEt8OfbMkYPZRX-SjtnVmii9LEc8uTL2uOPOKGTzd8HZeW93ZFzyJPumjiJ5ImH9pg7SE2c-MRFOfJk37TVwcAk4xjaxMJGQTUgM_nODKv_ceqZAIneypYIw52AnfqRfcxp_X5pghPSZ1-6mF7FCAxp3T4A6d7dPf9_tkkQNCFObdHC1vGkpNQ3UJc5njyM_hKWo-qWaTacVgMGYl1"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Side Navigation Bar (Right Sidebar) -->
+<aside class="fixed right-0 top-[60px] h-[calc(100vh-60px)] w-80 bg-bg-card backdrop-blur-xl border-l border-outline-variant/20 shadow-2xl z-[90] flex flex-col py-6 px-4 gap-4">
+<div class="flex flex-col gap-1 mb-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary-container/20 flex items-center justify-center border border-primary-container/30">
+<span class="material-symbols-outlined text-primary-fixed">auto_awesome_motion</span>
+</div>
+<div>
+<h2 class="font-headline-md text-body-md font-bold text-primary-fixed">Project Assets</h2>
+<p class="text-text-muted text-body-sm">Mapa Phase</p>
+</div>
+</div>
+</div>
+<button class="w-full py-3 px-4 bg-primary-container text-on-primary-container rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-[0_4px_14px_rgba(204,238,0,0.25)] transition-all active:scale-95 mb-4">
+<span class="material-symbols-outlined">add</span> Add New Asset
+        </button>
+<div class="flex gap-2 p-1 bg-surface-container rounded-lg mb-4">
+<button class="flex-1 py-1.5 text-body-sm font-semibold rounded bg-secondary-container/20 text-secondary border-r-4 border-secondary">Personagens</button>
+<button class="flex-1 py-1.5 text-body-sm text-text-muted hover:text-on-surface-variant transition-colors">Locações</button>
+<button class="flex-1 py-1.5 text-body-sm text-text-muted hover:text-on-surface-variant transition-colors">Atos</button>
+</div>
+<div class="flex-1 overflow-y-auto space-y-3 pr-2">
+<!-- Asset Cards -->
+<div class="glass-panel p-3 rounded-xl hover:translate-x-[-4px] transition-transform duration-300 cursor-pointer group">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-accent-amber">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a noir detective character, wearing a fedora, illuminated by harsh cinematic lighting from one side. The visual style is high-contrast, atmospheric black and white with a subtle gold aura. The background is a blurred cityscape in obsidian and lime tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAADGi1yAl8MElbhWpyhI4A5z1SLHGV9NYweCYfzempSplAQ-3OC35lZE2AzDN0W8ikD5OnLxUKnooJQHXFxnUUb_F4GTMCoDQbwxuUgpfJN6eYyh33ZZcOPDjfJU-4entAfH6W2UQOQIZqEapk_N2pxjVJ_TA1IK0m__upNKKEQHrYaH8qN48faKxR410QyIdV5aQCcoU6dC0FDpu19QCKB0qIOR4C66SnbIJGCHpG1q2NHmw1ed5OTNWA-4HhMMsCpNU4AIy_D_KC"/>
+</div>
+<div class="flex-1">
+<h4 class="font-bold text-on-surface">Detetive Elias</h4>
+<span class="inline-block px-2 py-0.5 bg-accent-amber/20 text-accent-amber text-[10px] uppercase tracking-wider rounded font-bold">Protagonista</span>
+</div>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary-fixed">chevron_right</span>
+</div>
+</div>
+<div class="glass-panel p-3 rounded-xl hover:translate-x-[-4px] transition-transform duration-300 cursor-pointer group">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-accent-blue">
+<img class="w-full h-full object-cover" data-alt="Portrait of a mysterious woman in an elegant evening gown, her face partially obscured by a delicate lace veil. The lighting is cinematic teal and orange, focusing on her piercing eyes. High-end production studio aesthetic with deep shadow depth and professional color grading." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNyGxEGyFbMdrqa33GMugHQ0b5uFigfnX2Rs1lqTLcYUixpbwj0uEbvyBFZhWkECaEmMjbHyg55jROtiuPeroxWo2WyK7JuTnEk0F_Y7GtHhCQ-yJhoPEAuHLV6wLtGCSSoMjdyLFyZZuGIK190CwZ-jO8hFm8uiCZZx0BSwHSsVYDTG4u0Zc3Gj02WV72vYvQumrlv5ax_TvK728KISYfBwGgbE_8OA4v3WF5OLLFBWOFRTBhX7SR4SZauaW3RxEn6aUO1DbfIJjB"/>
+</div>
+<div class="flex-1">
+<h4 class="font-bold text-on-surface">Dra. Clara</h4>
+<span class="inline-block px-2 py-0.5 bg-accent-blue/20 text-accent-blue text-[10px] uppercase tracking-wider rounded font-bold">Mentor</span>
+</div>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary-fixed">chevron_right</span>
+</div>
+</div>
+<div class="glass-panel p-3 rounded-xl hover:translate-x-[-4px] transition-transform duration-300 cursor-pointer group">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-accent-red">
+<img class="w-full h-full object-cover" data-alt="A shadowy figure in a leather jacket standing in a rainy alleyway, illuminated by neon red lights from a nearby sign. Dramatic film noir lighting with high contrast and deep obsidian blacks. The mood is tense and villainous, maintaining the professional cinematic aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjRGkMtcfuU3GqMb-XNP2YpmTXXsRiCku0oxnEi87gXTdaGRc-x0dKMasK0iME3E_lEqvhJCHaYdoKQTjJHggm2B0npa7kFWDYMyc8olerLUscS41NuIxl49xjBMQx7c9DL49NNV1IRAJt6uiytUICKsa769X_FM-5prMh2Zz2F6fLRulfXztcj0KDhi4tpJ4vGUGN9xUm6Nwc_JEQTAH88uL2Ms1BcjfXSz-xsVQi10BPltGo6jxpn3j4hjcIZ29_QKvddqR4SybH"/>
+</div>
+<div class="flex-1">
+<h4 class="font-bold text-on-surface">O Sombra</h4>
+<span class="inline-block px-2 py-0.5 bg-accent-red/20 text-accent-red text-[10px] uppercase tracking-wider rounded font-bold">Antagonista</span>
+</div>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary-fixed">chevron_right</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Canvas Area -->
+<main class="canvas-container" id="canvas">
+<svg class="absolute inset-0 w-full h-full pointer-events-none" id="connections">
+<!-- Dynamic SVG Lines will be drawn here -->
+<line stroke="rgba(204,238,0,0.1)" stroke-width="2" x1="200" x2="450" y1="300" y2="250"></line>
+<line stroke="rgba(204,238,0,0.1)" stroke-width="2" x1="450" x2="700" y1="250" y2="400"></line>
+<line stroke="rgba(204,238,0,0.1)" stroke-width="2" x1="450" x2="300" y1="250" y2="550"></line>
+</svg>
+<!-- Node: Ato 1 -->
+<div class="absolute top-[280px] left-[150px] node-container text-center group" data-type="act">
+<div class="w-16 h-16 rounded-full bg-accent-blue flex items-center justify-center node-glow-blue border-2 border-white/20">
+<span class="material-symbols-outlined text-white text-3xl">exposure_plus_1</span>
+</div>
+<p class="mt-3 font-bold text-sm tracking-wide text-accent-blue uppercase">Ato I: Partida</p>
+</div>
+<!-- Node: Cena Principal -->
+<div class="absolute top-[220px] left-[420px] node-container text-center group" data-type="scene">
+<div class="w-14 h-14 rounded-full bg-accent-purple flex items-center justify-center node-glow-purple border-2 border-white/20">
+<span class="material-symbols-outlined text-white text-2xl">movie</span>
+</div>
+<p class="mt-3 font-bold text-sm tracking-wide text-accent-purple uppercase">Incidente Incitante</p>
+</div>
+<!-- Node: Personagem -->
+<div class="absolute top-[380px] left-[680px] node-container text-center group" data-type="character">
+<div class="w-12 h-12 rounded-full bg-accent-amber flex items-center justify-center node-glow-amber border-2 border-white/20 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of Detective Elias character profile, cinematic lighting, gold aura" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2bp50wfZ_iiEwvhY8BpuXns0GC7eYFs6OPR_z3zPSNmgVpZJSMNDRqHZsq3ZK7sO1Ki_i_Zg_eSd2-T_VvXOSs75bXhibKiQ9uYpa6jfxa09O6HNFebBvCL77P4HggAnf2ZblEqucT7MT7edbU-4hx1sAWan2LMcpuctp2dUzSyPQT1SlDs8PQwXm90Jz8NoZDHh0o937T2dIWfGF7SFMcebyQmOb-rUJdj_zWLrfE86euUVhKwDX5a2Q1QHvpGIZaMu8IuUhuRAi"/>
+</div>
+<p class="mt-3 font-bold text-sm tracking-wide text-accent-amber uppercase">Detetive Elias</p>
+</div>
+<!-- Node: Localização -->
+<div class="absolute top-[520px] left-[280px] node-container text-center group" data-type="location">
+<div class="w-12 h-12 rounded-full bg-accent-green flex items-center justify-center node-glow-green border-2 border-white/20">
+<span class="material-symbols-outlined text-white">location_on</span>
+</div>
+<p class="mt-3 font-bold text-sm tracking-wide text-accent-green uppercase">Cais do Porto</p>
+</div>
+<!-- Node: Objeto -->
+<div class="absolute top-[100px] left-[600px] node-container text-center group" data-type="object">
+<div class="w-12 h-12 rounded-full bg-accent-red flex items-center justify-center node-glow-red border-2 border-white/20">
+<span class="material-symbols-outlined text-white">key</span>
+</div>
+<p class="mt-3 font-bold text-sm tracking-wide text-accent-red uppercase">A Chave de Prata</p>
+</div>
+</main>
+<!-- Floating UI Controls -->
+<!-- Add Button (Top Left) -->
+<div class="fixed top-[80px] left-6 z-[110]">
+<button class="w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-[0_0_20px_rgba(204,238,0,0.4)] hover:scale-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-4xl">add</span>
+</button>
+</div>
+<!-- Zoom/Action Controls (Bottom Left) -->
+<div class="fixed bottom-8 left-6 z-[110] glass-panel p-2 rounded-2xl flex gap-2">
+<button class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-primary-container/20 text-on-surface-variant hover:text-primary-fixed transition-all" title="Zoom In">
+<span class="material-symbols-outlined">zoom_in</span>
+</button>
+<button class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-primary-container/20 text-on-surface-variant hover:text-primary-fixed transition-all" title="Zoom Out">
+<span class="material-symbols-outlined">zoom_out</span>
+</button>
+<div class="w-[1px] h-6 bg-outline-variant/30 self-center mx-1"></div>
+<button class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-primary-container/20 text-on-surface-variant hover:text-primary-fixed transition-all" title="Center View">
+<span class="material-symbols-outlined">center_focus_strong</span>
+</button>
+<button class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-primary-container/20 text-on-surface-variant hover:text-primary-fixed transition-all" title="Auto-arrange">
+<span class="material-symbols-outlined">account_tree</span>
+</button>
+<button class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-primary-container/20 text-on-surface-variant hover:text-primary-fixed transition-all" title="Reload">
+<span class="material-symbols-outlined">refresh</span>
+</button>
+</div>
+<script>
+        const canvas = document.getElementById('canvas');
+        let isDragging = false;
+        let startX, startY;
+        let scrollLeft, scrollTop;
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.node-container')) return;
+            isDragging = true;
+            startX = e.pageX - canvas.offsetLeft;
+            startY = e.pageY - canvas.offsetTop;
+            scrollLeft = canvas.scrollLeft;
+            scrollTop = canvas.scrollTop;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = e.pageX - canvas.offsetLeft;
+            const y = e.pageY - canvas.offsetTop;
+            const walkX = (x - startX) * 2;
+            const walkY = (y - startY) * 2;
+            // Simple visual move for demo
+            canvas.style.transform = `translate(${walkX}px, ${walkY}px)`;
+        });
+
+        // Simple node dragging logic
+        const nodes = document.querySelectorAll('.node-container');
+        nodes.forEach(node => {
+            node.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                let shiftX = e.clientX - node.getBoundingClientRect().left;
+                let shiftY = e.clientY - node.getBoundingClientRect().top;
+
+                function moveAt(pageX, pageY) {
+                    node.style.left = pageX - shiftX + 'px';
+                    node.style.top = pageY - shiftY + 'px';
+                }
+
+                function onMouseMove(event) {
+                    moveAt(event.pageX, event.pageY);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+
+                node.onmouseup = function() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    node.onmouseup = null;
+                };
+            });
+
+            node.ondragstart = function() {
+                return false;
+            };
+        });
+    </script>
+</body></html>

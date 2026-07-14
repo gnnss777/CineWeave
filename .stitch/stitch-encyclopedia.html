@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Courier+Prime&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet"/>
+<title>CineWeave | Fichas</title>
+<style>
+        body {
+            background-color: #050505;
+            color: #e3e4cf;
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: rgba(20, 20, 20, 0.75);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(204, 238, 0, 0.15);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            border-color: rgba(204, 238, 0, 0.5);
+            box-shadow: 0 0 20px rgba(204, 238, 0, 0.15);
+            transform: translateY(-4px);
+        }
+        .neon-glow {
+            box-shadow: 0 0 15px rgba(204, 238, 0, 0.3);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #454933;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #ccee00;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary": "#f9fdff",
+                      "secondary-fixed": "#6ffbbe",
+                      "on-primary-fixed-variant": "#404c00",
+                      "outline": "#909379",
+                      "on-secondary-fixed": "#002113",
+                      "bg-input": "#151515",
+                      "tertiary-fixed-dim": "#8dd1e5",
+                      "secondary": "#4edea3",
+                      "secondary-container": "#00a572",
+                      "accent-blue": "#3b82f6",
+                      "on-surface-variant": "#c6c9ac",
+                      "surface-dim": "#121408",
+                      "surface-tint": "#b5d400",
+                      "surface-container-highest": "#343628",
+                      "on-secondary-fixed-variant": "#005236",
+                      "on-background": "#e3e4cf",
+                      "on-error": "#690005",
+                      "secondary-fixed-dim": "#4edea3",
+                      "error": "#ffb4ab",
+                      "text-muted": "#737373",
+                      "error-container": "#93000a",
+                      "on-tertiary-container": "#1f6b7d",
+                      "accent-amber": "#f59e0b",
+                      "surface-container-lowest": "#0d0f05",
+                      "on-primary-fixed": "#181e00",
+                      "primary-container": "#ccee00",
+                      "bg-card": "rgba(20, 20, 20, 0.75)",
+                      "inverse-surface": "#e3e4cf",
+                      "surface-container-high": "#292b1e",
+                      "on-error-container": "#ffdad6",
+                      "inverse-on-surface": "#2f3224",
+                      "bg-darkest": "#050505",
+                      "tertiary-container": "#a6eaff",
+                      "on-surface": "#e3e4cf",
+                      "surface-variant": "#343628",
+                      "on-secondary-container": "#00311f",
+                      "on-tertiary-fixed": "#001f27",
+                      "background": "#121408",
+                      "text-secondary": "#a3a3a3",
+                      "inverse-primary": "#566500",
+                      "primary-fixed-dim": "#b5d400",
+                      "on-primary-container": "#596900",
+                      "on-primary": "#2b3400",
+                      "bg-obsidian": "#0a0a0a",
+                      "on-secondary": "#003824",
+                      "accent-pink": "#ec4899",
+                      "primary": "#fbffdc",
+                      "primary-fixed": "#cff10a",
+                      "on-tertiary": "#003641",
+                      "surface-container-low": "#1b1d10",
+                      "on-tertiary-fixed-variant": "#004e5d",
+                      "outline-variant": "#454933",
+                      "surface-container": "#1f2114",
+                      "surface-bright": "#383a2c",
+                      "tertiary-fixed": "#afecff",
+                      "surface": "#121408",
+                      "accent-red": "#ef4444"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "grid-gap": "1rem",
+                      "header-height": "60px",
+                      "card-padding": "1.25rem",
+                      "container-max": "1440px",
+                      "section-margin": "2rem"
+              },
+              "fontFamily": {
+                      "headline-xl": ["Outfit"],
+                      "body-lg": ["Outfit"],
+                      "script-text": ["Courier Prime"],
+                      "headline-md": ["Outfit"],
+                      "body-md": ["Outfit"],
+                      "label-caps": ["Outfit"],
+                      "body-sm": ["Outfit"],
+                      "headline-lg": ["Outfit"]
+              },
+              "fontSize": {
+                      "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "script-text": ["16px", {"lineHeight": "1.2", "fontWeight": "400"}],
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-bg-darkest min-h-screen">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full h-[60px] z-50 bg-bg-obsidian/75 backdrop-blur-xl border-b border-outline-variant/30 flex justify-between items-center px-6 max-w-[1440px] left-1/2 -translate-x-1/2 shadow-[0_0_20px_rgba(204,238,0,0.1)]">
+<div class="font-headline-lg text-headline-lg font-extrabold text-primary-container flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">movie</span>
+            CineWeave
+        </div>
+<nav class="hidden md:flex gap-8 h-full items-center">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md" href="#">Brainstorm</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md" href="#">Mapa</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md" href="#">Roteiro</a>
+<a class="text-primary font-bold border-b-2 border-primary-container pb-1 h-full flex items-center font-body-md text-body-md" href="#">Fichas</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary-container transition-all">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="flex items-center gap-1 cursor-pointer bg-surface-variant/30 px-3 py-1.5 rounded-full hover:bg-surface-variant/50 transition-all">
+<div class="w-6 h-6 rounded-full bg-primary-container text-bg-darkest flex items-center justify-center font-bold text-xs">JD</div>
+<span class="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-[80px] px-6 max-w-[1440px] mx-auto pb-24">
+<!-- Tab Bar & Actions -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-outline-variant/20 pb-4">
+<div class="flex gap-8 overflow-x-auto w-full md:w-auto">
+<button class="relative pb-4 text-primary font-bold whitespace-nowrap font-label-caps text-label-caps tracking-widest">
+                    PERSONAGENS
+                    <div class="absolute bottom-[-1px] left-0 w-full h-[2px] bg-primary-container shadow-[0_0_8px_#ccee00]"></div>
+</button>
+<button class="pb-4 text-on-surface-variant hover:text-primary transition-colors whitespace-nowrap font-label-caps text-label-caps tracking-widest">
+                    LOCAÇÕES
+                </button>
+<button class="pb-4 text-on-surface-variant hover:text-primary transition-colors whitespace-nowrap font-label-caps text-label-caps tracking-widest">
+                    OBJETOS
+                </button>
+</div>
+<button class="bg-primary-container text-bg-darkest px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px_rgba(204,238,0,0.3)]" onclick="document.getElementById('modal-overlay').classList.remove('hidden')">
+<span class="material-symbols-outlined">add</span>
+                ADICIONAR FICHA
+            </button>
+</div>
+<!-- Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+<!-- Character Card 1 -->
+<div class="glass-card rounded-xl p-5 flex flex-col h-full group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="w-14 h-14 rounded-full bg-accent-amber text-bg-darkest flex items-center justify-center font-bold text-xl shadow-lg">EL</div>
+<span class="bg-primary-container/10 text-primary-container px-2 py-0.5 rounded text-[10px] font-bold tracking-tighter uppercase border border-primary-container/20">PROTAGONISTA</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-white mb-2">Elias Thorne</h3>
+<p class="text-on-surface-variant font-body-sm text-body-sm line-clamp-3 mb-6">
+                    Um ex-detetive atormentado por visões do futuro. Vive em um apartamento decadente cercado por relógios analógicos que nunca param.
+                </p>
+<div class="mt-auto flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-surface-variant/40 rounded text-[10px] text-on-surface uppercase font-medium">ESTOICO</span>
+<span class="px-2 py-1 bg-surface-variant/40 rounded text-[10px] text-on-surface uppercase font-medium">OBSESSIVO</span>
+<span class="px-2 py-1 bg-surface-variant/40 rounded text-[10px] text-on-surface uppercase font-medium">TRAUMATIZADO</span>
+</div>
+</div>
+<!-- Character Card 2 -->
+<div class="glass-card rounded-xl p-5 flex flex-col h-full group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="w-14 h-14 rounded-full bg-accent-blue text-bg-darkest flex items-center justify-center font-bold text-xl shadow-lg">MA</div>
+<span class="bg-surface-variant/40 text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold tracking-tighter uppercase border border-outline-variant/30">ANTAGONISTA</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-white mb-2">Marcus Vane</h3>
+<p class="text-on-surface-variant font-body-sm text-body-sm line-clamp-3 mb-6">
+                    Magnata da tecnologia que acredita que o livre arbítrio é uma falha de design na experiência humana. Elegante e implacável.
+                </p>
+<div class="mt-auto flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-surface-variant/40 rounded text-[10px] text-on-surface uppercase font-medium">CALCULISTA</span>
+<span class="px-2 py-1 bg-surface-variant/40 rounded text-[10px] text-on-surface uppercase font-medium">CARISMÁTICO</span>
+</div>
+</div>
+<!-- Location Card 1 (Draft Style) -->
+<div class="glass-card rounded-xl p-5 flex flex-col h-full group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="w-14 h-14 rounded-lg bg-surface-container-high border border-outline-variant/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-container">location_on</span>
+</div>
+<span class="bg-secondary-container/20 text-secondary px-2 py-0.5 rounded text-[10px] font-bold tracking-tighter uppercase border border-secondary-container/30 italic">INT.</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-white mb-2">A Toca do Relógio</h3>
+<p class="text-on-surface-variant font-body-sm text-body-sm line-clamp-3 mb-6">
+                    O porão de Elias Thorne. O som de milhares de tiquetaques preenche o ar pesado com cheiro de óleo de máquina e café velho.
+                </p>
+<div class="mt-auto flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-accent-red/10 border border-accent-red/20 rounded text-[10px] text-accent-red uppercase font-medium">SOMBRIO</span>
+<span class="px-2 py-1 bg-accent-amber/10 border border-accent-amber/20 rounded text-[10px] text-accent-amber uppercase font-medium">TENSO</span>
+</div>
+</div>
+<!-- Object Card 1 -->
+<div class="glass-card rounded-xl p-5 flex flex-col h-full group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="w-14 h-14 rounded-lg bg-surface-container-high border border-outline-variant/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-accent-pink">category</span>
+</div>
+</div>
+<h3 class="font-headline-md text-headline-md text-white mb-2">O Cronômetro Reverso</h3>
+<p class="text-on-surface-variant font-body-sm text-body-sm line-clamp-3 mb-6">
+                    Um dispositivo antigo que, em vez de contar o tempo que passou, mostra exatamente quanto resta antes de um evento catastrófico.
+                </p>
+<div class="mt-auto flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-surface-variant/40 rounded text-[10px] text-on-surface uppercase font-medium">IMPORTANTE</span>
+<span class="px-2 py-1 bg-surface-variant/40 rounded text-[10px] text-on-surface uppercase font-medium">MISTERIOSO</span>
+</div>
+</div>
+<!-- Empty State / Add Card -->
+<button class="border-2 border-dashed border-outline-variant/30 rounded-xl p-5 flex flex-col items-center justify-center min-h-[220px] hover:border-primary-container/50 hover:bg-primary-container/5 transition-all group" onclick="document.getElementById('modal-overlay').classList.remove('hidden')">
+<span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-primary-container mb-2">add_circle</span>
+<span class="text-on-surface-variant font-label-caps text-label-caps group-hover:text-primary-container">NOVA FICHA</span>
+</button>
+</div>
+</main>
+<!-- Modal Overlay -->
+<div class="fixed inset-0 z-[100] bg-bg-darkest/90 backdrop-blur-md flex items-center justify-center p-4 hidden" id="modal-overlay">
+<div class="w-full max-w-5xl bg-bg-obsidian rounded-2xl border border-outline-variant/30 shadow-2xl flex flex-col max-h-[921px] overflow-hidden">
+<!-- Modal Header -->
+<div class="flex items-center justify-between p-6 border-b border-outline-variant/20">
+<button class="flex items-center gap-2 text-on-surface-variant hover:text-white transition-colors group" onclick="document.getElementById('modal-overlay').classList.add('hidden')">
+<span class="material-symbols-outlined group-hover:-translate-x-1 transition-transform">arrow_back</span>
+<span class="font-label-caps text-label-caps">VOLTAR</span>
+</button>
+<h2 class="font-headline-md text-headline-md text-white">Editar Ficha de Personagem</h2>
+<button class="bg-primary-container text-bg-darkest px-6 py-2 rounded-lg font-bold hover:brightness-110 active:scale-95 transition-all" onclick="document.getElementById('modal-overlay').classList.add('hidden')">
+                    SALVAR
+                </button>
+</div>
+<!-- Modal Body -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+<!-- Left Column -->
+<div class="space-y-8">
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-primary-container">NOME COMPLETO</label>
+<input class="bg-bg-input border-outline-variant/40 rounded-xl px-4 py-3 text-white focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all outline-none" type="text" value="Elias Thorne"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-primary-container">PAPEL / TIPO</label>
+<select class="bg-bg-input border-outline-variant/40 rounded-xl px-4 py-3 text-white focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all outline-none appearance-none">
+<option>PROTAGONISTA</option>
+<option>ANTAGONISTA</option>
+<option>COADJUVANTE</option>
+<option>FIGURANTE</option>
+</select>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-primary-container">COR DO AVATAR</label>
+<div class="flex gap-4">
+<button class="w-10 h-10 rounded-full bg-accent-amber border-2 border-primary-container ring-2 ring-primary-container ring-offset-2 ring-offset-bg-obsidian"></button>
+<button class="w-10 h-10 rounded-full bg-accent-blue border-2 border-transparent hover:border-white/20"></button>
+<button class="w-10 h-10 rounded-full bg-accent-red border-2 border-transparent hover:border-white/20"></button>
+<button class="w-10 h-10 rounded-full bg-secondary border-2 border-transparent hover:border-white/20"></button>
+<button class="w-10 h-10 rounded-full bg-accent-pink border-2 border-transparent hover:border-white/20"></button>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-primary-container">TAGS DE TRAÇOS</label>
+<div class="flex flex-wrap gap-2 p-3 bg-bg-input border border-outline-variant/40 rounded-xl">
+<div class="flex items-center gap-2 bg-surface-variant px-3 py-1 rounded text-xs text-on-surface uppercase font-bold">
+                                    ESTOICO
+                                    <span class="material-symbols-outlined text-xs cursor-pointer hover:text-accent-red">close</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-variant px-3 py-1 rounded text-xs text-on-surface uppercase font-bold">
+                                    OBSESSIVO
+                                    <span class="material-symbols-outlined text-xs cursor-pointer hover:text-accent-red">close</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-variant px-3 py-1 rounded text-xs text-on-surface uppercase font-bold">
+                                    TRAUMATIZADO
+                                    <span class="material-symbols-outlined text-xs cursor-pointer hover:text-accent-red">close</span>
+</div>
+<button class="text-primary-container flex items-center gap-1 text-xs font-bold px-2 hover:underline">
+<span class="material-symbols-outlined text-sm">add</span> ADICIONAR
+                                </button>
+</div>
+</div>
+</div>
+<!-- Right Column -->
+<div class="space-y-8">
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-primary-container">DESCRIÇÃO BREVE</label>
+<textarea class="bg-bg-input border-outline-variant/40 rounded-xl px-4 py-3 text-white focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all outline-none resize-none font-body-sm text-body-sm" rows="3">Um ex-detetive atormentado por visões do futuro. Vive em um apartamento decadente cercado por relógios analógicos que nunca param.</textarea>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-primary-container">HISTÓRIA / BACKSTORY</label>
+<textarea class="bg-bg-input border-outline-variant/40 rounded-xl px-4 py-3 text-white focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all outline-none font-script-text text-script-text custom-scrollbar" rows="6">Após perder sua família em um acidente que ele "viu" mas não pôde impedir, Elias abandonou a força policial. Desde então, ele se dedica a catalogar suas visões em cadernos pretos, tentando encontrar um padrão que o leve ao dia em que tudo mudou.</textarea>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-primary-container">NOTAS DE PRODUÇÃO</label>
+<textarea class="bg-bg-input border-outline-variant/40 rounded-xl px-4 py-3 text-white focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all outline-none font-body-sm text-body-sm custom-scrollbar" placeholder="Ex: Referências visuais, figurino, voz..." rows="4"></textarea>
+</div>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="p-6 border-t border-outline-variant/20 flex justify-end gap-4 bg-surface-container-low/50">
+<button class="px-6 py-2.5 rounded-lg font-bold text-on-surface-variant hover:text-white transition-all" onclick="document.getElementById('modal-overlay').classList.add('hidden')">
+                    CANCELAR
+                </button>
+<button class="bg-primary-container text-bg-darkest px-8 py-2.5 rounded-lg font-bold hover:shadow-[0_0_20px_rgba(204,238,0,0.4)] transition-all" onclick="document.getElementById('modal-overlay').classList.add('hidden')">
+                    SALVAR FICHA
+                </button>
+</div>
+</div>
+</div>
+<!-- SideNavBar (Mobile Bottom Bar Pivot) -->
+<div class="md:hidden fixed bottom-0 w-full h-[60px] bg-bg-obsidian/80 backdrop-blur-2xl border-t border-outline-variant/20 flex justify-around items-center z-50">
+<button class="text-on-surface-variant hover:text-primary transition-colors flex flex-col items-center">
+<span class="material-symbols-outlined">apps</span>
+<span class="text-[8px] font-bold">TODAS</span>
+</button>
+<button class="text-primary-container flex flex-col items-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[8px] font-bold">FICHAS</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors flex flex-col items-center">
+<span class="material-symbols-outlined">palette</span>
+<span class="text-[8px] font-bold">TEMA</span>
+</button>
+</div>
+<script>
+        // Micro-interactions and Modal Toggles
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('modal-overlay').classList.add('hidden');
+            }
+        });
+
+        // Ambient background effect
+        const canvas = document.createElement('div');
+        canvas.className = 'fixed inset-0 pointer-events-none opacity-20 z-0';
+        canvas.style.background = 'radial-gradient(circle at 50% 50%, rgba(204, 238, 0, 0.05) 0%, transparent 70%)';
+        document.body.prepend(canvas);
+
+        window.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth) * 100;
+            const y = (e.clientY / window.innerHeight) * 100;
+            canvas.style.background = `radial-gradient(circle at ${x}% ${y}%, rgba(204, 238, 0, 0.08) 0%, transparent 70%)`;
+        });
+    </script>
+</body></html>

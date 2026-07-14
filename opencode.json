@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "supabase": {
+      "type": "local",
+      "command": ["node", ".opencode/mcp-servers/supabase-mcp.js"],
+      "enabled": true,
+      "env": {
+        "SUPABASE_URL": "{env:SUPABASE_URL}",
+        "SUPABASE_SERVICE_ROLE_KEY": "{env:SUPABASE_SERVICE_ROLE_KEY}"
+      }
+    },
+    "vercel": {
+      "type": "local",
+      "command": ["node", ".opencode/mcp-servers/vercel-mcp.js"],
+      "enabled": true,
+      "env": {
+        "VERCEL_TOKEN": "{env:VERCEL_TOKEN}",
+        "VERCEL_TEAM_ID": "{env:VERCEL_TEAM_ID}"
+      }
+    }
+  }
+}

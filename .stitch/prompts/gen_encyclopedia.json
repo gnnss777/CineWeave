@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 15,
+  "method": "tools/call",
+  "params": {
+    "name": "generate_screen_from_text",
+    "arguments": {
+      "projectId": "13500783605999863780",
+      "prompt": "Create a character/location/object encyclopedia catalog for CineWeave. BACKGROUND: #050505. HEADER: TopNavBar with Fichas (Active) tab having gold glow. TAB BAR below header: Personagens, Locacoes, Objetos with active underline in #ccee00. Right side has Add button (Adicionar Ficha). CARD GRID: auto-fill columns (min 280px). CHARACTER CARDS: glass card with initial avatar circle (colored: amber/purple/red/green), name in bold white, role badge (like Protagonista/Antagonista in gold caps), description (2-3 lines clamped), trait tags at bottom. Edit/Delete buttons appear on hover. LOCATION CARDS: Name, type badge (INT./EXT. in green), description, time of day plus mood badge. OBJECT CARDS: Name, significance description, appearance note. All cards use glassmorphism: rgba(20,20,20,0.75), backdrop-blur(20px), border 1px solid rgba(204,238,0,0.15). Cards lift on hover with gold glow. FICHA FORM MODAL (overlay when editing/adding): full-screen overlay, dark glass card, two-column grid layout. Left column has main fields (name, role select, avatar color, traits). Right column has larger textareas (description, backstory, notes). Top bar has Voltar button, title, Salvar button. Bottom has Cancelar and Salvar Ficha buttons. Use Cinematic Neon design system with #ccee00 accent.",
+      "deviceType": "DESKTOP"
+    }
+  }
+}
