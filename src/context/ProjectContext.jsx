@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { syncProjectToSupabase, loadProjectsFromSupabase, isConfigured as isSupabaseConfigured, isLoggedIn } from '../lib/sync';
+import { syncProjectToSupabase, syncAllProjectsToSupabase, loadProjectsFromSupabase, isConfigured as isSupabaseConfigured, isLoggedIn } from '../lib/sync';
+import * as db from '../lib/db';
 import { ensureEntities, updateEntity as updateEntityInProject, deleteEntity as deleteEntityFromProject } from '../lib/migration';
 
 const ProjectContext = createContext();
@@ -482,11 +483,34 @@ export const ProjectProvider = ({ children }) => {
     return newProj;
   };
 
-  const deleteProject = (id) => {
+  const deleteProject = async (id) => {
     if (projects.length <= 1) return;
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+    // Delete from Supabase if logged in
+    try {
+      const map = JSON.parse(localStorage.getItem('cineweave_sb_ids') || '{}');
+      const sbProjId = map.projects?.[id];
+      if (sbProjId) {
+        await db.deleteProject(sbProjId);
+        // Clean up ID map
+        delete map.projects[id];
+        localStorage.setItem('cineweave_sb_ids', JSON.stringify(map));
+      }
+    } catch (err) {
+      console.error('[ProjectContext] Failed to delete from Supabase:', err);
+    }
     const remaining = projects.filter(p => p.id !== id);
     setProjects(remaining);
     setCurrentProjectId(remaining[0].id);
+  };
+
+  const syncAllToCloud = async () => {
+    try {
+      await syncAllProjectsToSupabase(projects);
+    } catch (err) {
+      console.error('[ProjectContext] Sync all failed:', err);
+    }
   };
 
   // Add / Edit elements in project database
@@ -1238,6 +1262,7 @@ export const ProjectProvider = ({ children }) => {
       updateProject,
       addProject,
       deleteProject,
+      syncAllToCloud,
       saveCharacter,
       deleteCharacter,
       saveLocation,

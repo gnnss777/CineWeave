@@ -12,7 +12,7 @@ import InstallPrompt from './components/InstallPrompt';
 import LoginModal from './components/LoginModal';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import ConfirmModal from './components/ConfirmModal';
-import { Radio, Compass, FileText, BookOpen, Columns, Film, Plus, Trash2, HelpCircle, Book, BarChart3 } from 'lucide-react';
+import { Radio, Compass, FileText, BookOpen, Columns, Film, Plus, Trash2, HelpCircle, Book, BarChart3, Cloud } from 'lucide-react';
 
 function HelpButton() {
   const { startTour, hasCompleted } = useOnboarding();
@@ -40,6 +40,7 @@ function CineWeaveShell() {
     setCurrentProjectId, 
     addProject, 
     deleteProject,
+    syncAllToCloud,
     tabNavigation
   } = useProject();
   const { startTour } = useOnboarding();
@@ -195,6 +196,10 @@ function CineWeaveShell() {
                 </div>
               ))}
             </div>
+
+            <button onClick={syncAllToCloud} style={{ width: '100%', padding: '8px', background: 'rgba(204,238,0,0.08)', border: '1px solid rgba(204,238,0,0.2)', borderRadius: '6px', color: '#ccee00', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} title="Enviar todos os projetos para a nuvem">
+              <Cloud size={12} /> Sincronizar Tudo na Nuvem
+            </button>
 
             {/* Create new project form */}
             <form onSubmit={handleCreateProject} className="flex flex-col gap-3 border-t border-gray-800 pt-4">

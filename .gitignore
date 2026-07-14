@@ -28,3 +28,6 @@ dev-dist
 *.sw?
 
 .vercel
+ROTEIROS/
+*.pdf
+server.err
