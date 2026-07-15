@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
+import { useEntities } from '../context/useEntities';
 import { extractStructureFromDocuments } from '../lib/llm';
 import { parseFiles } from '../lib/fileParser';
 import ConfirmModal from './ConfirmModal';
@@ -155,15 +156,26 @@ const STATUS_CONFIG = {
 };
 
 export default function BrainstormTab() {
-  const { currentProject, processLLMToProject, addMediaUpload, addRecording, updateProject, updateMindMap, updateScreenplay, navigateTo, saveCharacter, deleteCharacter } = useProject();
-  const [documents, setDocuments] = useState([]);
-  const [extractedData, setExtractedData] = useState({
-    plot_points: [],
-    scenes: [],
-    dialogues: [],
-    world_elements: [],
-    themes: []
-  });
+  const { 
+    currentProject, 
+    processLLMToProject, 
+    addMediaUpload, 
+    addRecording, 
+    addBrainstormDocument, 
+    removeBrainstormDocument, 
+    updateProject, 
+    updateMindMap, 
+    updateScreenplay, 
+    navigateTo, 
+    saveCharacter, 
+    deleteCharacter,
+    saveEntity,
+    deleteEntityById,
+    getPendingStagingCount 
+  } = useProject();
+
+  const { plotPoints, scenes, dialogues, themes, worldElements } = useEntities();
+  const documents = currentProject?.brainstormDocuments || [];
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid');
@@ -184,6 +196,7 @@ export default function BrainstormTab() {
   const [manualNotesDocId, setManualNotesDocId] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
   const [promptModal, setPromptModal] = useState(null);
+  const [extractionError, setExtractionError] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -215,20 +228,6 @@ export default function BrainstormTab() {
       localStorage.setItem(`brainstorm-notes-${currentProject.id}`, manualNotes);
     }
   }, [manualNotes, currentProject]);
-
-  // Sync extractedData with currentProject when it changes
-  useEffect(() => {
-    if (currentProject) {
-      const bd = currentProject.brainstormData || {};
-      setExtractedData({
-        plot_points: bd.plot_points || [],
-        scenes: bd.scenes || [],
-        dialogues: bd.dialogues || [],
-        world_elements: bd.world_elements || [],
-        themes: bd.themes || [],
-      });
-    }
-  }, [currentProject]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -361,19 +360,6 @@ export default function BrainstormTab() {
     const duration = formatTime(recordingTime || 45);
     const savedRec = addRecording(title, duration, customTranscript);
     
-    const newDoc = {
-      id: `recording-${savedRec?.id || Date.now()}`,
-      name: title,
-      type: 'transcrição',
-      content: customTranscript,
-      size: customTranscript.length,
-      status: 'parsed',
-      metadata: { source: 'recording', duration, recordingId: savedRec?.id, wordCount: customTranscript.split(/\s+/).filter(Boolean).length },
-      extractedData: null,
-      createdAt: Date.now()
-    };
-    setDocuments(prev => [newDoc, ...prev]);
-    
     setAudioUrl(null);
     setCustomTranscript('');
     setRecordingTime(0);
@@ -417,6 +403,16 @@ export default function BrainstormTab() {
       return;
     }
 
+    // Get current user for projectId/userId
+    let currentUserId = null;
+    try {
+      const { getCurrentUser } = await import('../lib/supabase');
+      const user = await getCurrentUser();
+      currentUserId = user?.id || null;
+    } catch (e) {
+      console.warn('Could not get current user:', e);
+    }
+
     const newDocs = supportedFiles.map(file => ({
       id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       file,
@@ -427,11 +423,24 @@ export default function BrainstormTab() {
       content: '',
       metadata: null,
       extractedData: null,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      projectId: currentProject?.id,
+      userId: currentUserId
     }));
 
-    setDocuments(prev => [...newDocs, ...prev]);
-    await processDocuments(newDocs);
+    // Add all docs at once via project spread to avoid closure issues
+    const proj = { ...currentProject };
+    if (!proj.brainstormDocuments) proj.brainstormDocuments = [];
+    const preparedDocs = newDocs.map(doc => ({
+      ...doc,
+      id: doc.id || `bsd-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: doc.createdAt || Date.now(),
+      _sbSynced: false
+    }));
+    proj.brainstormDocuments = [...preparedDocs, ...proj.brainstormDocuments];
+    updateProject(proj);
+
+    await processDocuments(preparedDocs);
   };
 
   const getTypeFromExtension = (name) => {
@@ -449,42 +458,68 @@ export default function BrainstormTab() {
     if (processingRef.current) return;
     processingRef.current = true;
 
-    setDocuments(prev => prev.map(d => 
-      docsToProcess.some(dp => dp.id === d.id) ? { ...d, status: 'parsing' } : d
-    ));
+    // Helper that accumulates updates and flushes them in one project update
+    let pendingUpdates = new Map();
+    const flushUpdates = () => {
+      if (pendingUpdates.size === 0) return;
+      const docs = currentProject?.brainstormDocuments || [];
+      const updated = docs.map(d => {
+        const u = pendingUpdates.get(d.id);
+        return u ? { ...d, ...u } : d;
+      });
+      pendingUpdates = new Map();
+      updateProject({ ...currentProject, brainstormDocuments: updated });
+    };
+    const markStatus = (docId, updates) => {
+      const existing = pendingUpdates.get(docId) || {};
+      pendingUpdates.set(docId, { ...existing, ...updates });
+    };
+
+    // First mark all as parsing
+    docsToProcess.forEach(dp => markStatus(dp.id, { status: 'parsing' }));
+    flushUpdates();
 
     try {
-      const results = await parseFiles(supportedFiles => supportedFiles, (progress) => {
+      // Extract actual File objects from doc entries
+      const filesToParse = docsToProcess.map(d => d.file).filter(Boolean);
+      const results = await parseFiles(filesToParse, (progress) => {
         if (progress.status === 'parsed') {
-          setDocuments(prev => prev.map(d => 
-            d.id === progress.result.id ? { ...d, ...progress.result, status: 'parsed' } : d
-          ));
+          markStatus(progress.result.id, { ...progress.result, status: 'parsed' });
+          flushUpdates();
         }
       });
 
       for (const result of results) {
-        setDocuments(prev => prev.map(d => 
-          d.id === result.id ? { ...d, ...result, status: 'parsed' } : d
-        ));
+        if (result.status !== 'parsed') continue;
+        // Re-find the doc that maps to this file
+        const matched = docsToProcess.find(d => d.file === result.file);
+        if (matched) markStatus(matched.id, { ...result, status: 'parsed' });
       }
+      flushUpdates();
 
       await extractFromParsedDocs();
     } catch (error) {
       console.error('Parse error:', error);
-      setDocuments(prev => prev.map(d => 
-        docsToProcess.some(dp => dp.id === d.id) ? { ...d, status: 'error', error: error.message } : d
-      ));
+      docsToProcess.forEach(dp => markStatus(dp.id, { status: 'error', error: error.message }));
     } finally {
       processingRef.current = false;
     }
   };
 
   const extractFromParsedDocs = async () => {
+    // Documents now come from currentProject.brainstormDocuments, already scoped to project
     const unprocessed = documents.filter(d => d.status === 'parsed');
     if (unprocessed.length === 0) return;
 
     setIsProcessing(true);
     setProcessingStatus('Enviando documentos para IA extrair estrutura...');
+    setExtractionError(null);
+
+    const markDoc = (docId, updates) => {
+      const docs = currentProject?.brainstormDocuments || [];
+      const updated = docs.map(d => d.id === docId ? { ...d, ...updates } : d);
+      updateProject({ ...currentProject, brainstormDocuments: updated });
+    };
 
     try {
       const extracted = await extractStructureFromDocuments(
@@ -498,29 +533,74 @@ export default function BrainstormTab() {
         currentProject
       );
 
-      setExtractedData(prev => ({
-        characters: mergeByName(prev.characters, extracted.characters || [], 'name'),
-        plot_points: mergeByTitle(prev.plot_points, extracted.plot_points || [], 'title'),
-        scenes: mergeByTitle(prev.scenes, extracted.scenes || [], 'title'),
-        dialogues: [...prev.dialogues, ...(extracted.dialogues || [])],
-        world_elements: mergeByName(prev.world_elements, extracted.world_elements || [], 'name'),
-        themes: mergeByStatement(prev.themes, extracted.themes || [], 'statement')
-      }));
+      // Save extracted entities directly to the unified entities store
+      if (extracted.plot_points) {
+        extracted.plot_points.forEach(p => saveEntity('plot_points', p));
+      }
+      if (extracted.scenes) {
+        extracted.scenes.forEach(s => saveEntity('scenes', s));
+      }
+      if (extracted.dialogues) {
+        extracted.dialogues.forEach(d => saveEntity('dialogues', d));
+      }
+      if (extracted.world_elements) {
+        extracted.world_elements.forEach(w => saveEntity('world_elements', w));
+      }
+      if (extracted.themes) {
+        extracted.themes.forEach(t => saveEntity('themes', t));
+      }
 
-      processLLMToProject(extracted, 'Documentos importados', '');
+      const result = processLLMToProject(extracted, 'Documentos importados', '');
 
-      setDocuments(prev => prev.map(d => 
+      // Mark each unprocessed document as processed
+      // We use the snapshot of brainstormDocuments from the start of this function
+      const updatedDocs = documents.map(d => 
         unprocessed.some(u => u.id === d.id) ? { ...d, status: 'processed', extractedData: extracted } : d
-      ));
+      );
+      updateProject({ ...currentProject, brainstormDocuments: updatedDocs });
 
-      setProcessingStatus('Extração concluída!');
-      setTimeout(() => setProcessingStatus(''), 3000);
+      if (result) {
+        const parts = [];
+        if (result.characters) parts.push(`${result.characters} personagens`);
+        if (result.locations) parts.push(`${result.locations} locações`);
+        if (result.objects) parts.push(`${result.objects} objetos`);
+        if (result.scenes) parts.push(`${result.scenes} cenas`);
+        if (result.plot_points) parts.push(`${result.plot_points} plot points`);
+        if (result.themes) parts.push(`${result.themes} temas`);
+        if (result.acts) parts.push(`${result.acts} atos`);
+        setProcessingStatus(`Extraído: ${parts.join(', ')}`);
+        setConfirmModal({
+          title: 'Extração concluída!',
+          message: `Dados extraídos e integrados ao projeto:\n\n• ${parts.join('\n• ')}\n\nTodas as fichas foram criadas/atualizadas na Enciclopédia.`,
+          variant: 'success',
+          confirmLabel: 'OK',
+          onConfirm: () => setConfirmModal(null),
+          onCancel: () => setConfirmModal(null),
+        });
+      } else {
+        setProcessingStatus('Extração concluída!');
+      }
+      setTimeout(() => setProcessingStatus(''), 5000);
     } catch (error) {
       console.error('Extraction error:', error);
       setProcessingStatus(`Erro: ${error.message}`);
-      setDocuments(prev => prev.map(d => 
+      setExtractionError(error.message);
+      
+      // Mark each unprocessed document as error (using the snapshot)
+      const updatedDocs = documents.map(d => 
         unprocessed.some(u => u.id === d.id) ? { ...d, status: 'error', error: error.message } : d
-      ));
+      );
+      updateProject({ ...currentProject, brainstormDocuments: updatedDocs });
+      
+      // Show error modal
+      setConfirmModal({
+        title: 'Erro na extração',
+        message: `Falha ao processar documentos com IA:\n\n${error.message}\n\nVerifique sua conexão e chave de API da NVIDIA.`,
+        variant: 'danger',
+        confirmLabel: 'OK',
+        onConfirm: () => setConfirmModal(null),
+        onCancel: () => setConfirmModal(null),
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -546,7 +626,7 @@ export default function BrainstormTab() {
   };
 
   const handleDeleteDocument = (id) => {
-    setDocuments(prev => prev.filter(d => d.id !== id));
+    removeBrainstormDocument(id);
     const recId = id.startsWith('recording-') ? id.replace('recording-', '') : null;
     if (recId && currentProject?.recordings?.some(r => r.id === recId)) {
       const proj = { ...currentProject };
@@ -556,7 +636,11 @@ export default function BrainstormTab() {
   };
 
   const handleRetryDocument = async (doc) => {
-    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: 'pending', error: null } : d));
+    // Reset doc to pending in project
+    const updatedDocs = (currentProject?.brainstormDocuments || []).map(d => 
+      d.id === doc.id ? { ...d, status: 'pending', error: null } : d
+    );
+    updateProject({ ...currentProject, brainstormDocuments: updatedDocs });
     await processDocuments([doc]);
   };
 
@@ -570,19 +654,29 @@ export default function BrainstormTab() {
   };
 
   const handleReprocessAll = async () => {
-    setDocuments(prev => prev.map(d => isProcessingDoc(d) ? { ...d, status: 'pending', extractedData: null } : d));
-    await processDocuments(documents.filter(d => isProcessingDoc(d) && d.status !== 'processed'));
+    // Reset all non-processed imported docs (not recordings) to pending
+    const updatedDocs = (currentProject?.brainstormDocuments || []).map(d => 
+      isProcessingDoc(d) && d.status !== 'processed' ? { ...d, status: 'pending', extractedData: null } : d
+    );
+    updateProject({ ...currentProject, brainstormDocuments: updatedDocs });
+    const toProcess = updatedDocs.filter(d => isProcessingDoc(d) && d.status !== 'processed');
+    await processDocuments(toProcess);
   };
 
   const handleEditRecordingContent = (docId, newContent) => {
-    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, content: newContent } : d));
+    const updatedDocs = (currentProject?.brainstormDocuments || []).map(d => 
+      d.id === docId ? { ...d, content: newContent } : d
+    );
     const doc = allDocuments.find(d => d.id === docId);
     if (doc?.metadata?.source === 'recording' && doc.metadata.recordingId) {
       const proj = { ...currentProject };
       proj.recordings = proj.recordings.map(r =>
         r.id === doc.metadata.recordingId ? { ...r, transcript: newContent } : r
       );
+      proj.brainstormDocuments = updatedDocs;
       updateProject(proj);
+    } else {
+      updateProject({ ...currentProject, brainstormDocuments: updatedDocs });
     }
   };
 
@@ -600,14 +694,23 @@ export default function BrainstormTab() {
       createdAt: Date.now()
     };
     
-    setDocuments(prev => [doc, ...prev]);
-    setManualNotesDocId(doc.id);
+    const newDoc = addBrainstormDocument(doc);
+    setManualNotesDocId(newDoc.id);
   };
 
   // ── Category Filtering ──────────────────────────────────────
+  const entityMap = {
+    plot_points: plotPoints,
+    scenes,
+    dialogues,
+    themes,
+    world_elements: worldElements,
+  };
+
   const filteredItems = useMemo(() => {
     let result;
     if (activeCategory === 'characters') {
+      // Characters are still in legacy array for now, will migrate later
       result = (currentProject?.characters || []).map(c => ({
         ...c,
         _category: 'characters',
@@ -625,19 +728,19 @@ export default function BrainstormTab() {
         tags: c.traits || [],
         updatedAt: Date.now(),
       }));
-      const fromExtracted = Object.entries(extractedData).flatMap(([catId, items]) =>
+      const fromEntities = Object.entries(entityMap).flatMap(([catId, items]) =>
         (items || []).map(item => ({ ...item, _category: catId }))
       );
-      result = [...fromProject, ...fromExtracted];
+      result = [...fromProject, ...fromEntities];
     } else {
-      result = [...(extractedData[activeCategory] || [])];
+      result = [...(entityMap[activeCategory] || [])];
     }
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(item => 
         (item.name || item.title || item.statement || '').toLowerCase().includes(query) ||
-        (item.description || '').toLowerCase().includes(query) ||
+        (item.description || item.synopsis || item.evidence || item.context || '').toLowerCase().includes(query) ||
         (item.tags || []).some(t => t.toLowerCase().includes(query))
       );
     }
@@ -652,7 +755,7 @@ export default function BrainstormTab() {
     });
     
     return result;
-  }, [extractedData, currentProject?.characters, activeCategory, searchQuery, sortBy]);
+  }, [plotPoints, scenes, dialogues, themes, currentProject?.characters, activeCategory, searchQuery, sortBy]);
 
   const allDocuments = useMemo(() => {
     const docIds = new Set(documents.map(d => d.id));
@@ -677,11 +780,11 @@ export default function BrainstormTab() {
   const getCategoryCount = (catId) => {
     if (catId === 'all') {
       const charCount = currentProject?.characters?.length || 0;
-      const extractedCount = Object.values(extractedData).flat().length;
-      return charCount + extractedCount;
+      const entityCount = plotPoints.length + scenes.length + dialogues.length + themes.length;
+      return charCount + entityCount;
     }
     if (catId === 'characters') return currentProject?.characters?.length || 0;
-    return (extractedData[catId] || []).length;
+    return (entityMap[catId] || []).length;
   };
 
   const formatDate = (timestamp) => {
@@ -703,26 +806,27 @@ export default function BrainstormTab() {
       saveCharacter(char);
       return;
     }
-    const key = effectiveCat === 'all' ? 'plot_points' : effectiveCat;
-    setExtractedData(prev => {
-      if (!prev[key]) return prev;
-      return {
-        ...prev,
-        [key]: prev[key].map(i => {
-          if ((i.id || i.name) !== (item.id || item.name)) return i;
-          return { ...i, name: newName.trim(), title: newName.trim(), statement: newName.trim(), description: newDesc.trim(), evidence: newDesc.trim(), context: newDesc.trim() };
-        })
-      };
+    const entityTypeMap = {
+      plot_points: 'plot_points',
+      scenes: 'scenes',
+      dialogues: 'dialogues',
+      world_elements: 'world_elements',
+      themes: 'themes',
+    };
+    const entityType = entityTypeMap[effectiveCat] || 'plot_points';
+    
+    // Update in entities
+    saveEntity(entityType, {
+      ...item,
+      id: item.id,
+      name: newName.trim(),
+      title: newName.trim(),
+      statement: newName.trim(),
+      description: newDesc.trim(),
+      evidence: newDesc.trim(),
+      context: newDesc.trim(),
+      updatedAt: Date.now(),
     });
-    const proj = { ...currentProject };
-    const bd = { ...(proj.brainstormData || {}) };
-    if (bd[key]) {
-      bd[key] = bd[key].map(i => {
-        if ((i.id || i.name) !== (item.id || item.name)) return i;
-        return { ...i, name: newName.trim(), title: newName.trim(), statement: newName.trim(), description: newDesc.trim() };
-      });
-      updateProject({ ...proj, brainstormData: bd });
-    }
   };
 
   const handleEditItem = (item) => {
@@ -760,17 +864,7 @@ export default function BrainstormTab() {
       return;
     }
 
-    setExtractedData(prev => {
-      if (!prev[key]) return prev;
-      return { ...prev, [key]: prev[key].filter(i => (i.id || i.name) !== itemId) };
-    });
-
-    const proj = { ...currentProject };
-    const bd = { ...(proj.brainstormData || {}) };
-    if (bd[key]) {
-      bd[key] = bd[key].filter(i => (i.id || i.name) !== itemId);
-      updateProject({ ...proj, brainstormData: bd });
-    }
+    deleteEntityById(key, itemId);
   };
 
   const handleSendToScript = (item) => {
@@ -871,6 +965,32 @@ export default function BrainstormTab() {
 
   return (
     <div className="brainstorm-tab" ref={containerRef} data-onboarding="brainstorm-tab">
+      {getPendingStagingCount() > 0 && (
+        <div
+          onClick={() => navigateTo('versions')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '10px 20px',
+            background: 'rgba(245,158,11,0.1)',
+            border: '1px solid rgba(245,158,11,0.3)',
+            borderRadius: '10px',
+            margin: '12px 16px',
+            cursor: 'pointer',
+            color: '#f59e0b',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            transition: 'all 0.15s'
+          }}
+          title="Clique para revisar"
+        >
+          <AlertTriangle size={16} />
+          <span>
+            {getPendingStagingCount()} atualização(ões) de roteiro pendente(s) — clique para revisar e aprovar
+          </span>
+        </div>
+      )}
       {/* Header Bar */}
       <header className="brainstorm-header glass">
         <div className="header-left">
@@ -878,7 +998,7 @@ export default function BrainstormTab() {
             <BrainIcon className="header-icon" size={24} />
             <div>
               <h1>Brainstorm</h1>
-              <span className="idea-count">{Object.values(extractedData).flat().length} itens extraídos</span>
+              <span className="idea-count">{plotPoints.length + scenes.length + dialogues.length + themes.length + worldElements.length} itens extraídos</span>
             </div>
           </div>
         </div>

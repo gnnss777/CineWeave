@@ -121,29 +121,58 @@ export function ensureEntities(proj) {
   });
 
   // ── 6. World elements → objects se não existirem ──
-  const worldElements = (bd.world_elements || [])
-    .filter(w => !['location'].includes(w.type))
-    .filter(w => w.name && !(proj.objects || []).find(o => o.name === w.name))
+  const worldElementsToObjects = (bd.world_elements || [])
+    .filter(w => w.type === 'location')
+    .filter(w => w.name && !(proj.locations || []).find(o => o.name === w.name))
     .map((w, i) => ({
-      id: `obj-${proj.id}-world-${i}`,
+      id: `loc-${proj.id}-world-${i}`,
       name: w.name || '',
+      type: 'EXT.',
       description: w.description || '',
-      significance: w.tags?.join(', ') || '',
+      timeOfDay: 'DIA',
+      mood: w.tags?.join(', ') || '',
       group: '',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }));
 
+  const worldElementsToWorld = (bd.world_elements || [])
+    .filter(w => !['location'].includes(w.type))
+    .filter(w => w.name && !(proj.objects || []).find(o => o.name === w.name))
+    .map((w, i) => ({
+      id: `world-${proj.id}-${i}`,
+      name: w.name || '',
+      type: w.type || 'setting',
+      description: w.description || '',
+      tags: w.tags || [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }));
+
+  // ── 7. Dialogues ──
+  const dialogues = (bd.dialogues || []).map((d, i) => ({
+    id: d.id || `dlg-${proj.id}-${i}`,
+    speaker: d.speaker || '',
+    line: d.line || '',
+    context: d.context || '',
+    tags: d.tags || [],
+    sceneId: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }));
+
   return {
     ...proj,
     entities: {
       characters: proj.characters || [],
-      locations: proj.locations || [],
-      objects: [...(proj.objects || []), ...worldElements],
+      locations: [...(proj.locations || []), ...worldElementsToObjects],
+      objects: proj.objects || [],
       scenes,
       plot_points,
       themes,
       acts,
+      dialogues,
+      world_elements: worldElementsToWorld,
     },
   };
 }

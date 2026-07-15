@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { syncProjectToSupabase, syncAllProjectsToSupabase, loadProjectsFromSupabase, isConfigured as isSupabaseConfigured, isLoggedIn } from '../lib/sync';
 import * as db from '../lib/db';
 import { ensureEntities, updateEntity as updateEntityInProject, deleteEntity as deleteEntityFromProject } from '../lib/migration';
+import { screenplayToBlocks, blocksToScreenplay, mergeBlockStores } from '../lib/diffEngine/hashUtils';
+import { diffBlockOrders, enrichChanges, detectModifications } from '../lib/diffEngine/blockDiff';
 
 const ProjectContext = createContext();
 
@@ -225,19 +227,58 @@ const initialProjects = [
         { id: 'snc-bd-theme-1', statement: 'Coragem não é ausência de medo, mas a escolha de enfrentá-lo.', evidence: 'Fumaça sente medo dos pássaros, mas escolhe lutar pelo seu lar.', relevance: 'Central' },
         { id: 'snc-bd-theme-2', statement: 'A união transforma rivais em aliados — juntas somos mais fortes.', evidence: 'Baby e Fumaça começam como rivais e se tornam aliadas contra a ameaça maior.', relevance: 'Central' },
         { id: 'snc-bd-theme-3', statement: 'A natureza é mais forte que a tecnologia quando guiada pelo coração.', evidence: 'Fumaça, sem modificações, vence os pássaros cyberpunk usando instinto e treinamento.', relevance: 'Secundário' }
-      ]
+      ],
+      brainstormDocuments: []
     }
   },
 ];
 
+function migrateProjectVersions(proj) {
+  if (proj.versions) return proj;
+  const versions = { blockStore: {}, all: [], head: null, staging: [] };
+  if (proj.history && proj.history.length > 0) {
+    for (const oldV of proj.history) {
+      if (!oldV.screenplay || oldV.screenplay.length === 0) continue;
+      const { blockStore, blockOrder } = screenplayToBlocks(oldV.screenplay);
+      mergeBlockStores(versions.blockStore, blockStore);
+      const vType = oldV.id.startsWith('v-auto-') ? 'auto' :
+                    oldV.id.startsWith('v-manual-') ? 'manual' :
+                    oldV.id.startsWith('v-backup-') ? 'backup' : 'manual';
+      versions.all.push({
+        id: oldV.id,
+        parentId: null,
+        type: vType,
+        name: oldV.name,
+        timestamp: oldV.timestamp,
+        blockOrder,
+        metadata: {
+          mindMapNodes: oldV.mindMapNodes || null,
+          mindMapLinks: oldV.mindMapLinks || null
+        }
+      });
+    }
+    for (let i = versions.all.length - 1; i > 0; i--) {
+      versions.all[i].parentId = versions.all[i - 1].id;
+    }
+    if (versions.all.length > 0) versions.head = versions.all[versions.all.length - 1].id;
+    delete proj.history;
+  }
+  proj.versions = versions;
+  return proj;
+}
+
+function initVersionStore() {
+  return { blockStore: {}, all: [], head: null, staging: [] };
+}
+
 export const ProjectProvider = ({ children }) => {
   const [projects, setProjects] = useState(() => {
     const saved = localStorage.getItem('cineweave_projects');
-    if (!saved) return initialProjects.map(ensureEntities);
+    if (!saved) return initialProjects.map(p => migrateProjectVersions(ensureEntities(p)));
     try {
       const savedList = JSON.parse(saved);
       // Apply migration to all projects
-      const migratedList = savedList.map(p => ensureEntities(p));
+      const migratedList = savedList.map(p => migrateProjectVersions(ensureEntities(p)));
       // Merge initial projects with migration
       const mergedList = [...migratedList];
       initialProjects.forEach(initP => {
@@ -282,9 +323,9 @@ export const ProjectProvider = ({ children }) => {
           delete mergedList[i].brainstormData.characters;
         }
       }
-      return mergedList.map(ensureEntities);
+      return mergedList.map(p => migrateProjectVersions(ensureEntities(p)));
     } catch (e) {
-      return initialProjects.map(ensureEntities);
+      return initialProjects.map(p => migrateProjectVersions(ensureEntities(p)));
     }
   });
   
@@ -371,64 +412,266 @@ export const ProjectProvider = ({ children }) => {
   };
 
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState(0);
+  const [lastUserEditTimestamp, setLastUserEditTimestamp] = useState(0);
+
+  const vs = (proj) => {
+    if (!proj.versions) proj.versions = initVersionStore();
+    return proj.versions;
+  };
 
   const autoSaveVersionIfNeeded = (proj, type = 'Roteiro') => {
     const now = Date.now();
-    // 2 minutes (120000ms) cooldown for autosave to avoid bloat
     if (now - lastSavedTimestamp > 120000) {
-      if (!proj.history) proj.history = [];
-      const newVersion = {
+      const v = vs(proj);
+      const { blockStore: newBlocks, blockOrder } = screenplayToBlocks(proj.screenplay || []);
+      mergeBlockStores(v.blockStore, newBlocks);
+      const vType = (type === 'Brainstorm' || type === 'Extração IA') ? 'ai' :
+                    type === 'Importação Roteiro' ? 'import' : 'auto';
+      const ver = {
         id: `v-auto-${now}`,
-        timestamp: now,
+        parentId: v.head,
+        type: vType,
         name: `Auto-save ${type} (${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`,
-        screenplay: JSON.parse(JSON.stringify(proj.screenplay || [])),
-        mindMapNodes: JSON.parse(JSON.stringify(proj.mindMapNodes || [])),
-        mindMapLinks: JSON.parse(JSON.stringify(proj.mindMapLinks || []))
+        timestamp: now,
+        blockOrder,
+        metadata: {
+          mindMapNodes: JSON.parse(JSON.stringify(proj.mindMapNodes || [])),
+          mindMapLinks: JSON.parse(JSON.stringify(proj.mindMapLinks || []))
+        }
       };
-      proj.history = [newVersion, ...proj.history].slice(0, 10);
+      v.all.unshift(ver);
+      v.head = ver.id;
       setLastSavedTimestamp(now);
     }
   };
 
   const saveVersion = (name = '') => {
     const proj = { ...currentProject };
-    if (!proj.history) proj.history = [];
+    const v = vs(proj);
     const now = Date.now();
-    const newVersion = {
+    const { blockStore: newBlocks, blockOrder } = screenplayToBlocks(proj.screenplay || []);
+    mergeBlockStores(v.blockStore, newBlocks);
+    const ver = {
       id: `v-manual-${now}`,
-      timestamp: now,
+      parentId: v.head,
+      type: 'manual',
       name: name || `Versão ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-      screenplay: JSON.parse(JSON.stringify(proj.screenplay || [])),
-      mindMapNodes: JSON.parse(JSON.stringify(proj.mindMapNodes || [])),
-      mindMapLinks: JSON.parse(JSON.stringify(proj.mindMapLinks || []))
+      timestamp: now,
+      blockOrder,
+      metadata: {
+        mindMapNodes: JSON.parse(JSON.stringify(proj.mindMapNodes || [])),
+        mindMapLinks: JSON.parse(JSON.stringify(proj.mindMapLinks || []))
+      }
     };
-    proj.history = [newVersion, ...proj.history].slice(0, 10);
+    v.all.unshift(ver);
+    v.head = ver.id;
     setLastSavedTimestamp(now);
     updateProject(proj);
   };
 
+  const _backupCurrent = (proj, label) => {
+    const v = vs(proj);
+    const { blockStore: newBlocks, blockOrder } = screenplayToBlocks(proj.screenplay || []);
+    mergeBlockStores(v.blockStore, newBlocks);
+    const ver = {
+      id: `v-backup-${Date.now()}`,
+      parentId: v.head,
+      type: 'backup',
+      name: label || `Backup ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+      timestamp: Date.now(),
+      blockOrder,
+      metadata: {
+        mindMapNodes: JSON.parse(JSON.stringify(proj.mindMapNodes || [])),
+        mindMapLinks: JSON.parse(JSON.stringify(proj.mindMapLinks || []))
+      }
+    };
+    v.all.unshift(ver);
+    v.head = ver.id;
+    return proj;
+  };
+
   const restoreVersion = (versionId) => {
     const proj = { ...currentProject };
-    if (!proj.history) return;
-    const version = proj.history.find(v => v.id === versionId);
-    if (!version) return;
-
-    // Save a backup of the current state before restoring
-    const backupVersion = {
-      id: `v-backup-${Date.now()}`,
-      timestamp: Date.now(),
-      name: `Antes de restaurar: ${version.name}`,
-      screenplay: JSON.parse(JSON.stringify(proj.screenplay || [])),
-      mindMapNodes: JSON.parse(JSON.stringify(proj.mindMapNodes || [])),
-      mindMapLinks: JSON.parse(JSON.stringify(proj.mindMapLinks || []))
-    };
-
-    proj.screenplay = JSON.parse(JSON.stringify(version.screenplay));
-    proj.mindMapNodes = JSON.parse(JSON.stringify(version.mindMapNodes));
-    proj.mindMapLinks = JSON.parse(JSON.stringify(version.mindMapLinks));
-    proj.history = [backupVersion, ...proj.history.filter(v => v.id !== versionId)].slice(0, 10);
-
+    const v = vs(proj);
+    const target = v.all.find(vr => vr.id === versionId);
+    if (!target) return;
+    _backupCurrent(proj, `Antes de restaurar: ${target.name}`);
+    const restored = blocksToScreenplay(target.blockOrder, v.blockStore);
+    const nodeSnap = target.metadata?.mindMapNodes || [];
+    const linkSnap = target.metadata?.mindMapLinks || [];
+    if (restored.length > 0) proj.screenplay = restored;
+    if (nodeSnap.length > 0) proj.mindMapNodes = JSON.parse(JSON.stringify(nodeSnap));
+    if (linkSnap.length > 0) proj.mindMapLinks = JSON.parse(JSON.stringify(linkSnap));
     updateProject(proj);
+  };
+
+  /* ── Staging (Pending Changes) ── */
+  const stageProposedChanges = (proposedScreenplay, source, name) => {
+    const proj = { ...currentProject };
+    const v = vs(proj);
+    const now = Date.now();
+    const { blockStore: newBlocks, blockOrder } = screenplayToBlocks(proposedScreenplay);
+    const stagingEntry = {
+      id: `stg-${now}`,
+      source,
+      sourceVersionId: v.head,
+      name: name || `Proposta de ${source} (${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`,
+      timestamp: now,
+      newBlocks,
+      blockOrder,
+      status: 'pending'
+    };
+    v.staging.push(stagingEntry);
+    updateProject(proj);
+    return stagingEntry;
+  };
+
+  const approveStaging = (stagingId) => {
+    const proj = { ...currentProject };
+    const v = vs(proj);
+    const idx = v.staging.findIndex(s => s.id === stagingId);
+    if (idx === -1) return null;
+    const entry = v.staging[idx];
+    mergeBlockStores(v.blockStore, entry.newBlocks);
+    const now = Date.now();
+    const newVersion = {
+      id: `v-${now}`,
+      parentId: v.head,
+      type: entry.source === 'brainstorm' ? 'ai' :
+            entry.source === 'compile' ? 'ai' :
+            entry.source === 'import' ? 'import' : 'manual',
+      name: entry.name,
+      timestamp: now,
+      blockOrder: entry.blockOrder,
+      metadata: {
+        sourceStagingId: entry.id
+      }
+    };
+    v.all.unshift(newVersion);
+    v.head = newVersion.id;
+    const restored = blocksToScreenplay(entry.blockOrder, v.blockStore);
+    if (restored.length > 0) proj.screenplay = restored;
+    v.staging.splice(idx, 1);
+    updateProject(proj);
+    return newVersion;
+  };
+
+  const approveStagingPartial = (stagingId, selections) => {
+    const proj = { ...currentProject };
+    const v = vs(proj);
+    const idx = v.staging.findIndex(s => s.id === stagingId);
+    if (idx === -1) return null;
+    const entry = v.staging[idx];
+    const headVersion = v.all.find(vr => vr.id === v.head);
+    if (!headVersion) return null;
+    const mergedStore = { ...v.blockStore };
+    mergeBlockStores(mergedStore, entry.newBlocks);
+    const { changes } = diffBlockOrders(headVersion.blockOrder, entry.blockOrder);
+    const enriched = enrichChanges(changes, mergedStore, mergedStore);
+    const detected = detectModifications(enriched);
+    const resultBlockOrder = [...headVersion.blockOrder];
+    let offset = 0;
+    for (let i = 0; i < detected.length; i++) {
+      const c = detected[i];
+      const sel = selections[i];
+      if (sel === undefined || sel === true) {
+        if (c.type === 'added') {
+          const insertAt = Math.min(c.displayIndex + offset, resultBlockOrder.length);
+          resultBlockOrder.splice(insertAt, 0, [c.blockId, c.hash]);
+          offset++;
+        } else if (c.type === 'removed' && c.block) {
+          const removeIdx = resultBlockOrder.findIndex(([id]) => id === c.blockId);
+          if (removeIdx !== -1) {
+            resultBlockOrder.splice(removeIdx, 1);
+            if (removeIdx < c.displayIndex + offset) offset--;
+          }
+        } else if (c.type === 'modified') {
+          const replaceIdx = resultBlockOrder.findIndex(([id]) => id === c.oldBlockId);
+          if (replaceIdx !== -1) {
+            resultBlockOrder[replaceIdx] = [c.newBlockId, c.newHash];
+          }
+        }
+      }
+    }
+    mergeBlockStores(v.blockStore, entry.newBlocks);
+    const now = Date.now();
+    const newVersion = {
+      id: `v-${now}`,
+      parentId: v.head,
+      type: entry.source === 'brainstorm' ? 'ai' :
+            entry.source === 'compile' ? 'ai' :
+            entry.source === 'import' ? 'import' : 'manual',
+      name: `${entry.name} (parcial)`,
+      timestamp: now,
+      blockOrder: resultBlockOrder,
+      metadata: { sourceStagingId: entry.id, partial: true }
+    };
+    v.all.unshift(newVersion);
+    v.head = newVersion.id;
+    const restored = blocksToScreenplay(resultBlockOrder, v.blockStore);
+    if (restored.length > 0) proj.screenplay = restored;
+    v.staging.splice(idx, 1);
+    updateProject(proj);
+    return newVersion;
+  };
+
+  const rejectStaging = (stagingId) => {
+    const proj = { ...currentProject };
+    const v = vs(proj);
+    v.staging = v.staging.filter(s => s.id !== stagingId);
+    updateProject(proj);
+  };
+
+  const getPendingStagingCount = () => {
+    const v = currentProject?.versions;
+    return v?.staging?.filter(s => s.status === 'pending').length || 0;
+  };
+
+  const getVersionScreenplay = (versionId) => {
+    const v = currentProject?.versions;
+    if (!v) return [];
+    const target = v.all.find(vr => vr.id === versionId);
+    if (!target) return [];
+    return blocksToScreenplay(target.blockOrder, v.blockStore);
+  };
+
+  const compareVersions = (versionIdA, versionIdB) => {
+    const v = currentProject?.versions;
+    if (!v) return { changes: [], stats: { added: 0, removed: 0, modified: 0, unchanged: 0 } };
+    const vA = v.all.find(vr => vr.id === versionIdA);
+    const vB = v.all.find(vr => vr.id === versionIdB);
+    if (!vA || !vB) return { changes: [], stats: { added: 0, removed: 0, modified: 0, unchanged: 0 } };
+    const { changes: rawChanges, stats } = diffBlockOrders(vA.blockOrder, vB.blockOrder);
+    const enriched = enrichChanges(rawChanges, v.blockStore, v.blockStore);
+    const changes = detectModifications(enriched);
+    const finalStats = {
+      added: changes.filter(c => c.type === 'added').length,
+      removed: changes.filter(c => c.type === 'removed').length,
+      modified: changes.filter(c => c.type === 'modified').length,
+      unchanged: stats.unchanged
+    };
+    return { changes, stats: finalStats };
+  };
+
+  const compareWithStaging = (stagingId) => {
+    const v = currentProject?.versions;
+    if (!v) return { changes: [], stats: { added: 0, removed: 0, modified: 0, unchanged: 0 } };
+    const staging = v.staging.find(s => s.id === stagingId);
+    if (!staging) return { changes: [], stats: { added: 0, removed: 0, modified: 0, unchanged: 0 } };
+    const headVersion = v.all.find(vr => vr.id === v.head);
+    if (!headVersion) return { changes: [], stats: { added: 0, removed: 0, modified: 0, unchanged: 0 } };
+    const mergedStore = { ...v.blockStore };
+    mergeBlockStores(mergedStore, staging.newBlocks);
+    const { changes: rawChanges, stats } = diffBlockOrders(headVersion.blockOrder, staging.blockOrder);
+    const enriched = enrichChanges(rawChanges, mergedStore, mergedStore);
+    const changes = detectModifications(enriched);
+    const finalStats = {
+      added: changes.filter(c => c.type === 'added').length,
+      removed: changes.filter(c => c.type === 'removed').length,
+      modified: changes.filter(c => c.type === 'modified').length,
+      unchanged: stats.unchanged
+    };
+    return { changes, stats: finalStats };
   };
 
   const linkNodeToFirstAct = (proj, nodeId) => {
@@ -475,8 +718,10 @@ export const ProjectProvider = ({ children }) => {
       ],
       recordings: [],
       mediaUploads: [],
+      brainstormDocuments: [],
       ideas: [],
-      needsAutoLayout: true
+      needsAutoLayout: true,
+      versions: initVersionStore()
     };
     setProjects(prev => [...prev, newProj]);
     setCurrentProjectId(newProj.id);
@@ -696,6 +941,29 @@ export const ProjectProvider = ({ children }) => {
     updateProject(proj);
   };
 
+  const addBrainstormDocument = (document) => {
+    const proj = { ...currentProject };
+    if (!proj.brainstormDocuments) proj.brainstormDocuments = [];
+    const newDoc = {
+      ...document,
+      id: document.id || `bsd-${Date.now()}`,
+      createdAt: document.createdAt || new Date().toISOString(),
+      projectId: document.projectId || proj.id,
+      _sbSynced: false
+    };
+    proj.brainstormDocuments.unshift(newDoc);
+    updateProject(proj);
+    return newDoc;
+  };
+
+  const removeBrainstormDocument = (documentId) => {
+    const proj = { ...currentProject };
+    if (proj.brainstormDocuments) {
+      proj.brainstormDocuments = proj.brainstormDocuments.filter(d => d.id !== documentId);
+      updateProject(proj);
+    }
+  };
+
   const processBrainstorm = () => {
     const proj = { ...currentProject };
     let changed = false;
@@ -805,6 +1073,21 @@ export const ProjectProvider = ({ children }) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Extração IA');
 
+    // Ensure entities object exists
+    if (!proj.entities) {
+      proj.entities = {
+        characters: [],
+        locations: [],
+        objects: [],
+        scenes: [],
+        plot_points: [],
+        themes: [],
+        acts: [],
+        dialogues: [],
+        world_elements: [],
+      };
+    }
+
     // 1. Handle ACTS - preserve existing, add new from scenes
     let actNodes = proj.mindMapNodes.filter(n => n.type === 'act');
     const llmActs = new Set();
@@ -880,6 +1163,11 @@ export const ProjectProvider = ({ children }) => {
           traits: [...new Set([...(proj.characters[existingIdx].traits || []), ...newChar.traits])],
           backstory: newChar.backstory || proj.characters[existingIdx].backstory,
         };
+        // Also update in entities
+        const charEntityIdx = proj.entities.characters.findIndex(c => c.id === proj.characters[existingIdx].id);
+        if (charEntityIdx >= 0) {
+          proj.entities.characters[charEntityIdx] = { ...proj.entities.characters[charEntityIdx], ...proj.characters[existingIdx] };
+        }
         // Update mindMap node
         const nodeIdx = proj.mindMapNodes.findIndex(n => n.id === `n-${proj.characters[existingIdx].id}`);
         if (nodeIdx >= 0) {
@@ -894,6 +1182,8 @@ export const ProjectProvider = ({ children }) => {
         const id = `char-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const fullChar = { ...newChar, id };
         proj.characters.push(fullChar);
+        // Also add to entities
+        proj.entities.characters.push({ ...fullChar, avatar: fullChar.avatar || 'amber', relationships: [], createdAt: Date.now(), updatedAt: Date.now() });
         proj.mindMapNodes.push({
           id: `n-${id}`,
           label: fullChar.name,
@@ -927,6 +1217,11 @@ export const ProjectProvider = ({ children }) => {
       );
       if (existingIdx >= 0) {
         proj.locations[existingIdx] = { ...proj.locations[existingIdx], ...newLoc };
+        // Also update in entities
+        const locEntityIdx = proj.entities.locations.findIndex(l => l.id === proj.locations[existingIdx].id);
+        if (locEntityIdx >= 0) {
+          proj.entities.locations[locEntityIdx] = { ...proj.entities.locations[locEntityIdx], ...proj.locations[existingIdx] };
+        }
         const nodeIdx = proj.mindMapNodes.findIndex(n => n.id === `n-${proj.locations[existingIdx].id}`);
         if (nodeIdx >= 0) {
           proj.mindMapNodes[nodeIdx] = {
@@ -939,6 +1234,8 @@ export const ProjectProvider = ({ children }) => {
         const id = `loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const fullLoc = { ...newLoc, id };
         proj.locations.push(fullLoc);
+        // Also add to entities
+        proj.entities.locations.push({ ...fullLoc, group: '', createdAt: Date.now(), updatedAt: Date.now() });
         proj.mindMapNodes.push({
           id: `n-${id}`,
           label: fullLoc.name,
@@ -968,6 +1265,11 @@ export const ProjectProvider = ({ children }) => {
       const existingIdx = proj.objects.findIndex(o => o.name.toLowerCase() === newObj.name.toLowerCase());
       if (existingIdx >= 0) {
         proj.objects[existingIdx] = { ...proj.objects[existingIdx], ...newObj };
+        // Also update in entities
+        const objEntityIdx = proj.entities.objects.findIndex(o => o.id === proj.objects[existingIdx].id);
+        if (objEntityIdx >= 0) {
+          proj.entities.objects[objEntityIdx] = { ...proj.entities.objects[objEntityIdx], ...proj.objects[existingIdx] };
+        }
         const nodeIdx = proj.mindMapNodes.findIndex(n => n.id === `n-${proj.objects[existingIdx].id}`);
         if (nodeIdx >= 0) {
           proj.mindMapNodes[nodeIdx] = {
@@ -980,6 +1282,8 @@ export const ProjectProvider = ({ children }) => {
         const id = `obj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const fullObj = { ...newObj, id };
         proj.objects.push(fullObj);
+        // Also add to entities
+        proj.entities.objects.push({ ...fullObj, group: '', createdAt: Date.now(), updatedAt: Date.now() });
         proj.mindMapNodes.push({
           id: `n-${id}`,
           label: fullObj.name,
@@ -1019,8 +1323,22 @@ export const ProjectProvider = ({ children }) => {
         }
       }
 
+      // Also save scene to entities
+      const sceneId = `scn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      proj.entities.scenes.push({
+        id: sceneId,
+        title: scene.title || `Cena ${proj.entities.scenes.length + 1}`,
+        synopsis: scene.description || '',
+        actId: null, // could be resolved from act letter
+        characterIds: [],
+        order: proj.entities.scenes.length,
+        status: 'draft',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
       // Add scene node to mindmap
-      const sceneId = `sc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const mindmapSceneId = `sc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const actLetter = (scene.act || 'I').trim().toUpperCase();
       const actIdx = actNodes.findIndex(n => n.label.toUpperCase().includes(`ATO ${actLetter}`));
       const colX = 150 + (actIdx >= 0 ? actIdx : 0) * 250;
@@ -1028,7 +1346,7 @@ export const ProjectProvider = ({ children }) => {
       const rowY = 520 + sceneCount * 120;
 
       proj.mindMapNodes.push({
-        id: `n-${sceneId}`,
+        id: `n-${mindmapSceneId}`,
         label: scene.title || `Cena ${sceneCount + 1}`,
         type: 'scene',
         x: colX + Math.random() * 20,
@@ -1039,14 +1357,14 @@ export const ProjectProvider = ({ children }) => {
       const targetAct = proj.mindMapNodes.find(n => n.type === 'act' && n.label.toUpperCase().includes(`ATO ${actLetter}`));
       if (targetAct) {
         proj.mindMapLinks.push({
-          id: `l-scene-${sceneId}`,
+          id: `l-scene-${mindmapSceneId}`,
           source: targetAct.id,
-          target: `n-${sceneId}`
+          target: `n-${mindmapSceneId}`
         });
       }
     });
 
-    // 6. WORLD ELEMENTS (non-location, non-object) - add as generic nodes
+    // 6. WORLD ELEMENTS (non-location, non-object) - add as generic nodes AND to entities
     const otherWorldElements = (llmData.world_elements || []).filter(w => 
       !['location', 'object', 'technology', 'organization'].includes(w.type)
     );
@@ -1054,9 +1372,16 @@ export const ProjectProvider = ({ children }) => {
       if (!w.name) return;
       const id = `world-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const full = { ...w, id };
-      // Add to a general worldElements array if it exists, or store in project
-      if (!proj.worldElements) proj.worldElements = [];
-      proj.worldElements.push(full);
+      // Add to entities
+      proj.entities.world_elements.push({
+        id,
+        name: full.name,
+        type: full.type || 'setting',
+        description: full.description || '',
+        tags: full.tags || [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
       proj.mindMapNodes.push({
         id: `n-${id}`,
         label: full.name,
@@ -1068,7 +1393,7 @@ export const ProjectProvider = ({ children }) => {
       linkNodeToFirstAct(proj, `n-${id}`);
     });
 
-    // 7. PLOT POINTS - add as act-level nodes or connect to acts
+    // 7. PLOT POINTS - add as act-level nodes or connect to acts AND to entities
     (llmData.plot_points || []).forEach((pp, i) => {
       if (!pp.title) return;
       const id = `plot-${Date.now()}-${i}`;
@@ -1077,6 +1402,17 @@ export const ProjectProvider = ({ children }) => {
       const colX = 150 + (actIdx >= 0 ? actIdx : 0) * 250;
       const rowY = 300 + i * 100;
       
+      // Add to entities
+      proj.entities.plot_points.push({
+        id,
+        title: pp.title,
+        description: pp.description || '',
+        actId: null, // could be resolved
+        tags: pp.tags || [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
       proj.mindMapNodes.push({
         id: `n-${id}`,
         label: pp.title,
@@ -1096,10 +1432,21 @@ export const ProjectProvider = ({ children }) => {
       }
     });
 
-    // 8. THEMES - add as special nodes
+    // 8. THEMES - add as special nodes AND to entities
     (llmData.themes || []).forEach((t, i) => {
       if (!t.statement) return;
       const id = `theme-${Date.now()}-${i}`;
+      
+      // Add to entities
+      proj.entities.themes.push({
+        id,
+        statement: t.statement,
+        evidence: t.evidence || '',
+        relevance: t.relevance || 'Central',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
       proj.mindMapNodes.push({
         id: `n-${id}`,
         label: `Tema: ${t.statement.substring(0, 50)}${t.statement.length > 50 ? '...' : ''}`,
@@ -1111,18 +1458,21 @@ export const ProjectProvider = ({ children }) => {
       linkNodeToFirstAct(proj, `n-${id}`);
     });
 
-    // 9. Mark recordings/uploads as processed
-    proj.recordings = proj.recordings.map(r => ({ ...r, processed: true }));
-    proj.mediaUploads = proj.mediaUploads.map(m => ({ ...m, processed: true }));
-
-    // Save brainstormData for BrainstormTab extracted items (characters read from project.characters)
-    proj.brainstormData = {
-      plot_points: llmData.plot_points || [],
-      scenes: llmData.scenes || [],
-      dialogues: llmData.dialogues || [],
-      world_elements: llmData.world_elements || [],
-      themes: llmData.themes || [],
-    };
+    // 9. DIALOGUES - add to entities
+    (llmData.dialogues || []).forEach((d, i) => {
+      if (!d.speaker || !d.line) return;
+      const id = `dlg-${Date.now()}-${i}`;
+      proj.entities.dialogues.push({
+        id,
+        speaker: d.speaker,
+        line: d.line,
+        context: d.context || '',
+        tags: d.tags || [],
+        sceneId: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
 
     // 10. Rebuild semantic links (character-location, character-object, object-location)
     rebuildSemanticLinks(proj);
@@ -1228,6 +1578,27 @@ export const ProjectProvider = ({ children }) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Roteiro');
     proj.screenplay = newScreenplay;
+    const now = Date.now();
+    if (now - lastUserEditTimestamp > 30000) {
+      const v = vs(proj);
+      const { blockStore: newBlocks, blockOrder } = screenplayToBlocks(newScreenplay || []);
+      mergeBlockStores(v.blockStore, newBlocks);
+      const ver = {
+        id: `v-user-${now}`,
+        parentId: v.head,
+        type: 'user',
+        name: `Edição do usuário (${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`,
+        timestamp: now,
+        blockOrder,
+        metadata: {
+          mindMapNodes: JSON.parse(JSON.stringify(proj.mindMapNodes || [])),
+          mindMapLinks: JSON.parse(JSON.stringify(proj.mindMapLinks || []))
+        }
+      };
+      v.all.unshift(ver);
+      v.head = ver.id;
+      setLastUserEditTimestamp(now);
+    }
     updateProject(proj);
   };
 
@@ -1277,13 +1648,26 @@ export const ProjectProvider = ({ children }) => {
       reorderIdeas,
       addRecording,
       addMediaUpload,
+      addBrainstormDocument,
+      removeBrainstormDocument,
       processBrainstorm,
       processLLMToProject,
       markRecordingsProcessed,
       updateScreenplay,
       updateMindMap,
       tabNavigation,
-      navigateTo
+      navigateTo,
+      // Versioning system
+      saveVersion,
+      restoreVersion,
+      stageProposedChanges,
+      approveStaging,
+      approveStagingPartial,
+      rejectStaging,
+      getPendingStagingCount,
+      getVersionScreenplay,
+      compareVersions,
+      compareWithStaging
     }}>
       {children}
     </ProjectContext.Provider>

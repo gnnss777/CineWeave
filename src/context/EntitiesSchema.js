@@ -79,6 +79,25 @@ export const ENTITY_DEFAULTS = {
     createdAt: 0,
     updatedAt: 0,
   },
+  dialogues: {
+    id: '',
+    speaker: '',
+    line: '',
+    context: '',
+    tags: [],
+    sceneId: null,
+    createdAt: 0,
+    updatedAt: 0,
+  },
+  world_elements: {
+    id: '',
+    name: '',
+    type: 'setting',
+    description: '',
+    tags: [],
+    createdAt: 0,
+    updatedAt: 0,
+  },
 };
 
 // Tipos válidos de entidades
@@ -130,6 +149,8 @@ export function validateEntity(entity, type) {
   if (type === 'acts' && !entity.name?.trim()) errors.push('Nome do ato é obrigatório');
   if (type === 'plot_points' && !entity.title?.trim()) errors.push('Título é obrigatório');
   if (type === 'themes' && !entity.statement?.trim()) errors.push('Frase-tema é obrigatória');
+  if (type === 'dialogues' && !entity.speaker?.trim()) errors.push('Speaker é obrigatório');
+  if (type === 'world_elements' && !entity.name?.trim()) errors.push('Nome é obrigatório');
   
   if (type === 'characters' && entity.role && !VALID_ROLES.includes(entity.role)) {
     errors.push(`Role inválida: ${entity.role}. Válidas: ${VALID_ROLES.join(', ')}`);

@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { getLLMApiKey } from '../lib/llm';
+import { getLLMApiKey, extractEnrichmentFromScreenplay } from '../lib/llm';
 import { exportFountain, downloadFountain } from '../lib/fountainExport';
 import { parseFountain } from '../lib/fountainImport';
+import { parseFile } from '../lib/fileParser';
 import { exportScreenplayPDF } from '../lib/pdfExport';
+import { linkScreenplayToEntities, parseSceneHeading } from '../lib/entityExtractor';
 import FichaModal from './FichaModal';
 import SharedSidebar from './SharedSidebar';
 import ConfirmModal from './ConfirmModal';
@@ -12,9 +14,248 @@ import {
   Sparkles, Printer, Plus, Download, Upload,
   X, HelpCircle, BookOpen, Minimize2, 
   Trash2, BarChart2, Cpu, Grid, Layers,
-  Compass, ShieldAlert, Award, Target, Heart
+  Compass, ShieldAlert, Award, Target, Heart,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  Eye, EyeOff, Filter, ListChecks, Star, Settings2, Circle, AlertTriangle
 } from 'lucide-react';
 import './ScreenplayTab.css';
+
+function cleanSceneText(text) {
+  return (text || '').replace(/\[\[.*?\]\]/g, '').replace(/#([^#]+)#/g, '').trim();
+}
+
+function StylePanel({
+  open,
+  onCollapse,
+  revisionFilter,
+  setRevisionFilter,
+  revisionMode,
+  setRevisionMode,
+  revisionGeneration,
+  setRevisionGeneration,
+  revisionCount,
+  revisionGroups,
+  visibleCount,
+  revisions,
+  focusBlock,
+  toggleRevision,
+  clearAllRevisions,
+  printMode,
+  setPrintMode
+}) {
+  const activePanelGen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
+  const [expandedScenes, setExpandedScenes] = useState({});
+  if (!open) {
+    return (
+      <button
+        className="style-panel-toggle-pill"
+        onClick={onCollapse}
+        title="Abrir Estilo & Revisão"
+      >
+        <Settings2 size={16} />
+      </button>
+    );
+  }
+  const setFilterMode = (m) => setRevisionFilter(prev => ({ ...prev, mode: m }));
+  const toggleGen = (level) => setRevisionFilter(prev => {
+    const hidden = prev.hiddenGens.includes(level)
+      ? prev.hiddenGens.filter(x => x !== level)
+      : [...prev.hiddenGens, level];
+    return { ...prev, hiddenGens: hidden };
+  });
+  const toggleScene = (key) => setExpandedScenes(prev => ({ ...prev, [key]: !prev[key] }));
+  return (
+    <div className="style-panel">
+      <div className="style-panel-header">
+        <div className="style-panel-title">
+          <Settings2 size={14} />
+          <span>Estilo & Revisão</span>
+        </div>
+        <button className="style-panel-collapse" onClick={onCollapse} title="Recolher painel">
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
+      <div className="style-panel-section">
+        <div className="style-panel-section-label">
+          <Circle size={9} fill="#ccee00" stroke="#ccee00" />
+          <span>Tema Escuro</span>
+          <span className="style-panel-tag">SEMPRE ATIVO</span>
+        </div>
+        <p className="style-panel-hint">Texto cinza sobre fundo preto profundo. Otimizado para reduzir cansaço visual em sessões longas.</p>
+      </div>
+
+      <div className="style-panel-section">
+        <div className="style-panel-section-label">
+          <Printer size={11} />
+          <span>Visualização de Impressão</span>
+        </div>
+        <p className="style-panel-hint">Oculta todos os adornos (marcadores, estrelas, bordas) e usa tipografia de máquina de escrever, pronta para imprimir ou exportar.</p>
+        <button
+          className={`style-panel-toggle ${printMode ? 'on' : ''}`}
+          onClick={() => setPrintMode(v => !v)}
+        >
+          <span className="style-panel-toggle-knob" />
+          <span className="style-panel-toggle-text">{printMode ? 'P&B ATIVO' : 'PADRÃO'}</span>
+        </button>
+      </div>
+
+      <div className="style-panel-section">
+        <div className="style-panel-section-label">
+          <ListChecks size={11} />
+          <span>Revisões — Sistema Beat</span>
+          <span className="style-panel-tag">{visibleCount}/{revisionCount}</span>
+        </div>
+
+        <div className="style-panel-toggle-row">
+          <button
+            className={`style-panel-pill ${revisionMode ? 'on' : ''}`}
+            onClick={() => setRevisionMode(v => !v)}
+          >
+            <span className="style-panel-pill-dot" style={{ background: activePanelGen.color }} />
+            {revisionMode ? 'Monitorando' : 'Monitorar'}
+          </button>
+        </div>
+
+        <div className="style-panel-sublabel">Geração ativa para novas edições</div>
+        <div className="style-panel-gen-grid">
+          {REVISION_GENERATIONS.map(gen => (
+            <button
+              key={gen.level}
+              className={`style-panel-gen-chip ${revisionGeneration === gen.level ? 'active' : ''}`}
+              style={{
+                '--gen-color': gen.hex,
+                background: revisionGeneration === gen.level ? `rgba(${parseInt(gen.hex.slice(1,3),16)},${parseInt(gen.hex.slice(3,5),16)},${parseInt(gen.hex.slice(5,7),16)},0.18)` : 'transparent',
+                borderColor: revisionGeneration === gen.level ? gen.hex : 'rgba(255,255,255,0.08)'
+              }}
+              onClick={() => setRevisionGeneration(gen.level)}
+              title={`${gen.name} (${gen.label})`}
+            >
+              <span className="style-panel-gen-marker" style={{ color: gen.hex }}>{gen.marker}</span>
+              <span className="style-panel-gen-label">{gen.name.replace('Roteiro ', '')}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="style-panel-sublabel" style={{ marginTop: '10px' }}>Filtro de visualização</div>
+        <div className="style-panel-radio-group">
+          <button
+            className={`style-panel-radio ${revisionFilter.mode === 'all' ? 'active' : ''}`}
+            onClick={() => setFilterMode('all')}
+          >
+            <Eye size={11} /><span>Todas</span>
+          </button>
+          <button
+            className={`style-panel-radio ${revisionFilter.mode === 'only' ? 'active' : ''}`}
+            onClick={() => setFilterMode('only')}
+          >
+            <Filter size={11} /><span>Só revisões</span>
+          </button>
+          <button
+            className={`style-panel-radio ${revisionFilter.mode === 'hide' ? 'active' : ''}`}
+            onClick={() => setFilterMode('hide')}
+          >
+            <EyeOff size={11} /><span>Ocultar</span>
+          </button>
+        </div>
+
+        <div className="style-panel-sublabel" style={{ marginTop: '10px' }}>Ocultar gerações</div>
+        <div className="style-panel-gen-grid">
+          {REVISION_GENERATIONS.map(gen => {
+            const isHidden = revisionFilter.hiddenGens.includes(gen.level);
+            return (
+              <button
+                key={gen.level}
+                className={`style-panel-gen-chip ${isHidden ? 'muted' : ''}`}
+                style={{
+                  '--gen-color': gen.hex,
+                  borderColor: isHidden ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)',
+                  opacity: isHidden ? 0.4 : 1
+                }}
+                onClick={() => toggleGen(gen.level)}
+                title={isHidden ? `Mostrar ${gen.name}` : `Ocultar ${gen.name}`}
+              >
+                <span className="style-panel-gen-marker" style={{ color: gen.hex }}>{gen.marker}</span>
+                <span className="style-panel-gen-label">{gen.name.replace('Roteiro ', '')}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="style-panel-sublabel" style={{ marginTop: '12px' }}>Revisões detectadas</div>
+        {revisionGroups.length === 0 ? (
+          <div className="style-panel-empty">
+            <Star size={18} />
+            <span>{revisionMode ? 'Nenhuma alteração capturada ainda. Edite blocos no editor.' : 'Modo revisão desligado — ative para começar a monitorar.'}</span>
+          </div>
+        ) : (
+          <div className="style-panel-revision-list">
+            {revisionGroups.map((group, gi) => {
+              const key = `${group.scene.index}::${group.scene.heading}`;
+              const expanded = expandedScenes[key] !== false;
+              const visibleItems = group.items.filter(i => !revisionFilter.hiddenGens.includes(i.gen));
+              if (visibleItems.length === 0) return null;
+              return (
+                <div key={key} className="style-panel-revision-group">
+                  <button
+                    className="style-panel-revision-scene"
+                    onClick={() => {
+                      toggleScene(key);
+                      const first = visibleItems[0];
+                      if (first) focusBlock(first.id, 'start');
+                    }}
+                  >
+                    {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                    <span className="style-panel-revision-scene-num">#{group.scene.sceneNumber}</span>
+                    <span className="style-panel-revision-scene-title">{group.scene.heading}</span>
+                    <span className="style-panel-revision-count">{visibleItems.length}</span>
+                  </button>
+                  {expanded && (
+                    <div className="style-panel-revision-items">
+                      {visibleItems.map(item => {
+                        const gen = REVISION_GENERATIONS.find(g => g.level === item.gen) || REVISION_GENERATIONS[0];
+                        return (
+                          <div key={item.id} className="style-panel-revision-row">
+                            <span
+                              className="style-panel-revision-pin"
+                              style={{ background: gen.hex, color: '#000' }}
+                              title={`${gen.name} (${gen.label})`}
+                            >
+                              {gen.marker}
+                            </span>
+                            <button
+                              className="style-panel-revision-text"
+                              onClick={() => focusBlock(item.id, 'start')}
+                              title="Ir para o bloco"
+                            >
+                              {item.text.length > 70 ? `${item.text.slice(0, 70)}…` : item.text}
+                            </button>
+                            <button
+                              className="style-panel-revision-remove"
+                              onClick={() => toggleRevision(item.id)}
+                              title="Remover desta revisão"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {visibleCount > 0 && (
+              <button className="style-panel-clear-all" onClick={clearAllRevisions} title="Limpar todas as marcações">
+                <Trash2 size={11} /><span>Limpar todas as revisões</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ── Beat‑compatible 8‑level Production Revision System ── */
 const REVISION_GENERATIONS = [
@@ -45,11 +286,12 @@ const generateBeatBlock = (metadata) => {
 };
 
 export default function ScreenplayTab() {
-  const { 
-    currentProject, 
-    updateScreenplay, 
-    saveCharacter, 
-    saveLocation, 
+  const {
+    currentProject,
+    currentProjectId,
+    updateScreenplay,
+    saveCharacter,
+    saveLocation,
     saveObject,
     deleteCharacter,
     deleteLocation,
@@ -57,15 +299,21 @@ export default function ScreenplayTab() {
     saveEntity,
     deleteEntityById,
     navigateTo,
-    tabNavigation
+    tabNavigation,
+    importScreenplayWithEntities,
+    enrichWithLLM,
+    stageProposedChanges,
+    setProjects,
+    getPendingStagingCount
   } = useProject();
 
   const [elements, setElements] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [zenMode, setZenMode] = useState(false);
-  const [paperTheme, setPaperTheme] = useState('dark');
-  
+
+  const [sidebarTab, setSidebarTab] = useState('outliner');
+  const [sidebarPosition, setSidebarPosition] = useState('right');
   const [fichaModal, setFichaModal] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -78,8 +326,14 @@ export default function ScreenplayTab() {
   const [revisionGeneration, setRevisionGeneration] = useState(0);
   const [revisions, setRevisions] = useState([]);
 
-  /* ── Novel Mode (Modo Romance) ── */
-  const [novelMode, setNovelMode] = useState(false);
+  /* ── Print / Style panel state ── */
+  const [printMode, setPrintMode] = useState(false);
+  const [stylePanelOpen, setStylePanelOpen] = useState(true);
+  const [revisionFilter, setRevisionFilter] = useState({ mode: 'all', hiddenGens: [] });
+
+  /* ── Page View Mode ── */
+  const [pageViewMode, setPageViewMode] = useState('continuous'); // 'continuous' | 'paginated'
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [autocomplete, setAutocomplete] = useState({
     show: false, suggestions: [], index: 0, x: 0, y: 0, blockId: '', type: '' 
@@ -108,17 +362,97 @@ export default function ScreenplayTab() {
     exportScreenplayPDF(currentProject);
   };
 
-  const handleFountainImport = (e) => {
+  const handleFountainImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const fountainText = ev.target.result;
-      const imported = parseFountain(fountainText);
-      saveScreenplay(imported);
-    };
-    reader.readAsText(file);
     e.target.value = '';
+    try {
+      let fountainText;
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        const parsed = await parseFile(file);
+        fountainText = parsed.text;
+      } else {
+        fountainText = await file.text();
+      }
+      const imported = parseFountain(fountainText);
+      console.log('[FountainImport] elements:', imported);
+      console.log('[FountainImport] element types:', imported.map(el => `${el.type}: "${el.text?.slice(0, 60)}"`));
+      const result = importScreenplayWithEntities(imported);
+      console.log('[FountainImport] extracted entity counts:', result);
+
+      const lines = [];
+      if (result?.characters) lines.push(`• ${result.characters} ficha(s) de personagem`);
+      if (result?.locations) lines.push(`• ${result.locations} locação(ões)`);
+      if (result?.scenes) lines.push(`• ${result.scenes} cena(s)`);
+      if (result?.acts) lines.push(`• ${result.acts} ato(s)`);
+      const fountainSummary = lines.length > 0
+        ? `Foram criadas automaticamente:\n\n${lines.join('\n')}`
+        : 'Roteiro importado. Elementos foram parseados e estão prontos para edição.';
+
+      const hasKey = !!getLLMApiKey();
+      if (!hasKey) {
+        setConfirmModal({
+          title: 'Roteiro importado com sucesso',
+          message: `${fountainSummary}\n\nPara extrair objetos, plot points e temas via IA, configure a chave da API NVIDIA nas configurações.`,
+          variant: 'success',
+          confirmLabel: 'OK',
+          onConfirm: () => setConfirmModal(null),
+          onCancel: () => setConfirmModal(null),
+        });
+        return;
+      }
+
+      setConfirmModal({
+        title: 'Extraindo objetos, plot points e temas...',
+        message: 'Roteiro importado. Agora a IA está analisando o texto para extrair objetos, plot points e temas.\n\nIsso pode levar alguns segundos...',
+        variant: 'alert',
+        confirmLabel: 'Aguarde',
+        onConfirm: () => {},
+        onCancel: () => {},
+      });
+
+      try {
+        const llmResult = await extractEnrichmentFromScreenplay(fountainText, (status) => {
+          setConfirmModal(prev => prev ? { ...prev, message: `Roteiro importado. Status: ${status}` } : prev);
+        });
+        const enrichResult = enrichWithLLM(llmResult);
+        console.log('[FountainImport] LLM enrichment counts:', enrichResult);
+
+        const allLines = [...lines];
+        if (enrichResult.objects) allLines.push(`• ${enrichResult.objects} objeto(s)`);
+        if (enrichResult.plot_points) allLines.push(`• ${enrichResult.plot_points} plot point(s)`);
+        if (enrichResult.themes) allLines.push(`• ${enrichResult.themes} tema(s)`);
+        if (enrichResult.acts) allLines.push(`• ${enrichResult.acts} ato(s)`);
+
+        setConfirmModal({
+          title: 'Importação completa!',
+          message: `${allLines.join('\n')}\n\nTodas as fichas foram criadas na Enciclopédia. Personagens, locais e cenas vieram da análise do roteiro. Objetos, plot points, temas e atos foram extraídos pela IA.`,
+          variant: 'success',
+          confirmLabel: 'OK',
+          onConfirm: () => setConfirmModal(null),
+          onCancel: () => setConfirmModal(null),
+        });
+      } catch (llmErr) {
+        console.error('[FountainImport] LLM enrichment failed:', llmErr);
+        setConfirmModal({
+          title: 'Importação parcial',
+          message: `${fountainSummary}\n\nA extração via IA falhou: ${llmErr.message}\n\nVocê pode rodar a extração manualmente no BrainstormTab.`,
+          variant: 'alert',
+          confirmLabel: 'OK',
+          onConfirm: () => setConfirmModal(null),
+          onCancel: () => setConfirmModal(null),
+        });
+      }
+    } catch (err) {
+      setConfirmModal({
+        title: 'Erro ao importar',
+        message: `Não foi possível importar o arquivo: ${err.message}`,
+        variant: 'alert',
+        confirmLabel: 'OK',
+        onConfirm: () => setConfirmModal(null),
+        onCancel: () => setConfirmModal(null),
+      });
+    }
   };
 
   /* Load BEAT metadata on init */
@@ -129,7 +463,8 @@ export default function ScreenplayTab() {
       const meta = parseBeatMetadata(els);
       if (meta['Revision Mode'] !== undefined) setRevisionMode(meta['Revision Mode']);
       if (meta['Revision Level'] !== undefined) setRevisionGeneration(meta['Revision Level']);
-      if (meta['NovelMode'] !== undefined) setNovelMode(meta['NovelMode']);
+      if (meta['PrintMode'] !== undefined) setPrintMode(meta['PrintMode']);
+      else if (meta['NovelMode'] !== undefined) setPrintMode(meta['NovelMode']);
     }
   }, [currentProject]);
 
@@ -137,40 +472,70 @@ export default function ScreenplayTab() {
     const entities = currentProject.entities;
     const withoutMeta = updatedElements.filter(el => el.type !== 'beat-metadata');
 
-    const linked = withoutMeta.map(el => {
-      if (el.entityId) return el;
-      if (el.type === 'scene-heading') {
-        const text = el.text.toUpperCase().trim();
-        const matchingScene = entities?.scenes?.find(s =>
-          s.title.toUpperCase() === text
-        );
-        if (matchingScene) return { ...el, entityId: matchingScene.id };
-        const loc = entities?.locations?.find(l =>
-          l.name.toUpperCase() === text || `${l.type} ${l.name}`.toUpperCase() === text
-        );
-        if (loc) return { ...el, entityId: loc.id };
+    // Use unified linking function
+    const linked = linkScreenplayToEntities(withoutMeta, entities);
+
+    // Update entities based on screenplay changes
+    const updatedEntities = { ...entities };
+    let hasEntityChanges = false;
+
+    linked.forEach(el => {
+      if (el.type === 'scene-heading' && el.entityId) {
+        const scene = entities?.scenes?.find(s => s.id === el.entityId);
+        if (scene && scene.title !== el.text.trim()) {
+          const idx = updatedEntities.scenes.findIndex(s => s.id === scene.id);
+          if (idx >= 0) {
+            updatedEntities.scenes[idx] = { ...scene, title: el.text.trim(), updatedAt: Date.now() };
+            hasEntityChanges = true;
+          }
+        }
       }
-      if (el.type === 'character') {
-        const charName = el.text.trim().toUpperCase();
-        const matchingChar = entities?.characters?.find(c =>
-          c.name.toUpperCase() === charName
-        );
-        if (matchingChar) return { ...el, entityId: matchingChar.id };
+      if (el.type === 'character' && el.entityId) {
+        const char = entities?.characters?.find(c => c.id === el.entityId);
+        const charName = el.text.replace(/\(.*\)/, '').trim();
+        if (char && char.name !== charName) {
+          const idx = updatedEntities.characters.findIndex(c => c.id === char.id);
+          if (idx >= 0) {
+            updatedEntities.characters[idx] = { ...char, name: charName, updatedAt: Date.now() };
+            hasEntityChanges = true;
+          }
+        }
+        // New location from scene heading
+        const parsed = parseSceneHeading(el.text);
+        if (parsed && !entities?.locations?.some(l => l.name === parsed.name && l.type === parsed.type)) {
+          updatedEntities.locations = updatedEntities.locations || [];
+          updatedEntities.locations.push({
+            id: `loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: parsed.name,
+            type: parsed.type,
+            description: '',
+            timeOfDay: parsed.timeOfDay,
+            mood: '',
+            group: '',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          hasEntityChanges = true;
+        }
       }
-      return el;
     });
+
+    // Apply entity updates if any
+    if (hasEntityChanges) {
+      setProjects(prev => prev.map(p => p.id === currentProjectId ? { ...p, entities: updatedEntities } : p));
+    }
 
     const meta = {
       'Revision Level': revisionGeneration,
       'Revision Mode': revisionMode,
-      'NovelMode': novelMode,
+      'PrintMode': printMode,
       'BlockRevisions': revisions.reduce((acc, id) => { acc[id] = revisionGeneration; return acc; }, {}),
-      'CharacterGenders': (currentProject.characters || []).reduce((acc, c) => {
+      'CharacterGenders': (entities?.characters || []).reduce((acc, c) => {
         const gender = (c.notes || '').toLowerCase().includes('feminino') ? 'Feminino' : 'Masculino';
         acc[c.name.toUpperCase()] = gender;
         return acc;
       }, {}),
-      'DocumentStyle': novelMode ? 'novel' : 'screenplay'
+      'DocumentStyle': printMode ? 'print' : 'screenplay'
     };
     const metaBlock = { id: 'beat-metadata', type: 'beat-metadata', text: generateBeatBlock(meta) };
     setElements([...linked, metaBlock]);
@@ -692,13 +1057,80 @@ export default function ScreenplayTab() {
     finally { setAiLoading(false); }
   };
 
+  /* ── Derive revision metadata for the panel ── */
+  const revisionMeta = useMemo(() => {
+    const meta = parseBeatMetadata(elements);
+    return meta['BlockRevisions'] || {};
+  }, [elements]);
+
+  const revisionItems = useMemo(() => {
+    if (!revisions || revisions.length === 0) return [];
+    const items = [];
+    let currentScene = { heading: 'Início', index: 0, sceneNumber: 0 };
+    let sceneOrdinal = 0;
+    elements.forEach((el, idx) => {
+      const type = pendingAutoTypes[el.id] || el.type;
+      if (type === 'scene-heading' || type === 'section') {
+        sceneOrdinal += 1;
+        currentScene = {
+          heading: cleanSceneText(el.text) || (type === 'section' ? 'Seção' : 'Cena'),
+          index: idx,
+          sceneNumber: sceneOrdinal
+        };
+      }
+      if (revisions.includes(el.id)) {
+        items.push({
+          id: el.id,
+          text: cleanSceneText(el.text) || '[bloco vazio]',
+          type,
+          scene: currentScene,
+          elIndex: idx,
+          gen: typeof revisionMeta[el.id] === 'number' ? revisionMeta[el.id] : revisionGeneration
+        });
+      }
+    });
+    return items;
+  }, [revisions, elements, pendingAutoTypes, revisionMeta, revisionGeneration]);
+
+  const revisionGroups = useMemo(() => {
+    const groups = [];
+    let currentKey = null;
+    revisionItems.forEach(item => {
+      const key = `${item.scene.index}::${item.scene.heading}`;
+      if (key !== currentKey) {
+        groups.push({ scene: item.scene, items: [item] });
+        currentKey = key;
+      } else {
+        groups[groups.length - 1].items.push(item);
+      }
+    });
+    return groups;
+  }, [revisionItems]);
+
+  const visibleRevisionCount = useMemo(() => {
+    if (revisionFilter.mode === 'only') {
+      return revisionGroups.reduce((sum, g) => sum + g.items.filter(i => !revisionFilter.hiddenGens.includes(i.gen)).length, 0);
+    }
+    return revisionItems.filter(i => !revisionFilter.hiddenGens.includes(i.gen)).length;
+  }, [revisionItems, revisionGroups, revisionFilter]);
+
   /* ── Page estimator & scene list ── */
   const paginatedElements = useMemo(() => {
     let currentPage = 1;
     let score = 0;
     const items = [];
+    const idIndexMap = {};
+    elements.forEach((el, index) => { idIndexMap[el.id] = index; });
     elements.forEach((el, index) => {
       if (el.type === 'beat-metadata') return;
+      const revIndex = Object.prototype.hasOwnProperty.call(revisionMeta, el.id) ? revisionMeta[el.id] : null;
+      const isRevised = revisions.includes(el.id) && revIndex !== null && !revisionFilter.hiddenGens.includes(revisionMeta[el.id]);
+      const isHiddenRevision = revisions.includes(el.id) && (revisionMeta[el.id] === undefined || revisionFilter.hiddenGens.includes(revisionMeta[el.id]));
+      if (revisionFilter.mode === 'hide' && isHiddenRevision) return;
+      if (revisionFilter.mode === 'only' && !isRevised && !el.type.match(/scene-heading|section|synopsis|note|beat/)) {
+        const sceneBreak = el.type === 'scene-heading' || el.type === 'section';
+        if (!sceneBreak) return;
+      }
       let weight = 1;
       const textLength = el.text ? el.text.length : 0;
       if (el.type === 'scene-heading') weight = 4.5;
@@ -716,7 +1148,20 @@ export default function ScreenplayTab() {
       items.push({ ...el, originalIndex: index, pageNum: currentPage });
     });
     return { items, totalPages: currentPage };
-  }, [elements]);
+  }, [elements, revisions, revisionMeta, revisionFilter]);
+
+  const pages = useMemo(() => {
+    const map = {};
+    paginatedElements.items.forEach(item => {
+      if (item.isPageBreak) return;
+      if (!map[item.pageNum]) map[item.pageNum] = [];
+      map[item.pageNum].push(item);
+    });
+    return Object.entries(map).map(([num, items]) => ({
+      pageNum: Number(num),
+      elements: items.map(i => elements[i.originalIndex]).filter(Boolean)
+    }));
+  }, [paginatedElements, elements]);
 
   const sceneHeadingsList = useMemo(() => {
     const list = [];
@@ -739,6 +1184,14 @@ export default function ScreenplayTab() {
     });
     return list;
   }, [elements]);
+
+  const sceneNumberMap = useMemo(() => {
+    const map = {};
+    sceneHeadingsList.forEach(scene => {
+      map[scene.index] = scene.sceneNumber;
+    });
+    return map;
+  }, [sceneHeadingsList]);
 
   const storylines = useMemo(() => {
     const map = {};
@@ -885,10 +1338,10 @@ export default function ScreenplayTab() {
     setAiLoading(true); setAiError(''); setShowCompileModal(false);
     setTimeout(() => {
       try {
-        const bd = currentProject.brainstormData || {};
-        const plotPoints = bd.plot_points || [];
-        const bdScenes = bd.scenes || [];
-        const dialogues = bd.dialogues || [];
+        const projEntities = currentProject.entities || {};
+        const plotPoints = projEntities.plot_points || [];
+        const bdScenes = projEntities.scenes || [];
+        const dialogues = projEntities.dialogues || [];
         const compiledElements = [];
         compiledElements.push(
           { id: `tp-1`, type: 'title-page', key: 'title', value: currentProject.title || 'Smoke Ninja Cat', text: `Title: ${currentProject.title || 'Smoke Ninja Cat'}` },
@@ -924,15 +1377,36 @@ export default function ScreenplayTab() {
             });
           }
         });
-        saveScreenplay(compiledElements);
-        setActiveTab('editor');
-        setConfirmModal({ title: 'Compilação Concluída', message: 'Compilação concluída com sucesso! Seu roteiro foi estruturado em blocos.', variant: 'alert', confirmLabel: 'OK', onConfirm: () => setConfirmModal(null), onCancel: () => setConfirmModal(null) });
+setActiveTab('editor');
+        const linkedElements = compiledElements.map(el => {
+          if (el.entityId) return el;
+          if (el.type === 'scene-heading') {
+            const elText = el.text.toUpperCase().trim();
+            const cleanText2 = elText.replace(/^\d+\s+/, '').replace(/\s+\d+\s*$/, '').trim();
+            const matchingScene = projEntities?.scenes?.find(s =>
+              s.title.toUpperCase() === elText || s.title.toUpperCase() === cleanText2
+            );
+            if (matchingScene) return { ...el, entityId: matchingScene.id };
+            const loc = projEntities?.locations?.find(l =>
+              l.name.toUpperCase() === elText || `${l.type} ${l.name}`.toUpperCase() === elText
+            );
+            if (loc) return { ...el, entityId: loc.id };
+          }
+          if (el.type === 'character') {
+            const charName = el.text.replace(/\(.*\)/, '').trim().toUpperCase();
+            const matchingChar = projEntities?.characters?.find(c =>
+              c.name.toUpperCase() === charName
+            );
+            if (matchingChar) return { ...el, entityId: matchingChar.id };
+          }
+          return el;
+        });
+        stageProposedChanges(linkedElements, 'compile', 'Compilação do Brainstorm');
+        setConfirmModal({ title: 'Compilação Concluída', message: 'Compilação concluída! As mudanças estão pendentes para revisão. Vá na aba "Versões" para aprovar.', variant: 'alert', confirmLabel: 'Ir para Versões', onConfirm: () => { setConfirmModal(null); navigateTo('versions'); }, onCancel: () => setConfirmModal(null) });
       } catch (err) { console.error(err); setAiError('Falha ao compilar roteiro.'); }
       finally { setAiLoading(false); }
     }, 1200);
   };
-
-  const handlePrint = () => { window.print(); };
 
   // outlinerFilteredScenes removed — using sceneHeadingsList directly via SharedSidebar
 
@@ -958,42 +1432,11 @@ export default function ScreenplayTab() {
       case 'parenthetical': return 'script-parenthetical';
       case 'dialogue': return 'script-dialogue';
       case 'transition': return 'script-transition';
+      case 'section': return 'script-section';
+      case 'synopsis': return 'script-synopsis';
       default: return 'script-action';
     }
   };
-
-  /* ── Novel Mode prose renderer ── */
-  const renderNovelText = (el, index) => {
-    if (el.type === 'scene-heading') {
-      const clean = (el.text || '').replace(/\[\[.*?\]\]/g, '').replace(/#.*?#/g, '').trim();
-      return <h3 key={el.id} className="novel-chapter-heading">CAPÍTULO {index + 1}: {clean}</h3>;
-    }
-    if (el.type === 'action') {
-      return <p key={el.id} className="novel-paragraph">{el.text}</p>;
-    }
-    if (el.type === 'character') {
-      return <p key={el.id} className="novel-dialogue-line"><em className="novel-speaker">{el.text}</em></p>;
-    }
-    if (el.type === 'dialogue') {
-      return <p key={el.id} className="novel-dialogue-text">— {el.text}</p>;
-    }
-    if (el.type === 'parenthetical') {
-      return <p key={el.id} className="novel-parenthetical"><em>({el.text.replace(/[()]/g, '')})</em></p>;
-    }
-    if (el.type === 'transition') {
-      return <p key={el.id} className="novel-transition"><em>{el.text}</em></p>;
-    }
-    if (el.type === 'section') {
-      return <h2 key={el.id} className="novel-section-heading">{el.text}</h2>;
-    }
-    if (el.type === 'synopsis') {
-      return <p key={el.id} className="novel-synopsis"><em>{el.text}</em></p>;
-    }
-    return null;
-  };
-
-  /* ── Helper to get active revision gen ── */
-  const activeGen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
 
   /* ── FichaModal handlers + Beat integration ── */
   const openFicha = (item, type, mode = 'view') => {
@@ -1023,6 +1466,14 @@ export default function ScreenplayTab() {
     setFichaModal(null);
   };
 
+  const handleSidebarDelete = (item, type) => {
+    if (!item?.id) return;
+    if (type === 'character') deleteCharacter(item.id);
+    else if (type === 'location') deleteLocation(item.id);
+    else if (type === 'object') deleteObject(item.id);
+    else deleteEntityById(type + 's', item.id);
+  };
+
   /* ── Entity matching helpers for Ficha badges ── */
   const findMatchingScene = (text) => {
     if (!text || !currentProject?.entities?.scenes) return null;
@@ -1041,31 +1492,37 @@ export default function ScreenplayTab() {
 
   return (
     <div className={`screenplay-layout-container ${zenMode ? 'zen-active' : ''}`} style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#050505', color: '#fff' }}>
-
-      <SharedSidebar
-        currentProject={currentProject}
-        onEdit={(item, type, mode) => {
-          if (!item) {
-            switch (type) {
-              case 'character': openFicha({ name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, 'character', 'edit'); break;
-              case 'location': openFicha({ name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, 'location', 'edit'); break;
-              case 'object': openFicha({ name: '', description: '', significance: '' }, 'object', 'edit'); break;
-              case 'scene': openFicha({ title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' }, 'scene', 'edit'); break;
-              case 'plot_point': openFicha({ name: 'Novo Plot Point', description: '', impact: '', storyArc: '' }, 'plot_point', 'edit'); break;
-              case 'theme': openFicha({ name: 'Novo Tema', statement: '', description: '', tags: [] }, 'theme', 'edit'); break;
-              case 'act': openFicha({ name: 'Novo Ato', description: '', color: '#ccee00', order: 0 }, 'act', 'edit'); break;
-              default: openFicha({ name: '' }, type, 'edit');
-            }
-          } else {
-            openFicha(item, type, mode || 'edit');
-          }
-        }}
-        onSelectItem={(item, type) => openFicha(item, type)}
-        open={sidebarOpen && !zenMode}
-        onToggle={() => { if (zenMode) setZenMode(false); setSidebarOpen(prev => !prev); }}
-        outlinerData={sceneHeadingsList}
-        onOutlinerSelect={(item) => focusBlock(item.id, 'start')}
-      />
+      {(() => {
+        const pendingCount = getPendingStagingCount();
+        if (pendingCount === 0) return null;
+        return (
+          <div
+            onClick={() => navigateTo('versions')}
+            style={{
+              position: 'absolute',
+              top: '50px',
+              right: '20px',
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 14px',
+              background: 'rgba(245,158,11,0.15)',
+              border: '1px solid rgba(245,158,11,0.4)',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              color: '#f59e0b',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              boxShadow: '0 0 12px rgba(245,158,11,0.2)'
+            }}
+            title="Clique para revisar"
+          >
+            <AlertTriangle size={14} />
+            <span>{pendingCount} atualização(ões) pendente(s)</span>
+          </div>
+        );
+      })()}
 
       {/* ── Main workspace ── */}
       <div className="workspace">
@@ -1078,18 +1535,25 @@ export default function ScreenplayTab() {
               <button onClick={() => setActiveTab('timeline')} className={`toolbar-tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}><Layers size={14} /><span>Linha do Tempo</span></button>
               <button onClick={() => setActiveTab('stats')} className={`toolbar-tab-btn ${activeTab === 'stats' ? 'active' : ''}`}><BarChart2 size={14} /><span>Estatisticas</span></button>
               <button onClick={() => setActiveTab('plugins')} className={`toolbar-tab-btn ${activeTab === 'plugins' ? 'active' : ''}`}><Cpu size={14} /><span>Plugins</span></button>
-              <button onClick={() => setActiveTab('style')} className={`toolbar-tab-btn ${activeTab === 'style' ? 'active' : ''}`}><Compass size={14} /><span>Estilo & Revisao</span></button>
+              <button onClick={() => setStylePanelOpen(v => !v)} className={`toolbar-tab-btn ${stylePanelOpen ? 'active' : ''}`} title="Abrir painel de Estilo & Revisao"><Settings2 size={14} /><span>Estilo</span></button>
+              <div className="toolbar-separator" />
+              <button onClick={() => { setPageViewMode('continuous'); setCurrentPage(1); }} className={`toolbar-tab-btn ${pageViewMode === 'continuous' ? 'active' : ''}`} title="Pagina continua">
+                <FileText size={14} /><span>Continuo</span>
+              </button>
+              <button onClick={() => { setPageViewMode('paginated'); setCurrentPage(1); }} className={`toolbar-tab-btn ${pageViewMode === 'paginated' ? 'active' : ''}`} title="Pagina por pagina">
+                <Layers size={14} /><span>Paginas</span>
+              </button>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               ref={fountainInputRef}
               type="file"
-              accept=".fountain,.txt"
+              accept=".fountain,.txt,.pdf"
               onChange={handleFountainImport}
               style={{ display: 'none' }}
             />
-            <button onClick={() => fountainInputRef.current.click()} className="toolbar-tab-btn" title="Importar .fountain"><Upload size={14} /><span>Importar</span></button>
+            <button onClick={() => fountainInputRef.current.click()} className="toolbar-tab-btn" title="Importar .fountain / .pdf"><Upload size={14} /><span>Importar</span></button>
             <button onClick={handleFountainExport} className="toolbar-tab-btn" title="Exportar .fountain"><Download size={14} /><span>Exportar</span></button>
             <button onClick={handlePDFExport} className="toolbar-tab-btn" title="Exportar PDF"><Printer size={14} /></button>
             <button onClick={handleAIFeedback} disabled={aiLoading} className="toolbar-tab-btn" title="Feedback da IA"><Award size={14} /><span>Feedback IA</span></button>
@@ -1098,32 +1562,12 @@ export default function ScreenplayTab() {
           </div>
         </div>
 
-        <div className={`editor-container ${paperTheme === 'light' ? 'light-theme' : ''}`}>
+        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''}`}>
           
           {/* ── A. TEXT EDITOR ── */}
           {activeTab === 'editor' && (
-            novelMode ? (
-              <div className="novel-container">
-                {elements.filter(el => el.type !== 'beat-metadata').length === 0 ? (
-                  <div style={{ padding: '60px', textAlign: 'center', color: '#7c7c82' }}>
-                    <BookOpen size={48} style={{ margin: '0 auto 16px auto', opacity: 0.5 }} />
-                    <p style={{ fontSize: '13px', fontStyle: 'italic', marginBottom: '16px' }}>Modo Romance ativado. Escreva seu roteiro em prosa literaria.</p>
-                  </div>
-                ) : (
-                  elements.map((el, index) => {
-                    if (el.type === 'beat-metadata') return null;
-                    return renderNovelText(el, index);
-                  })
-                )}
-                <div style={{ position: 'fixed', bottom: '24px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '6px 16px', display: 'flex', gap: '8px', zIndex: 'var(--z-tooltip)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-                  <button onClick={() => addLineAtEnd('scene-heading')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Capitulo</button>
-                  <button onClick={() => addLineAtEnd('action')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Paragrafo</button>
-                  <button onClick={() => addLineAtEnd('character')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Fala</button>
-                  <button onClick={() => addLineAtEnd('dialogue')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Dialogo</button>
-                </div>
-              </div>
-            ) : (
-              <div className={`screenplay-container ${paperTheme === 'dark' ? 'dark-paper' : ''}`} style={{ width: '100%', maxWidth: '816px' }}>
+            pageViewMode === 'continuous' ? (
+              <div className={`screenplay-container continuous-mode dark-paper ${printMode ? 'print-mode' : ''}`} style={{ width: '100%' }}>
                 {elements.filter(el => el.type !== 'beat-metadata').length === 0 ? (
                   <div style={{ padding: '60px', textAlign: 'center', color: '#7c7c82' }}>
                     <FileText size={48} style={{ margin: '0 auto 16px auto', opacity: 0.5 }} />
@@ -1133,7 +1577,11 @@ export default function ScreenplayTab() {
                 ) : (
                   paginatedElements.items.map((item) => {
                     if (item.isPageBreak) {
-                      return <div key={`break-${item.pageNum}`} className="virtual-page-break">FIM DA PAGINA {item.pageNum} • INICIO DA PAGINA {item.nextPageNum}</div>;
+                      return (
+                        <div key={`break-${item.pageNum}`} className="virtual-page-break">
+                          <span className="virtual-page-number">{item.pageNum}</span>
+                        </div>
+                      );
                     }
                     const el = elements[item.originalIndex];
                     if (!el) return null;
@@ -1146,9 +1594,14 @@ export default function ScreenplayTab() {
                     }
                     const isRevised = revisions.includes(el.id);
                     const gen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
+                    const cleanText = cleanSceneText(el.text);
+                    const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';
                     return (
                       <div key={el.id} className="script-element-wrapper">
                         <span className="format-badge">{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
+                        {isSceneHeading && (
+                          <span className="scene-marker">#{sceneNumberMap[item.originalIndex] || item.originalIndex + 1}</span>
+                        )}
                         {isRevised && (
                           <>
                             <span className="revision-star" style={{ color: gen.hex }}>{gen.marker}</span>
@@ -1160,7 +1613,7 @@ export default function ScreenplayTab() {
                             if (ref) {
                               elementRefs.current[el.id] = ref;
                               if (!ceInitSet.current.has(el.id) || !ref.innerText.trim()) {
-                                ref.innerText = el.text;
+                                ref.innerText = cleanText;
                                 ceInitSet.current.add(el.id);
                               }
                             }
@@ -1188,12 +1641,12 @@ export default function ScreenplayTab() {
                             Ficha
                           </span>
                         )}
-                        {(pendingAutoTypes[el.id] || el.type) === 'scene-heading' && findMatchingScene(el.text) && (
-                          <span onClick={() => openFicha(findMatchingScene(el.text), 'scene')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        {isSceneHeading && findMatchingScene(cleanText) && (
+                          <span onClick={() => openFicha(findMatchingScene(cleanText), 'scene')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
                             Cena
                           </span>
                         )}
-                        {(pendingAutoTypes[el.id] || el.type) === 'scene-heading' && !findMatchingScene(el.text) && findMatchingLocationFromHeading(el.text) && (
+                        {isSceneHeading && !findMatchingScene(cleanText) && findMatchingLocationFromHeading(el.text) && (
                           <span onClick={() => openFicha(findMatchingLocationFromHeading(el.text), 'location')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
                             Loc
                           </span>
@@ -1201,6 +1654,11 @@ export default function ScreenplayTab() {
                       </div>
                     );
                   })
+                )}
+                {paginatedElements.totalPages > 0 && (
+                  <div className="virtual-page-break final-page">
+                    <span className="virtual-page-number">{paginatedElements.totalPages}</span>
+                  </div>
                 )}
                 <div style={{ position: 'fixed', bottom: '24px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '6px 16px', display: 'flex', gap: '8px', zIndex: 'var(--z-tooltip)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
                   <button onClick={() => addLineAtEnd('scene-heading')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Cena</button>
@@ -1211,7 +1669,127 @@ export default function ScreenplayTab() {
                   <button onClick={() => addLineAtEnd('transition')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Transicao</button>
                 </div>
               </div>
+            ) : (
+              <div className="paginated-viewport">
+                {pages.length === 0 ? (
+                  <div style={{ padding: '60px', textAlign: 'center', color: '#7c7c82' }}>
+                    <FileText size={48} style={{ margin: '0 auto 16px auto', opacity: 0.5 }} />
+                    <p style={{ fontSize: '13px', fontStyle: 'italic', marginBottom: '16px' }}>Roteiro vazio. Escreva algo para ver as paginas.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="page-sheet-wrapper">
+                      <div className={`screenplay-container page-sheet dark-paper ${printMode ? 'print-mode' : ''}`}>
+                        {pages[currentPage - 1]?.elements.map((el) => {
+                          if (el.type === 'beat-metadata') return null;
+                          if (el.type === 'title-page') {
+                            return <div key={el.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '12px 0', fontSize: '11px', color: '#7c7c82', display: 'flex', gap: '8px', fontFamily: 'monospace' }}>
+                              <span style={{ color: '#ccee00' }}>[FOLHA DE ROSTO]</span>
+                              <span>{el.text}</span>
+                            </div>;
+                          }
+                          const isRevised = revisions.includes(el.id);
+                          const gen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
+                          const origIndex = elements.indexOf(el);
+                          const cleanText = cleanSceneText(el.text);
+                          const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';
+                          return (
+                            <div key={el.id} className="script-element-wrapper">
+                              <span className="format-badge">{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
+                              {isSceneHeading && (
+                                <span className="scene-marker">#{sceneNumberMap[origIndex] || origIndex + 1}</span>
+                              )}
+                              {isRevised && (
+                                <>
+                                  <span className="revision-star" style={{ color: gen.hex }}>{gen.marker}</span>
+                                  <div className="revision-star-bar" style={{ backgroundColor: gen.hex }} />
+                                </>
+                              )}
+                              <div
+                                ref={ref => {
+                                  if (ref) {
+                                    elementRefs.current[el.id] = ref;
+                                    if (!ceInitSet.current.has(el.id) || !ref.innerText.trim()) {
+                                      ref.innerText = cleanText;
+                                      ceInitSet.current.add(el.id);
+                                    }
+                                  }
+                                }}
+                                contentEditable
+                                suppressContentEditableWarning
+                                className={`script-element ${getStyleForType(pendingAutoTypes[el.id] || el.type)}`}
+                                onInput={(e) => handleInput(el.id, e.target.innerText)}
+                                onBlur={() => handleBlur(el.id)}
+                                onKeyDown={(e) => handleKeyDown(e, origIndex, el)}
+                                style={{ minHeight: '1.5em' }}
+                              />
+                              <div className="script-element-actions-trigger">
+                                <button onClick={() => handleAIAutoComplete(el.id)} style={{ padding: '4px', borderRadius: '4px', background: 'rgba(204,238,0,0.1)', border: '1px solid rgba(204,238,0,0.3)', color: '#ccee00', cursor: 'pointer' }} title="Completar Cena com IA"><Sparkles size={11} /></button>
+                                <select value={aiTone} onChange={(e) => { setAiTone(e.target.value); setTimeout(() => handleAIImproveBlock(el.id), 50); }} style={{ background: '#020203', border: '1px solid #1d1d24', color: '#fff', fontSize: '9px', borderRadius: '4px', padding: '2px' }} title="Reescrever Linha com IA">
+                                  <option value="dramatico">Drama</option>
+                                  <option value="misterioso">Misterio</option>
+                                  <option value="comico">Comico</option>
+                                  <option value="acao">Acao</option>
+                                </select>
+                              </div>
+                              <div onClick={(e) => handleGripClick(e, el.id, origIndex)} style={{ position: 'absolute', left: '-24px', top: '8px', cursor: 'pointer', color: '#444', fontSize: '12px', userSelect: 'none' }} title="Acoes do Bloco">⠿</div>
+                              {(pendingAutoTypes[el.id] || el.type) === 'character' && findMatchingCharacter(el.text) && (
+                                <span onClick={() => openFicha(findMatchingCharacter(el.text), 'character')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(204,238,0,0.12)', color: '#ccee00', border: '1px solid rgba(204,238,0,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>Ficha</span>
+                              )}
+                              {isSceneHeading && findMatchingScene(cleanText) && (
+                                <span onClick={() => openFicha(findMatchingScene(cleanText), 'scene')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>Cena</span>
+                              )}
+                              {isSceneHeading && !findMatchingScene(cleanText) && findMatchingLocationFromHeading(el.text) && (
+                                <span onClick={() => openFicha(findMatchingLocationFromHeading(el.text), 'location')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>Loc</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div className="page-footer-number">{currentPage}</div>
+                      </div>
+                    </div>
+                    <div className="page-nav-bar">
+                      <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="page-nav-btn"><ChevronLeft size={14} /> Anterior</button>
+                      <span className="page-nav-indicator">{currentPage} / {paginatedElements.totalPages}</span>
+                      <button onClick={() => setCurrentPage(p => Math.min(paginatedElements.totalPages, p + 1))} disabled={currentPage >= paginatedElements.totalPages} className="page-nav-btn">Proxima <ChevronRight size={14} /></button>
+                    </div>
+                    <div style={{ position: 'fixed', bottom: '24px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '6px 16px', display: 'flex', gap: '8px', zIndex: 'var(--z-tooltip)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                      <button onClick={() => addLineAtEnd('scene-heading')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Cena</button>
+                      <button onClick={() => addLineAtEnd('action')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Acao</button>
+                      <button onClick={() => addLineAtEnd('character')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Persona</button>
+                      <button onClick={() => addLineAtEnd('dialogue')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Dialogo</button>
+                      <button onClick={() => addLineAtEnd('parenthetical')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>() Parentese</button>
+                      <button onClick={() => addLineAtEnd('transition')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Transicao</button>
+                    </div>
+                  </>
+                )}
+              </div>
             )
+          )}
+
+          {/* ── ESTILO & REVISAO floating panel ── */}
+          {activeTab === 'editor' && (
+            <StylePanel
+              open={stylePanelOpen}
+              onCollapse={() => setStylePanelOpen(false)}
+              revisionFilter={revisionFilter}
+              setRevisionFilter={setRevisionFilter}
+              revisionMode={revisionMode}
+              setRevisionMode={setRevisionMode}
+              revisionGeneration={revisionGeneration}
+              setRevisionGeneration={setRevisionGeneration}
+              revisionCount={revisionItems.length}
+              revisionGroups={revisionGroups}
+              visibleCount={visibleRevisionCount}
+              revisions={revisions}
+              focusBlock={focusBlock}
+              toggleRevision={(id) => {
+                setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+              }}
+              clearAllRevisions={() => setRevisions([])}
+              printMode={printMode}
+              setPrintMode={setPrintMode}
+            />
           )}
 
           {aiFeedback && (
@@ -1399,103 +1977,41 @@ export default function ScreenplayTab() {
             </div>
           )}
 
-          {/* ── F. STYLE & REVISIONS ── */}
-          {activeTab === 'style' && (
-            <div style={{ flex: 1, padding: '32px', background: '#050506', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
-              
-              {/* Paper Theme Selection */}
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', marginBottom: '8px' }}>Padrao de Visualizacao / Estilos</h3>
-                <p style={{ fontSize: '12px', color: '#7c7c82', marginBottom: '16px' }}>Altere o estilo geral da folha de escrita.</p>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <div onClick={() => setPaperTheme('dark')} style={{ flex: 1, padding: '16px', borderRadius: '8px', border: paperTheme === 'dark' ? '2px solid #ccee00' : '1px solid #141419', background: '#08080a', cursor: 'pointer', textAlign: 'center' }}>
-                    <span style={{ display: 'block', fontWeight: 'bold', fontSize: '13px' }}>Folha Escura (Distracao Zero)</span>
-                    <span style={{ fontSize: '11px', color: '#7c7c82' }}>Texto cinza sobre fundo preto profundo</span>
-                  </div>
-                  <div onClick={() => setPaperTheme('light')} style={{ flex: 1, padding: '16px', borderRadius: '8px', border: paperTheme === 'light' ? '2px solid #ccee00' : '1px solid #141419', background: '#08080a', cursor: 'pointer', textAlign: 'center' }}>
-                    <span style={{ display: 'block', fontWeight: 'bold', fontSize: '13px' }}>Folha de Producao (Clara)</span>
-                    <span style={{ fontSize: '11px', color: '#7c7c82' }}>Texto escuro sobre folha branca padrao</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Novel Mode Toggle */}
-              <div style={{ borderTop: '1px solid #141419', paddingTop: '24px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', marginBottom: '8px' }}>Modo Romance (Novel Mode)</h3>
-                <p style={{ fontSize: '12px', color: '#7c7c82', marginBottom: '16px' }}>Reformata o roteiro como prosa literaria — cabecalhos viram capitulos, dialogos usam travessao.</p>
-                <div style={{ background: '#08080a', border: '1px solid #141419', padding: '20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ display: 'block', fontWeight: 'bold', fontSize: '13px' }}>Ativar Modo Romance</span>
-                    <span style={{ fontSize: '11px', color: '#7c7c82' }}>Alterna entre visualizacao de roteiro e prosa literaria.</span>
-                  </div>
-                  <button onClick={() => setNovelMode(!novelMode)} style={{ background: novelMode ? '#10b981' : '#ccee00', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', minWidth: '80px' }}>
-                    {novelMode ? 'Ativo' : 'Desativado'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Beat 8-Level Production Revision System */}
-              <div style={{ borderTop: '1px solid #141419', paddingTop: '24px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', marginBottom: '8px' }}>Controle de Revisoes de Producao (Sistema Beat 8 Geracoes)</h3>
-                <p style={{ fontSize: '12px', color: '#7c7c82', marginBottom: '16px' }}>
-                  Monitore edicoes em tempo real. Cada geracao de revisao usa um marcador de margem especifico e cor canonica da industria: 
-                  <code style={{ color: '#ccee00' }}> * ** + ++ @@ # ##</code>
-                </p>
-                
-                {/* Revision Generation Selector */}
-                <div style={{ background: '#08080a', border: '1px solid #141419', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
-                  <span style={{ display: 'block', fontWeight: 'bold', fontSize: '13px', marginBottom: '12px' }}>Geracao de Revisao Ativa</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                    {REVISION_GENERATIONS.map(gen => {
-                      const isActive = revisionGeneration === gen.level;
-                      return (
-                        <div 
-                          key={gen.level}
-                          onClick={() => setRevisionGeneration(gen.level)}
-                          style={{
-                            padding: '12px', borderRadius: '8px', cursor: 'pointer',
-                            background: isActive ? `rgba(${parseInt(gen.hex.slice(1,3),16)}, ${parseInt(gen.hex.slice(3,5),16)}, ${parseInt(gen.hex.slice(5,7),16)}, 0.15)` : '#020203',
-                            border: isActive ? `2px solid ${gen.hex}` : '1px solid #1d1d24',
-                            textAlign: 'center', transition: 'all 0.2s'
-                          }}
-                        >
-                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: gen.hex, marginBottom: '4px' }}>{gen.marker}</div>
-                          <div style={{ fontSize: '10px', fontWeight: 'bold', color: isActive ? gen.hex : '#7c7c82' }}>{gen.name}</div>
-                          <div style={{ fontSize: '8px', color: '#7c7c82' }}>{gen.label}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Revision Mode Toggle */}
-                <div style={{ background: '#08080a', border: '1px solid #141419', padding: '20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ display: 'block', fontWeight: 'bold', fontSize: '13px' }}>Ativar Modo de Revisao</span>
-                      {revisionMode && (
-                        <span style={{ display: 'inline-block', padding: '2px 8px', background: activeGen.hex, color: '#000', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold' }}>
-                          {activeGen.marker} {activeGen.name}
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '11px', color: '#7c7c82' }}>Modificacoes feitas no editor serao monitoradas com estrelas na margem.</span>
-                    {revisions.length > 0 && (
-                      <span style={{ display: 'block', fontSize: '11px', color: '#ccee00', fontWeight: 'bold', marginTop: '4px' }}>
-                        {revisions.length} alteracoes marcadas na margem
-                      </span>
-                    )}
-                  </div>
-                  <button onClick={() => setRevisionMode(!revisionMode)} style={{ background: revisionMode ? '#ef4444' : '#ccee00', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', minWidth: '80px' }}>
-                    {revisionMode ? 'Desativar' : 'Ativar'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ── F. ESTILO & REVISOES moved into floating editor panel */}
 
         </div>
       </div>
+
+      <SharedSidebar
+        currentProject={currentProject}
+        activeTab={sidebarTab}
+        onTabChange={setSidebarTab}
+        onEdit={(item, type, mode) => {
+          if (!item) {
+            switch (type) {
+              case 'character': openFicha({ name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, 'character', 'edit'); break;
+              case 'location': openFicha({ name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, 'location', 'edit'); break;
+              case 'object': openFicha({ name: '', description: '', significance: '' }, 'object', 'edit'); break;
+              case 'scene': openFicha({ title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' }, 'scene', 'edit'); break;
+              case 'plot_point': openFicha({ name: 'Novo Plot Point', description: '', impact: '', storyArc: '' }, 'plot_point', 'edit'); break;
+              case 'theme': openFicha({ name: 'Novo Tema', statement: '', description: '', tags: [] }, 'theme', 'edit'); break;
+              case 'act': openFicha({ name: 'Novo Ato', description: '', color: '#ccee00', order: 0 }, 'act', 'edit'); break;
+              default: openFicha({ name: '' }, type, 'edit');
+            }
+          } else {
+            openFicha(item, type, mode || 'edit');
+          }
+        }}
+        onDelete={handleSidebarDelete}
+        onSelectItem={(item, type) => openFicha(item, type)}
+        tabContext="screenplay"
+        open={sidebarOpen && !zenMode}
+        onToggle={() => { if (zenMode) setZenMode(false); setSidebarOpen(prev => !prev); }}
+        outlinerData={sceneHeadingsList}
+        onOutlinerSelect={(item) => focusBlock(item.id, 'start')}
+        position={sidebarPosition}
+        onPositionToggle={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
+      />
 
       {/* ── Autocomplete ── */}
       {autocomplete.show && (
@@ -1561,6 +2077,12 @@ export default function ScreenplayTab() {
           onDelete={handleFichaDelete}
           onClose={() => setFichaModal(null)}
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+          onNavigateToScreenplay={(id) => {
+            setActiveTab('editor');
+            // The entityId will be linked in the screenplay elements
+            // scrollToEntityId will be handled by the tabNavigation
+            navigateTo('screenplay', id);
+          }}
         />
       )}
       {confirmModal && <ConfirmModal {...confirmModal} />}

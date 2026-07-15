@@ -24,6 +24,8 @@ export function useEntities() {
   const plotPoints = useMemo(() => getList('plot_points'), [entities]);
   const themes = useMemo(() => getList('themes'), [entities]);
   const acts = useMemo(() => getList('acts'), [entities]);
+  const dialogues = useMemo(() => getList('dialogues'), [entities]);
+  const worldElements = useMemo(() => getList('world_elements'), [entities]);
 
   const findEntity = (entityId) => {
     return findEntityInProject(currentProject, entityId);
@@ -57,6 +59,8 @@ export function useEntities() {
     plotPoints,
     themes,
     acts,
+    dialogues,
+    worldElements,
     entities,
     findEntity,
     getScenesByAct,
@@ -79,5 +83,9 @@ export function useEntities() {
     deleteTheme: (id) => deleteEntityById('themes', id),
     saveAct: (data) => saveEntity('acts', data),
     deleteAct: (id) => deleteEntityById('acts', id),
+    saveDialogue: (data) => saveEntity('dialogues', data),
+    deleteDialogue: (id) => deleteEntityById('dialogues', id),
+    saveWorldElement: (data) => saveEntity('world_elements', data),
+    deleteWorldElement: (id) => deleteEntityById('world_elements', id),
   };
 }

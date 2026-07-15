@@ -11,7 +11,7 @@ const TYPE_LABELS = {
   act: 'Ato',
 };
 
-export default function FichaModal({ item, type, mode: initialMode, onSave, onDelete, onClose, acts = [], onNavigateToEncyclopedia }) {
+export default function FichaModal({ item, type, mode: initialMode, onSave, onDelete, onClose, acts = [], onNavigateToEncyclopedia, onNavigateToScreenplay }) {
   const [isEditing, setIsEditing] = useState(initialMode === 'edit');
 
   const [form, setForm] = useState({
@@ -167,6 +167,15 @@ export default function FichaModal({ item, type, mode: initialMode, onSave, onDe
           ) : <div />}
           {footerRight}
         </div>
+        
+        {/* Botão "Ver no Roteiro" */}
+        {item?.id && onNavigateToScreenplay && (
+          <div className="ficha-actions mt-4">
+            <button className="btn btn-primary" onClick={() => onNavigateToScreenplay(item.id)}>
+              Ver no Roteiro
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );
