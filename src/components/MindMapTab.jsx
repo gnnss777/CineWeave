@@ -1240,8 +1240,8 @@ export default function MindMapTab() {
       {promptModal && <PromptModal {...promptModal} />}
       <SharedSidebar
         currentProject={currentProject}
-        activeTab={sidebarTab}
-        onTabChange={setSidebarTab}
+        activeTab={sharedSidebarTab}
+        onTabChange={setSharedSidebarTab}
         open={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onEdit={(item, type, mode) => openFicha(item, type, mode)}
