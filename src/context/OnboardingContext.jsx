@@ -12,7 +12,7 @@ export const ONBOARDING_STEPS = {
       content: 'Aqui é onde tudo começa. Grave suas ideias por voz, escreva a sinopse ou envie anotações e imagens. O CineWeave transforma tudo em estrutura narrativa.',
       position: 'bottom',
     },
-    {
+{
       id: 'brainstorm-record',
       target: '[data-onboarding="brainstorm-record"]',
       title: 'Gravar por Voz',

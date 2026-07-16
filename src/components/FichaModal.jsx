@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Edit3, Check, Trash2, MapPin, FileText, Target, Feather, Layers } from 'lucide-react';
+import { ArrowLeft, Edit3, Check, Trash2, MapPin, FileText, Target, Feather, Layers, MessageSquare, Globe } from 'lucide-react';
 import TagSelector from './TagSelector';
 
 const TYPE_LABELS = {
@@ -8,6 +8,8 @@ const TYPE_LABELS = {
   object: 'Objeto',
   scene: 'Cena',
   plot_point: 'Plot Point',
+  dialogue: 'Diálogo',
+  world_element: 'Elemento do Mundo',
   theme: 'Tema',
   act: 'Ato',
 };
@@ -50,6 +52,16 @@ export default function FichaModal({ item, type, mode: initialMode, onSave, onDe
     actOrder: item?.order ?? 0,
     actDescription: item?.description || '',
     actColor: item?.color || '#ccee00',
+
+    dialogueSpeaker: item?.speaker || '',
+    dialogueLine: item?.line || '',
+    dialogueContext: item?.context || '',
+    dialogueTags: (item?.tags || []).join(', '),
+
+    worldName: item?.name || '',
+    worldType: item?.type || 'setting',
+    worldDescription: item?.description || '',
+    worldTags: (item?.tags || []).join(', '),
   });
 
   const set = (field) => (e) => {
@@ -102,6 +114,18 @@ export default function FichaModal({ item, type, mode: initialMode, onSave, onDe
           ...base, title: form.plotTitle, description: form.plotDescription,
           actId: form.plotActId || null,
           tags: form.plotTags.split(',').map(t => t.trim()).filter(Boolean),
+        };
+      case 'dialogue':
+        return {
+          ...base, speaker: form.dialogueSpeaker, line: form.dialogueLine,
+          context: form.dialogueContext,
+          tags: form.dialogueTags.split(',').map(t => t.trim()).filter(Boolean),
+        };
+      case 'world_element':
+        return {
+          ...base, name: form.worldName, type: form.worldType,
+          description: form.worldDescription,
+          tags: form.worldTags.split(',').map(t => t.trim()).filter(Boolean),
         };
       case 'theme':
         return {
@@ -393,6 +417,53 @@ function renderEditForm(type, form, set, acts) {
           </div>
         </>
       )}
+      {type === 'dialogue' && (
+        <>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Falante</label>
+            <input type="text" value={form.dialogueSpeaker} onChange={set('dialogueSpeaker')} required placeholder="Nome do personagem" />
+          </div>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Fala</label>
+            <textarea value={form.dialogueLine} onChange={set('dialogueLine')} rows={3} required placeholder="O que o personagem diz..." />
+          </div>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Contexto</label>
+            <input type="text" value={form.dialogueContext} onChange={set('dialogueContext')} placeholder="Em que situação..." />
+          </div>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Tags</label>
+            <input type="text" value={form.dialogueTags} onChange={set('dialogueTags')} placeholder="Separadas por vírgula" />
+          </div>
+        </>
+      )}
+      {type === 'world_element' && (
+        <>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Nome do Elemento</label>
+            <input type="text" value={form.worldName} onChange={set('worldName')} required placeholder="Ex: Cristais de Memória" />
+          </div>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Tipo</label>
+            <select value={form.worldType} onChange={set('worldType')}>
+              <option value="setting">Cenário</option>
+              <option value="technology">Tecnologia</option>
+              <option value="organization">Organização</option>
+              <option value="location">Local</option>
+              <option value="object">Objeto</option>
+              <option value="concept">Conceito</option>
+            </select>
+          </div>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Descrição</label>
+            <textarea value={form.worldDescription} onChange={set('worldDescription')} rows={4} placeholder="Descreva este elemento do mundo..." />
+          </div>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Tags</label>
+            <input type="text" value={form.worldTags} onChange={set('worldTags')} placeholder="Separadas por vírgula" />
+          </div>
+        </>
+      )}
       {type === 'theme' && (
         <>
           <div className="field-group">
@@ -614,6 +685,45 @@ function renderViewCard(type, item, acts, getActName) {
               </div>
             </div>
           )}
+        </>
+      )}
+      {type === 'dialogue' && (
+        <>
+          <div className="flex items-center gap-3">
+            <div className="sidebar-avatar large" style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: '1px solid #ef4444' }}>
+              <MessageSquare size={22} />
+            </div>
+            <div>
+              <h4 className="readonly-name text-lg font-bold text-white">{item?.speaker || 'Sem falante'}</h4>
+            </div>
+          </div>
+          <div className="readonly-section">
+            <label className="text-xs text-gray-500 uppercase font-bold">Fala</label>
+            <p className="text-sm italic text-gray-300 mt-1">"{item?.line}"</p>
+          </div>
+          {item?.context && (
+            <div className="readonly-section">
+              <label className="text-xs text-gray-500 uppercase font-bold">Contexto</label>
+              <p className="text-sm text-gray-300 mt-1">{item.context}</p>
+            </div>
+          )}
+        </>
+      )}
+      {type === 'world_element' && (
+        <>
+          <div className="flex items-center gap-3">
+            <div className="sidebar-avatar large" style={{ background: 'rgba(16,185,129,0.2)', color: '#10b981', border: '1px solid #10b981' }}>
+              <Globe size={22} />
+            </div>
+            <div>
+              <h4 className="readonly-name text-lg font-bold text-white">{item?.name}</h4>
+              <span className="readonly-role text-sm text-gray-400 capitalize">{item?.type || 'setting'}</span>
+            </div>
+          </div>
+          <div className="readonly-section">
+            <label className="text-xs text-gray-500 uppercase font-bold">Descrição</label>
+            <p className="text-sm text-gray-300 mt-1">{item?.description || 'Nenhuma descrição.'}</p>
+          </div>
         </>
       )}
       {type === 'theme' && (

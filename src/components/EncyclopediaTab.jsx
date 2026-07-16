@@ -12,10 +12,10 @@ const ENTITY_TYPE_MAP = {
   objects: 'object',
   scenes: 'scene',
   plot_points: 'plot_point',
-  themes: 'theme',
-  acts: 'act',
   dialogues: 'dialogue',
   world_elements: 'world_element',
+  themes: 'theme',
+  acts: 'act',
 };
 
 export default function EncyclopediaTab() {
@@ -99,10 +99,10 @@ export default function EncyclopediaTab() {
       objects: { name: '', description: '', significance: '', group: '' },
       scenes: { title: '', synopsis: '', actId: '', order: 0, status: 'draft' },
       plot_points: { title: '', description: '', actId: '', tags: [] },
-      themes: { statement: '', evidence: '', relevance: 'Central' },
-      acts: { name: '', order: 0, description: '', color: '#ccee00' },
       dialogues: { speaker: '', line: '', context: '', tags: [] },
       world_elements: { name: '', type: 'setting', description: '', tags: [] },
+      themes: { statement: '', evidence: '', relevance: 'Central' },
+      acts: { name: '', order: 0, description: '', color: '#ccee00' },
     }[activeTab] || { name: '' };
     setFichaModal({ item: empty, type: t, mode: 'edit' });
   };
@@ -122,10 +122,10 @@ export default function EncyclopediaTab() {
       case 'objects': return e.objects || [];
       case 'scenes': return e.scenes || [];
       case 'plot_points': return e.plot_points || [];
-      case 'themes': return e.themes || [];
-      case 'acts': return e.acts || [];
       case 'dialogues': return e.dialogues || [];
       case 'world_elements': return e.world_elements || [];
+      case 'themes': return e.themes || [];
+      case 'acts': return e.acts || [];
       default: return [];
     }
   };
@@ -142,7 +142,7 @@ export default function EncyclopediaTab() {
   }
 
   return (
-    <div className="encyclopedia-container">
+    <div className="encyclopedia-container" data-onboarding="encyclopedia-tab">
 
 
       <div className="encyclopedia-layout">
@@ -163,20 +163,20 @@ export default function EncyclopediaTab() {
             <button onClick={() => setActiveTab('plot_points')} className={`tab-btn text-sm ${activeTab === 'plot_points' ? 'active' : ''}`}>
               <Target size={16} /> Plot Points
             </button>
-            <button onClick={() => setActiveTab('themes')} className={`tab-btn text-sm ${activeTab === 'themes' ? 'active' : ''}`}>
-              <Feather size={16} /> Temas
-            </button>
-            <button onClick={() => setActiveTab('acts')} className={`tab-btn text-sm ${activeTab === 'acts' ? 'active' : ''}`}>
-              <Layers size={16} /> Atos
-            </button>
             <button onClick={() => setActiveTab('dialogues')} className={`tab-btn text-sm ${activeTab === 'dialogues' ? 'active' : ''}`}>
               <MessageSquare size={16} /> Diálogos
             </button>
             <button onClick={() => setActiveTab('world_elements')} className={`tab-btn text-sm ${activeTab === 'world_elements' ? 'active' : ''}`}>
               <Globe size={16} /> Mundo
             </button>
+            <button onClick={() => setActiveTab('themes')} className={`tab-btn text-sm ${activeTab === 'themes' ? 'active' : ''}`}>
+              <Feather size={16} /> Temas
+            </button>
+            <button onClick={() => setActiveTab('acts')} className={`tab-btn text-sm ${activeTab === 'acts' ? 'active' : ''}`}>
+              <Layers size={16} /> Atos
+            </button>
           </div>
-          <button onClick={openAddForm} className="btn-primary py-2 px-3 text-xs flex items-center gap-1">
+          <button onClick={openAddForm} className="btn-primary py-2 px-3 text-xs flex items-center gap-1" data-onboarding="encyclopedia-create">
             <Plus size={14} /> Adicionar Ficha
           </button>
           <button onClick={() => setShowCorkboard(!showCorkboard)} className={`btn-secondary py-2 px-3 text-xs flex items-center gap-1 ml-2 ${showCorkboard ? 'active' : ''}`}>
@@ -332,26 +332,6 @@ export default function EncyclopediaTab() {
             ))
           ))}
 
-          {activeTab === 'acts' && (list.length === 0 ? (
-            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum ato cadastrado.</p>
-          ) : (
-            list.map(act => (
-              <div key={act.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(act, 'acts')} style={{ cursor: 'pointer' }}>
-                <div>
-                  <h4 className="text-base font-bold text-white leading-tight">{act.name}</h4>
-                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-3 leading-relaxed">{act.description}</p>
-                  <div className="flex gap-1 mt-2">
-                    <span className="text-[10px] text-gray-500">Ordem: {act.order + 1}</span>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
-                  <button onClick={(e) => { e.stopPropagation(); openEditForm(act, 'acts'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
-                  <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(act.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
-                </div>
-              </div>
-            ))
-          ))}
-
           {activeTab === 'dialogues' && (list.length === 0 ? (
             <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum diálogo cadastrado.</p>
           ) : (
@@ -383,6 +363,47 @@ export default function EncyclopediaTab() {
                 <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
                   <button onClick={(e) => { e.stopPropagation(); openEditForm(we, 'world_elements'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
                   <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(we.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'themes' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum tema cadastrado.</p>
+          ) : (
+            list.map(theme => (
+              <div key={theme.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(theme, 'themes')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-xs font-bold text-yellow-400 mb-1">TEMA</h4>
+                  <p className="text-sm italic text-white leading-relaxed">"{theme.statement}"</p>
+                  <p className="text-xs text-gray-400 mt-2 font-sans line-clamp-2">{theme.evidence}</p>
+                </div>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-800/60">
+                  <span className="text-[10px] text-gray-500 font-mono">{theme.relevance}</span>
+                  <div className="flex gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); openEditForm(theme, 'themes'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(theme.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'acts' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum ato cadastrado.</p>
+          ) : (
+            list.map(act => (
+              <div key={act.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(act, 'acts')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-base font-bold text-white leading-tight">{act.name}</h4>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-3 leading-relaxed">{act.description}</p>
+                  <div className="flex gap-1 mt-2">
+                    <span className="text-[10px] text-gray-500">Ordem: {act.order + 1}</span>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
+                  <button onClick={(e) => { e.stopPropagation(); openEditForm(act, 'acts'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(act.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
                 </div>
               </div>
             ))

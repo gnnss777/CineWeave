@@ -8,6 +8,8 @@ const SIDEBAR_TABS = {
   brainstorm: { label: 'Brainstorm', icon: Sparkle },
   scenes: { label: 'Cenas', icon: Film },
   plot_points: { label: 'Plot Points', icon: Target },
+  dialogues: { label: 'Dialogos', icon: MessageSquare },
+  world_elements: { label: 'Mundo', icon: Globe },
   themes: { label: 'Temas', icon: Heart },
   acts: { label: 'Atos', icon: Layers },
   outliner: { label: 'Cenas', icon: Film },
@@ -98,8 +100,8 @@ export default function SharedSidebar({
   const [bsCat, setBsCat] = useState('all');
 
   const baseKeys = tabContext === 'encyclopedia'
-    ? ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts']
-    : ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts', 'brainstorm', 'outliner'];
+    ? ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'dialogues', 'world_elements', 'themes', 'acts']
+    : ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'dialogues', 'world_elements', 'themes', 'acts', 'brainstorm', 'outliner'];
   const tabKeys = [...baseKeys, ...(extraTabs || []).map(t => t.id)];
 
   const characters = currentProject?.characters || [];
@@ -365,7 +367,7 @@ export default function SharedSidebar({
   };
 
   return (
-    <div className="reference-sidebar open" style={{ width: '320px', minWidth: '320px', borderLeft: position === 'right' ? '1px solid rgba(255,255,255,0.06)' : 'none', borderRight: position === 'left' ? '1px solid rgba(255,255,255,0.06)' : 'none', backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className="reference-sidebar open" data-onboarding="screenplay-outline" style={{ width: '320px', minWidth: '320px', borderLeft: position === 'right' ? '1px solid rgba(255,255,255,0.06)' : 'none', borderRight: position === 'left' ? '1px solid rgba(255,255,255,0.06)' : 'none', backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="sidebar-drag-handle" />
       <div className="reference-sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
         <div className="reference-tabs" style={{ display: 'flex', gap: '1px', overflow: 'hidden', flex: 1 }}>
@@ -405,9 +407,9 @@ export default function SharedSidebar({
         {listItems()}
       </div>
 
-      {['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts'].includes(activeTab) && (
+      {['characters', 'locations', 'objects', 'scenes', 'plot_points', 'dialogues', 'world_elements', 'themes', 'acts'].includes(activeTab) && (
         <div style={{ padding: '4px 8px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          <button onClick={() => onEdit?.(null, activeTab === 'characters' ? 'character' : activeTab === 'locations' ? 'location' : activeTab === 'objects' ? 'object' : activeTab === 'scenes' ? 'scene' : activeTab === 'plot_points' ? 'plot_point' : activeTab === 'themes' ? 'theme' : 'act')}
+          <button onClick={() => onEdit?.(null, activeTab === 'characters' ? 'character' : activeTab === 'locations' ? 'location' : activeTab === 'objects' ? 'object' : activeTab === 'scenes' ? 'scene' : activeTab === 'plot_points' ? 'plot_point' : activeTab === 'dialogues' ? 'dialogue' : activeTab === 'world_elements' ? 'world_element' : activeTab === 'themes' ? 'theme' : 'act')}
             className="btn-primary w-full py-1 text-xs font-bold flex items-center justify-center gap-1" style={{ fontSize: 10 }}>
             <Plus size={10} /> Novo
           </button>

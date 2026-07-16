@@ -12,22 +12,22 @@ export const ENTITY_DEFAULTS = {
   characters: {
     id: '',
     name: '',
-    role: 'Coadjuvante',       // Protagonista, Antagonista, Aliado, Mentor, Coadjuvante, Figurante
+    role: 'Coadjuvante',
     description: '',
-    traits: [],                 // array de strings
+    traits: [],
     backstory: '',
-    avatar: 'amber',            // amber, green, blue, purple, red, pink
+    avatar: 'amber',
     notes: '',
-    relationships: [],          // [{ targetId, type: 'aliado'|'rival'|'mentor'|'familia', intensity: 1-5 }]
+    relationships: [],
     createdAt: 0,
     updatedAt: 0,
   },
   locations: {
     id: '',
     name: '',
-    type: 'INT.',               // INT., EXT., INT./EXT.
+    type: 'INT.',
     description: '',
-    timeOfDay: 'DIA',           // DIA, NOITE, TARDE, ENTARDECER, MADRUGADA
+    timeOfDay: 'DIA',
     mood: '',
     group: '',
     createdAt: 0,
@@ -46,10 +46,10 @@ export const ENTITY_DEFAULTS = {
     id: '',
     title: '',
     synopsis: '',
-    actId: null,                // ref para entities.acts[].id
-    characterIds: [],           // refs para entities.characters[].id
-    order: 0,                   // posição na timeline
-    status: 'draft',            // draft, written, revised, final
+    actId: null,
+    characterIds: [],
+    order: 0,
+    status: 'draft',
     createdAt: 0,
     updatedAt: 0,
   },
@@ -59,23 +59,6 @@ export const ENTITY_DEFAULTS = {
     description: '',
     actId: null,
     tags: [],
-    createdAt: 0,
-    updatedAt: 0,
-  },
-  themes: {
-    id: '',
-    statement: '',
-    evidence: '',
-    relevance: 'Central',       // Central, Secundário, Menor
-    createdAt: 0,
-    updatedAt: 0,
-  },
-  acts: {
-    id: '',
-    name: '',
-    order: 0,
-    description: '',
-    color: '#ccee00',
     createdAt: 0,
     updatedAt: 0,
   },
@@ -95,6 +78,23 @@ export const ENTITY_DEFAULTS = {
     type: 'setting',
     description: '',
     tags: [],
+    createdAt: 0,
+    updatedAt: 0,
+  },
+  themes: {
+    id: '',
+    statement: '',
+    evidence: '',
+    relevance: 'Central',
+    createdAt: 0,
+    updatedAt: 0,
+  },
+  acts: {
+    id: '',
+    name: '',
+    order: 0,
+    description: '',
+    color: '#ccee00',
     createdAt: 0,
     updatedAt: 0,
   },

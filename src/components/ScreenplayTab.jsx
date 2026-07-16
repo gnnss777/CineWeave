@@ -1652,7 +1652,7 @@ setActiveTab('editor');
   }
 
   return (
-    <div className={`screenplay-layout-container ${zenMode ? 'zen-active' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#050505', color: '#fff' }}>
+    <div className={`screenplay-layout-container ${zenMode ? 'zen-active' : ''}`} data-onboarding="screenplay-tab" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#050505', color: '#fff' }}>
       {(() => {
         const pendingCount = getPendingStagingCount();
         if (pendingCount === 0) return null;
@@ -1752,7 +1752,7 @@ setActiveTab('editor');
           <button onClick={handleAIFeedback} disabled={aiLoading} className="toolbar-tab-btn" title="Feedback da IA"><Award size={14} /></button>
           <button onClick={() => setShowCompileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(204,238,0,0.1)', border: '1px solid rgba(204,238,0,0.3)', color: '#ccee00', padding: '6px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}><Sparkles size={12} /></button>
           <button onClick={() => setTypewriterMode(!typewriterMode)} className={`toolbar-tab-btn ${typewriterMode ? 'active' : ''}`} title="Modo Typewriter"><Edit3 size={14} /></button>
-          <button onClick={() => setZenMode(!zenMode)} className={`toolbar-tab-btn ${zenMode ? 'active' : ''}`} title="Modo Zen"><Minimize2 size={14} /></button>
+          <button onClick={() => setZenMode(!zenMode)} className={`toolbar-tab-btn ${zenMode ? 'active' : ''}`} data-onboarding="zen-mode" title="Modo Zen"><Minimize2 size={14} /></button>
         </div>
       </div>
 
@@ -1782,7 +1782,7 @@ setActiveTab('editor');
         </div>
 
         {/* ── Editor Container ── */}
-        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`} style={{ overflow: 'auto' }}>
+        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`} data-onboarding="screenplay-editor" style={{ overflow: 'auto' }}>
           
           {/* ── Print Mode Toggle (canto superior direito) ── */}
           {activeTab === 'editor' && (
@@ -1872,7 +1872,7 @@ setActiveTab('editor');
                           onKeyDown={(e) => handleKeyDown(e, item.originalIndex, el)}
                           style={{ minHeight: '1.5em' }}
                         />
-                        <div className="script-element-actions-trigger">
+                        <div className="script-element-actions-trigger" data-onboarding="screenplay-ai">
                           <button onClick={() => handleAIAutoComplete(el.id)} style={{ padding: '4px', borderRadius: '4px', background: 'rgba(204,238,0,0.1)', border: '1px solid rgba(204,238,0,0.3)', color: '#ccee00', cursor: 'pointer' }} title="Completar Cena com IA"><Sparkles size={11} /></button>
                           <select value={aiTone} onChange={(e) => { setAiTone(e.target.value); setTimeout(() => handleAIImproveBlock(el.id), 50); }} style={{ background: '#020203', border: '1px solid #1d1d24', color: '#fff', fontSize: '9px', borderRadius: '4px', padding: '2px' }} title="Reescrever Linha com IA">
                             <option value="dramatico">Drama</option>
@@ -1913,6 +1913,9 @@ setActiveTab('editor');
                   <button onClick={() => addLineAtEnd('dialogue')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Dialogo</button>
                   <button onClick={() => addLineAtEnd('parenthetical')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>() Parentese</button>
                   <button onClick={() => addLineAtEnd('transition')} style={{ background: 'none', border: 'none', color: '#eaeaea', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>Transicao</button>
+                </div>
+                <div className="shortcuts-hint" data-onboarding="screenplay-shortcuts" style={{ position: 'fixed', bottom: '80px', background: 'rgba(8,8,10,0.95)', border: '1px solid #141419', borderRadius: '30px', padding: '4px 16px', fontSize: '9px', color: '#888', zIndex: 'var(--z-tooltip)' }}>
+                  Ctrl+1..6 = tipo | Enter = nova linha | Alt+↑/↓ = mover | Ctrl+D = duplicar | Alt+Backspace = apagar
                 </div>
               </div>
             ) : (

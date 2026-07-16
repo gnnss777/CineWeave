@@ -122,6 +122,8 @@ export default function MindMapTab() {
     object: 'objects',
     scene: 'scenes',
     plot_point: 'plot_points',
+    dialogue: 'dialogues',
+    world_element: 'world_elements',
     theme: 'themes',
     act: 'acts',
   };
@@ -446,7 +448,7 @@ export default function MindMapTab() {
     const result = findEntityInProject(currentProject, node.entityId);
     if (result) {
       const { type, data } = result;
-      const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'plot_points' ? 'plot_point' : type === 'themes' ? 'theme' : type === 'acts' ? 'act' : null;
+      const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'plot_points' ? 'plot_point' : type === 'dialogues' ? 'dialogue' : type === 'world_elements' ? 'world_element' : type === 'themes' ? 'theme' : type === 'acts' ? 'act' : null;
       return shortType ? { type: shortType, data } : null;
     }
     return null;
@@ -690,7 +692,7 @@ export default function MindMapTab() {
       })()}
 
       {/* SVG Drawing Canvas */}
-<svg
+      <svg className="mindmap-canvas" data-onboarding="mindmap-canvas">
         ref={svgRef}
         className={`canvas-svg ${linkSourceId ? 'linking-active' : ''} ${isPlacingNode ? 'placing-node' : ''}`}
         onMouseDown={handleMouseDown}
@@ -969,6 +971,7 @@ export default function MindMapTab() {
                   <g
                     onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
                     className="connector-handle"
+                    data-onboarding="mindmap-connector"
                   >
                     <circle
                       r={connectorRadius}
@@ -1117,7 +1120,7 @@ export default function MindMapTab() {
           <div className="mobile-node-actions">
             {sd.entity && (
               <button
-                onClick={() => setFichaModal({ item: sd.entity, type: sd.entityType === 'characters' ? 'character' : sd.entityType === 'locations' ? 'location' : sd.entityType === 'objects' ? 'object' : sd.entityType === 'scenes' ? 'scene' : sd.entityType === 'plot_points' ? 'plot_point' : sd.entityType === 'themes' ? 'theme' : sd.entityType === 'acts' ? 'act' : 'character', mode: 'view' })}
+                onClick={() => setFichaModal({ item: sd.entity, type: sd.entityType === 'characters' ? 'character' : sd.entityType === 'locations' ? 'location' : sd.entityType === 'objects' ? 'object' : sd.entityType === 'scenes' ? 'scene' : sd.entityType === 'plot_points' ? 'plot_point' : sd.entityType === 'dialogues' ? 'dialogue' : sd.entityType === 'world_elements' ? 'world_element' : sd.entityType === 'themes' ? 'theme' : sd.entityType === 'acts' ? 'act' : 'character', mode: 'view' })}
                 className="mobile-action-btn" title="Ver Ficha"
               >
                 <FileText size={16} />
@@ -1234,6 +1237,20 @@ export default function MindMapTab() {
 
       {confirmModal && <ConfirmModal {...confirmModal} />}
       {promptModal && <PromptModal {...promptModal} />}
+      <SharedSidebar
+        currentProject={currentProject}
+        activeTab={sidebarTab}
+        onTabChange={setSidebarTab}
+        open={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onEdit={(item, type, mode) => openFicha(item, type, mode)}
+        onNavigateToMindMap={(id) => navigateTo('mindmap', id)}
+        onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+        onSelectItem={(item, type) => openFicha(item, type)}
+        tabContext="mindmap"
+        data-onboarding="mindmap-sidebar"
+      />
     </div>
+    <div className="mindmap-tab-container" data-onboarding="mindmap-tab">
   );
 }

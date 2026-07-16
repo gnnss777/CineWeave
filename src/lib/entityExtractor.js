@@ -210,7 +210,7 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
     scenes.push(currentScene);
   }
 
-  return { characters, locations, objects, scenes, acts, dialogues, themes };
+  return { characters, locations, objects, scenes, plot_points: [], dialogues, world_elements: [], themes, acts };
 }
 
 function removeAccents(str) {

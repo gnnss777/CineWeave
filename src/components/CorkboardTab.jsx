@@ -4,11 +4,11 @@ import { useEntities } from '../context/useEntities';
 import FichaModal from './FichaModal';
 import ConfirmModal from './ConfirmModal';
 import './CorkboardTab.css';
-import { ExternalLink, FileText, User, MapPin, Target, Heart, Plus } from 'lucide-react';
+import { ExternalLink, FileText, User, MapPin, Target, Heart, Plus, MessageSquare, Globe, Layers, Film } from 'lucide-react';
 
 export default function CorkboardTab() {
   const { currentProject, updateProject, saveEntity, deleteEntityById, navigateTo } = useProject();
-  const { scenes, acts, characters, locations, objects, plotPoints, themes } = useEntities();
+  const { scenes, acts, characters, locations, objects, plotPoints, themes, dialogues, worldElements } = useEntities();
   const [collapsedActs, setCollapsedActs] = useState({});
   const [showRibbon, setShowRibbon] = useState(true);
   const [fichaModal, setFichaModal] = useState(null);
@@ -49,6 +49,8 @@ export default function CorkboardTab() {
     else if (t === 'scene') saveEntity('scenes', data);
     else if (t === 'plot_point') saveEntity('plot_points', data);
     else if (t === 'theme') saveEntity('themes', data);
+    else if (t === 'dialogue') saveEntity('dialogues', data);
+    else if (t === 'world_element') saveEntity('world_elements', data);
     else if (t === 'act') saveEntity('acts', data);
     setFichaModal(null);
   };
@@ -71,6 +73,8 @@ export default function CorkboardTab() {
     else if (t === 'scene') deleteEntityById('scenes', id);
     else if (t === 'plot_point') deleteEntityById('plot_points', id);
     else if (t === 'theme') deleteEntityById('themes', id);
+    else if (t === 'dialogue') deleteEntityById('dialogues', id);
+    else if (t === 'world_element') deleteEntityById('world_elements', id);
     else if (t === 'act') deleteEntityById('acts', id);
     setFichaModal(null);
   };
@@ -139,6 +143,10 @@ export default function CorkboardTab() {
               { label: 'Objetos', items: objects, icon: FileText, type: 'object', emptyText: 'Nenhum objeto', color: 'var(--color-object)', newDefaults: { name: 'Novo Objeto', description: '', significance: '' } },
               { label: 'Plot Points', items: plotPoints, icon: Target, type: 'plot_point', emptyText: 'Nenhum plot point', color: 'var(--primary-gold)', newDefaults: { name: 'Novo Plot Point', description: '', impact: '', storyArc: '' } },
               { label: 'Temas', items: themes, icon: Heart, type: 'theme', emptyText: 'Nenhum tema', color: '#ec4899', newDefaults: { name: 'Novo Tema', statement: '', description: '', tags: [] } },
+              { label: 'Cenas', items: scenes, icon: Film, type: 'scene', emptyText: 'Nenhuma cena', color: '#3b82f6', newDefaults: { name: 'Nova Cena', synopsis: '', status: 'rascunho', characterIds: [], actId: null } },
+              { label: 'Dialogos', items: dialogues, icon: MessageSquare, type: 'dialogue', emptyText: 'Nenhum dialogo', color: '#ef4444', newDefaults: { name: 'Novo Dialogo', content: '', speaker: '', notes: '' } },
+              { label: 'Mundo', items: worldElements, icon: Globe, type: 'world_element', emptyText: 'Nenhum elemento', color: '#10b981', newDefaults: { name: 'Novo Elemento', description: '', category: '', significance: '' } },
+              { label: 'Atos', items: acts, icon: Layers, type: 'act', emptyText: 'Nenhum ato', color: '#6366f1', newDefaults: { name: 'Novo Ato', description: '', color: '#ccee00' } },
             ].map(section => (
               <div key={section.type} style={{ minWidth: '180px', maxWidth: '220px', background: 'rgba(10,10,14,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>

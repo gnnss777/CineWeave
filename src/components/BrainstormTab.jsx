@@ -1112,11 +1112,12 @@ export default function BrainstormTab() {
           >
             <List size={20} />
           </button>
-          <button 
+          <button
             className={`btn-icon ${isProcessing ? 'processing' : ''}`}
             onClick={handleProcessAll}
             disabled={isProcessing || documents.filter(d => d.status === 'pending' || d.status === 'parsed' || d.status === 'error').length === 0}
             title={isProcessing ? 'Processando...' : 'Processar tudo com IA'}
+            data-onboarding="brainstorm-process"
           >
             {isProcessing ? (
               <>
@@ -1176,7 +1177,7 @@ export default function BrainstormTab() {
       <main className={`brainstorm-dashboard ${viewMode}`}>
         
         {/* PANEL 1: GRAVADORES (top-left) */}
-        <section className="panel panel-recorder glass" data-onboarding="brainstorm-recorder">
+        <section className="panel panel-recorder glass" data-onboarding="brainstorm-record">
           <div className="panel-header">
             <h3>
               <Radio className="text-red-500 animate-pulse" size={18} />
@@ -1365,7 +1366,7 @@ export default function BrainstormTab() {
         </section>
 
         {/* PANEL 3: CAIXA DE TEXTO MANUAL (bottom-left) */}
-        <section className="panel panel-manual-notes glass" data-onboarding="brainstorm-notes">
+        <section className="panel panel-manual-notes glass" data-onboarding="brainstorm-synopsis">
           <div className="panel-header">
             <h3>
               <Edit size={18} />
@@ -1415,7 +1416,7 @@ export default function BrainstormTab() {
         </section>
 
         {/* PANEL 4: ITENS EXTRAÍDOS + PROCESSAMENTO (bottom-right) */}
-        <section className="panel panel-items glass" data-onboarding="brainstorm-items">
+        <section className="panel panel-items glass" data-onboarding="brainstorm-history">
           <div className="panel-header">
             <h3>
               <Sparkles size={18} />

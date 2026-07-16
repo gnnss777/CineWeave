@@ -797,10 +797,10 @@ export const ProjectProvider = ({ children }) => {
         objects: [],
         scenes: [],
         plot_points: [],
-        themes: [],
-        acts: [],
         dialogues: [],
         world_elements: [],
+        themes: [],
+        acts: [],
       };
     }
 
@@ -1201,8 +1201,9 @@ export const ProjectProvider = ({ children }) => {
     if (!proj.entities) {
       proj.entities = {
         characters: [], locations: [], objects: [],
-        scenes: [], plot_points: [], themes: [],
-        acts: [], dialogues: [], world_elements: [],
+        scenes: [], plot_points: [],
+        dialogues: [], world_elements: [],
+        themes: [], acts: [],
       };
     }
 

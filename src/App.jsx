@@ -15,13 +15,13 @@ import OnboardingOverlay from './components/OnboardingOverlay';
 import ConfirmModal from './components/ConfirmModal';
 import LoginPage from './components/LoginPage';
 import InviteModal from './components/InviteModal';
+import GuideModal from './components/GuideModal';
 import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Hash, Users, Share2, Sun, Moon, Menu } from 'lucide-react';
 import TagSelector from './components/TagSelector';
 
 function HelpButton() {
-  const { startTour } = useOnboarding();
   return (
-    <button onClick={() => startTour('brainstorm')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px' }} title="Guia Interativo (G)">
+    <button onClick={() => setShowGuideModal(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px' }} title="Guia Interativo (G)">
       <HelpCircle size={14} />
       <span>Guia</span>
     </button>
@@ -57,6 +57,7 @@ function CineWeaveShell() {
 
   const [activeTab, setActiveTab] = useState('brainstorm');
   const [showProjectDrawer, setShowProjectDrawer] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
   const [newProjTitle, setNewProjTitle] = useState('');
   const [newProjTagline, setNewProjTagline] = useState('');
   const [filterTags, setFilterTags] = useState([]);
@@ -89,17 +90,17 @@ function CineWeaveShell() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.key === 'g' || e.key === 'G') && 
-          e.target.tagName !== 'INPUT' && 
-          e.target.tagName !== 'TEXTAREA' && 
+      if ((e.key === 'g' || e.key === 'G') &&
+          e.target.tagName !== 'INPUT' &&
+          e.target.tagName !== 'TEXTAREA' &&
           !e.target.isContentEditable) {
         e.preventDefault();
-        startTour('brainstorm');
+        setShowGuideModal(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [startTour]);
+  }, []);
 
   const handleCreateProject = (e) => {
     e.preventDefault();
@@ -192,10 +193,11 @@ function CineWeaveShell() {
           </button>
           <UserMenu />
           <span className="desktop-only">
-            <button 
-              onClick={() => setShowProjectDrawer(!showProjectDrawer)} 
+            <button
+              onClick={() => setShowProjectDrawer(!showProjectDrawer)}
               className="btn-secondary"
               style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
+              data-onboarding="project-selector"
             >
               <Film size={14} style={{ color: 'var(--primary-gold)' }} />
               <span style={{ fontWeight: 700 }}>{currentProject?.title}</span>
@@ -434,10 +436,11 @@ function AuthenticatedApp() {
       <ThemeProvider>
         <SyncProvider>
           <ProjectProvider>
-            <OnboardingProvider>
-              <CineWeaveShell />
-              <OnboardingOverlay />
-            </OnboardingProvider>
+             <OnboardingProvider>
+               <CineWeaveShell />
+               <OnboardingOverlay />
+               <GuideModal isOpen={showGuideModal} onClose={() => setShowGuideModal(false)} />
+             </OnboardingProvider>
           </ProjectProvider>
         </SyncProvider>
       </ThemeProvider>

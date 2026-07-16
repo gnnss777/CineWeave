@@ -385,7 +385,7 @@ export async function syncProjectToSupabase(project) {
             if (!Array.isArray(list)) continue;
             const entity = list.find(e => e.id === n.entityId);
             if (entity) {
-              const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'plot_points' ? 'plot_point' : type === 'themes' ? 'theme' : type === 'acts' ? 'act' : type;
+              const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'plot_points' ? 'plot_point' : type === 'dialogues' ? 'dialogue' : type === 'world_elements' ? 'world_element' : type === 'themes' ? 'theme' : type === 'acts' ? 'act' : type;
               return {
                 ...n,
                 label: entity.name || entity.title || entity.statement || '?',
