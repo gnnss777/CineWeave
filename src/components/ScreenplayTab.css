@@ -183,10 +183,17 @@
   opacity: 0.5;
 }
 
-/* ── REVISÃO floating panel ── */
+/* ── Main area (3-col grid: revision | editor | sidebar) ── */
+.main-area {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 0px 1fr 0px;
+  overflow: hidden;
+  transition: grid-template-columns 0.22s ease-out;
+}
+
+/* ── REVISÃO panel ── */
 .style-panel-wrapper {
-  display: flex;
-  flex-shrink: 0;
   overflow: hidden;
   transition: width 0.22s ease-out;
 }

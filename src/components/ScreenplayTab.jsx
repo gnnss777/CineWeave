@@ -1757,34 +1757,32 @@ setActiveTab('editor');
       </div>
 
       {/* ── Main area (panels + editor) ── */}
-      <div className="main-area" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="main-area" style={{ gridTemplateColumns: `${stylePanelOpen ? '320px' : '0px'} 1fr ${sidebarOpen ? '320px' : '0px'}` }}>
         {/* ── Revision Panel ── */}
-        {stylePanelOpen && (
-          <div className="style-panel-wrapper open">
-            <StylePanel
-              open={true}
-              onCollapse={() => setStylePanelOpen(false)}
-              revisionFilter={revisionFilter}
-              setRevisionFilter={setRevisionFilter}
-              revisionMode={revisionMode}
-              setRevisionMode={setRevisionMode}
-              revisionGeneration={revisionGeneration}
-              setRevisionGeneration={setRevisionGeneration}
-              revisionCount={revisionItems.length}
-              revisionGroups={revisionGroups}
-              visibleCount={visibleRevisionCount}
-              revisions={revisions}
-              focusBlock={focusBlock}
-              toggleRevision={(id) => {
-                setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-              }}
-              clearAllRevisions={() => setRevisions([])}
-            />
-          </div>
-        )}
+        <div className={`style-panel-wrapper ${stylePanelOpen ? 'open' : 'closed'}`}>
+          <StylePanel
+            open={stylePanelOpen}
+            onCollapse={() => setStylePanelOpen(false)}
+            revisionFilter={revisionFilter}
+            setRevisionFilter={setRevisionFilter}
+            revisionMode={revisionMode}
+            setRevisionMode={setRevisionMode}
+            revisionGeneration={revisionGeneration}
+            setRevisionGeneration={setRevisionGeneration}
+            revisionCount={revisionItems.length}
+            revisionGroups={revisionGroups}
+            visibleCount={visibleRevisionCount}
+            revisions={revisions}
+            focusBlock={focusBlock}
+            toggleRevision={(id) => {
+              setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+            }}
+            clearAllRevisions={() => setRevisions([])}
+          />
+        </div>
 
         {/* ── Editor Container ── */}
-        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`} style={{ flex: 1, overflow: 'auto' }}>
+        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`} style={{ overflow: 'auto' }}>
           
           {/* ── Print Mode Toggle (canto superior direito) ── */}
           {activeTab === 'editor' && (
@@ -2014,31 +2012,6 @@ setActiveTab('editor');
                 )}
               </div>
             )
-          )}
-
-          {/* ── ESTILO & REVISAO floating panel ── */}
-          {activeTab === 'editor' && (
-            <StylePanel
-              open={stylePanelOpen}
-              onCollapse={() => setStylePanelOpen(false)}
-              revisionFilter={revisionFilter}
-              setRevisionFilter={setRevisionFilter}
-              revisionMode={revisionMode}
-              setRevisionMode={setRevisionMode}
-              revisionGeneration={revisionGeneration}
-              setRevisionGeneration={setRevisionGeneration}
-              revisionCount={revisionItems.length}
-              revisionGroups={revisionGroups}
-              visibleCount={visibleRevisionCount}
-              revisions={revisions}
-              focusBlock={focusBlock}
-              toggleRevision={(id) => {
-                setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-              }}
-              clearAllRevisions={() => setRevisions([])}
-              printMode={printMode}
-              setPrintMode={setPrintMode}
-            />
           )}
 
           {aiFeedback && (
