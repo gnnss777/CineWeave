@@ -1785,7 +1785,7 @@ setActiveTab('editor');
         )}
 
         {/* ── Editor Container ── */}
-        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`} style={{ flex: 1, overflow: 'auto' }}>
+        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`} style={{ flex: 1, overflow: 'auto', order: 1 }}>
           
           {/* ── Print Mode Toggle (canto superior direito) ── */}
           {activeTab === 'editor' && (
