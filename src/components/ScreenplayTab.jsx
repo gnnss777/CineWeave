@@ -480,10 +480,11 @@ export default function ScreenplayTab() {
     e.target.value = '';
     
     let fileStorageRecord = null;
+    let fountainText = '';
     
     try {
       // Upload file to Storage
-      const importType = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'fountain';
+      const importType = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : file.name.toLowerCase().endsWith('.fdx') ? 'fdx' : 'fountain';
       try {
         const { getCurrentUser } = await import('../lib/supabase');
         const { getSupabaseId } = await import('../lib/sync');
@@ -514,14 +515,15 @@ export default function ScreenplayTab() {
       let imported;
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         const parsed = await parseFile(file);
-        const fountainText = parsed.text;
+        fountainText = parsed.text;
         imported = parseFountain(fountainText);
       } else if (file.name.toLowerCase().endsWith('.fdx')) {
         const { parseFdx } = await import('../lib/fdxImport');
         const xmlText = await file.text();
         imported = parseFdx(xmlText);
+        fountainText = imported.map(e => e.text).join('\n');
       } else {
-        const fountainText = await file.text();
+        fountainText = await file.text();
         imported = parseFountain(fountainText);
       }
       console.log('[FountainImport] elements:', imported.length, 'types:', imported.filter(e => e.type === 'scene-heading').length, 'scenes,', imported.filter(e => e.type === 'character').length, 'chars');

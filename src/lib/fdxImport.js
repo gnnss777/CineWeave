@@ -30,22 +30,12 @@ export function parseFdx(xmlText) {
     if (!internalType || fdxType === 'Script') return;
 
     const textNodes = p.querySelectorAll('Text');
-    if (!textNodes.length) {
-      if (internalType === 'action') {
-        elements.push({ id: `fdx-${i}`, type: internalType, text: '' });
-      }
-      return;
-    }
+    if (!textNodes.length) return;
 
     const text = Array.from(textNodes)
       .map(n => n.textContent)
       .join('')
       .trim();
-
-    if (!text && internalType === 'action') {
-      elements.push({ id: `fdx-${i}`, type: internalType, text: '' });
-      return;
-    }
     if (!text) return;
 
     elements.push({
