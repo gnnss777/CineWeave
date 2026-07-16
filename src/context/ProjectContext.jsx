@@ -1195,54 +1195,169 @@ export const ProjectProvider = ({ children }) => {
 
   const importScreenplayWithEntities = (importedElements) => {
     const proj = { ...currentProject };
-    autoSaveVersionIfNeeded(proj, 'Importação Roteiro');
+    // Always backup current version before importing
+    _backupCurrent(proj, `Antes de importar: ${new Date().toLocaleString('pt-BR')}`);
+
+    if (!proj.entities) {
+      proj.entities = {
+        characters: [], locations: [], objects: [],
+        scenes: [], plot_points: [], themes: [],
+        acts: [], dialogues: [], world_elements: [],
+      };
+    }
 
     // Extract entities from screenplay text
     const extracted = extractEntitiesFromScreenplay(importedElements, proj.entities);
 
-    // Merge extracted entities into project
-    const entityTypes = [
-      { key: 'characters', items: extracted.characters },
-      { key: 'locations', items: extracted.locations },
-      { key: 'objects', items: extracted.objects },
-      { key: 'scenes', items: extracted.scenes },
-      { key: 'acts', items: extracted.acts },
-    ];
+    // Helper: generate consistent ID
+    const genId = (prefix) => `${prefix}-import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    for (const { key, items } of entityTypes) {
-      for (const item of items) {
-        if (key === 'characters') {
-          proj.entities = proj.entities || {};
-          if (!proj.entities.characters) proj.entities.characters = [];
-          const exists = proj.entities.characters.find(
-            c => c.name?.toUpperCase() === item.name?.toUpperCase()
-          );
-          if (!exists) {
-            proj.entities.characters.push({ ...item, id: item.id || `char-import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
-          }
-        } else if (key === 'locations') {
-          proj.entities = proj.entities || {};
-          if (!proj.entities.locations) proj.entities.locations = [];
-          const exists = proj.entities.locations.find(
-            l => l.name?.toUpperCase() === item.name?.toUpperCase() && l.type === item.type
-          );
-          if (!exists) {
-            proj.entities.locations.push({ ...item, id: item.id || `loc-import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
-          }
-        } else if (key === 'scenes') {
-          proj.entities = proj.entities || {};
-          if (!proj.entities.scenes) proj.entities.scenes = [];
-          const exists = proj.entities.scenes.find(
-            s => s.title?.toUpperCase() === item.title?.toUpperCase()
-          );
-          if (!exists) {
-            proj.entities.scenes.push({ ...item, id: item.id || `scn-import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
-          }
-        } else {
-          proj.entities = proj.entities || {};
-          const arrKey = key;
-          if (!proj.entities[arrKey]) proj.entities[arrKey] = [];
-          proj.entities[arrKey].push(item);
+    // Track new entity IDs for mind map creation
+    const newEntityIds = [];
+
+    // 1. MERGE CHARACTERS (into entities.characters + legacy proj.characters)
+    for (const item of extracted.characters) {
+      if (!item.name) continue;
+      const exists = proj.entities.characters.find(
+        c => c.name?.toUpperCase() === item.name.toUpperCase()
+      );
+      if (!exists) {
+        const id = item.id || genId('char');
+        const fullChar = {
+          ...item, id,
+          role: item.role || 'Coadjuvante',
+          traits: item.traits || [],
+          backstory: item.backstory || '',
+          avatar: item.avatar || ['amber','green','blue','purple','red','pink'][proj.entities.characters.length % 6],
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        proj.entities.characters.push(fullChar);
+        if (!proj.characters) proj.characters = [];
+        proj.characters.push({ ...fullChar, relationships: [] });
+        newEntityIds.push({ id, type: 'character', label: fullChar.name });
+      }
+    }
+
+    // 2. MERGE LOCATIONS
+    for (const item of extracted.locations) {
+      if (!item.name) continue;
+      const exists = proj.entities.locations.find(
+        l => l.name?.toUpperCase() === item.name.toUpperCase() && l.type === item.type
+      );
+      if (!exists) {
+        const id = item.id || genId('loc');
+        const fullLoc = {
+          ...item, id,
+          timeOfDay: item.timeOfDay || 'DIA',
+          mood: item.mood || '',
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        proj.entities.locations.push(fullLoc);
+        if (!proj.locations) proj.locations = [];
+        proj.locations.push({ ...fullLoc, group: '' });
+        newEntityIds.push({ id, type: 'location', label: fullLoc.name });
+      }
+    }
+
+    // 3. MERGE SCENES
+    for (const item of extracted.scenes) {
+      if (!item.title) continue;
+      const exists = proj.entities.scenes.find(
+        s => s.title?.toUpperCase() === item.title.toUpperCase()
+      );
+      if (!exists) {
+        const id = item.id || genId('scn');
+        const fullScene = {
+          ...item, id,
+          synopsis: item.synopsis || '',
+          actId: item.actId || null,
+          characterIds: item.characterIds || [],
+          order: proj.entities.scenes.length,
+          status: 'draft',
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        proj.entities.scenes.push(fullScene);
+        newEntityIds.push({ id, type: 'scene', label: fullScene.title });
+      }
+    }
+
+    // 4. MERGE ACTS
+    for (const item of extracted.acts) {
+      if (!item.name) continue;
+      const exists = proj.entities.acts.find(
+        a => a.name?.toUpperCase() === item.name.toUpperCase()
+      );
+      if (!exists) {
+        const id = item.id || genId('act');
+        const fullAct = {
+          ...item, id,
+          order: proj.entities.acts.length,
+          color: '#ccee00',
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        proj.entities.acts.push(fullAct);
+        newEntityIds.push({ id, type: 'act', label: fullAct.name });
+      }
+    }
+
+    // 5. MERGE OBJECTS
+    for (const item of extracted.objects) {
+      if (!item.name) continue;
+      const exists = proj.entities.objects.find(
+        o => o.name?.toUpperCase() === item.name.toUpperCase()
+      );
+      if (!exists) {
+        const id = item.id || genId('obj');
+        const fullObj = {
+          ...item, id,
+          description: item.description || '',
+          significance: item.significance || '',
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        proj.entities.objects.push(fullObj);
+        if (!proj.objects) proj.objects = [];
+        proj.objects.push({ ...fullObj, group: '' });
+        newEntityIds.push({ id, type: 'object', label: fullObj.name });
+      }
+    }
+
+    // 6. CREATE MIND MAP NODES for new entities
+    if (!proj.mindMapNodes) proj.mindMapNodes = [];
+    const firstActNode = proj.mindMapNodes.find(n => {
+      if (n.type === 'act') return true;
+      if (n.entityId && proj.entities?.acts?.some(a => a.id === n.entityId)) return true;
+      return false;
+    });
+    for (const { id, type, label } of newEntityIds) {
+      const nodeId = `n-${id}`;
+      const exists = proj.mindMapNodes.some(n => n.id === nodeId || n.entityId === id);
+      if (exists) continue;
+      let nodeX = 300 + Math.random() * 400;
+      let nodeY = 300 + Math.random() * 200;
+      if (type === 'act') {
+        const actIdx = proj.entities.acts.length - 1;
+        nodeX = 150 + actIdx * 250;
+        nodeY = 150;
+      }
+      proj.mindMapNodes.push({
+        id: nodeId,
+        entityId: id,
+        x: Math.round(nodeX),
+        y: Math.round(nodeY),
+      });
+      // Link to first act (except acts themselves)
+      if (type !== 'act' && firstActNode) {
+        const alreadyLinked = proj.mindMapLinks?.some(l =>
+          (l.source === firstActNode.id && l.target === nodeId) ||
+          (l.source === nodeId && l.target === firstActNode.id)
+        );
+        if (!alreadyLinked) {
+          if (!proj.mindMapLinks) proj.mindMapLinks = [];
+          proj.mindMapLinks.push({
+            id: `l-auto-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            source: firstActNode.id,
+            target: nodeId,
+          });
         }
       }
     }
@@ -1253,6 +1368,7 @@ export const ProjectProvider = ({ children }) => {
 
     // Update screenplay
     proj.screenplay = linkedScreenplay;
+    proj.needsAutoLayout = true;
     updateProject(proj);
 
     return {

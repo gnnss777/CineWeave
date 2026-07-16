@@ -21,7 +21,7 @@ import {
   Compass, ShieldAlert, Award, Target, Heart,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Eye, EyeOff, Filter, ListChecks, Star, Settings2, Circle, AlertTriangle,
-  Clock, GitBranch
+  Clock, GitBranch, MoveHorizontal
 } from 'lucide-react';
 import './ScreenplayTab.css';
 
@@ -45,22 +45,9 @@ function StylePanel({
   focusBlock,
   toggleRevision,
   clearAllRevisions,
-  printMode,
-  setPrintMode
 }) {
   const activePanelGen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
   const [expandedScenes, setExpandedScenes] = useState({});
-  if (!open) {
-    return (
-      <button
-        className="style-panel-toggle-pill"
-        onClick={onCollapse}
-        title="Abrir Estilo & Revisão"
-      >
-        <Settings2 size={16} />
-      </button>
-    );
-  }
   const setFilterMode = (m) => setRevisionFilter(prev => ({ ...prev, mode: m }));
   const toggleGen = (level) => setRevisionFilter(prev => {
     const hidden = prev.hiddenGens.includes(level)
@@ -74,34 +61,10 @@ function StylePanel({
       <div className="style-panel-header">
         <div className="style-panel-title">
           <Settings2 size={14} />
-          <span>Estilo & Revisão</span>
+          <span>Revisão</span>
         </div>
         <button className="style-panel-collapse" onClick={onCollapse} title="Recolher painel">
           <ChevronRight size={14} />
-        </button>
-      </div>
-
-      <div className="style-panel-section">
-        <div className="style-panel-section-label">
-          <Circle size={9} fill="#ccee00" stroke="#ccee00" />
-          <span>Tema Escuro</span>
-          <span className="style-panel-tag">SEMPRE ATIVO</span>
-        </div>
-        <p className="style-panel-hint">Texto cinza sobre fundo preto profundo. Otimizado para reduzir cansaço visual em sessões longas.</p>
-      </div>
-
-      <div className="style-panel-section">
-        <div className="style-panel-section-label">
-          <Printer size={11} />
-          <span>Visualização de Impressão</span>
-        </div>
-        <p className="style-panel-hint">Oculta todos os adornos (marcadores, estrelas, bordas) e usa tipografia de máquina de escrever, pronta para imprimir ou exportar.</p>
-        <button
-          className={`style-panel-toggle ${printMode ? 'on' : ''}`}
-          onClick={() => setPrintMode(v => !v)}
-        >
-          <span className="style-panel-toggle-knob" />
-          <span className="style-panel-toggle-text">{printMode ? 'P&B ATIVO' : 'PADRÃO'}</span>
         </button>
       </div>
 
@@ -414,6 +377,7 @@ export default function ScreenplayTab() {
   /* ── Print / Style panel state ── */
   const [printMode, setPrintMode] = useState(false);
   const [stylePanelOpen, setStylePanelOpen] = useState(true);
+  const [panelsSwapped, setPanelsSwapped] = useState(false);
   const [revisionFilter, setRevisionFilter] = useState({ mode: 'all', hiddenGens: [] });
 
   /* ── Page View Mode ── */
@@ -1717,12 +1681,51 @@ setActiveTab('editor');
         );
       })()}
 
+      {/* ── Revision Panel (flex sibling) ── */}
+      {activeTab === 'editor' && (
+        stylePanelOpen ? (
+          <div className="style-panel-wrapper open" style={{ order: panelsSwapped ? 2 : 0 }}>
+            <StylePanel
+              open={true}
+              onCollapse={() => setStylePanelOpen(false)}
+              revisionFilter={revisionFilter}
+              setRevisionFilter={setRevisionFilter}
+              revisionMode={revisionMode}
+              setRevisionMode={setRevisionMode}
+              revisionGeneration={revisionGeneration}
+              setRevisionGeneration={setRevisionGeneration}
+              revisionCount={revisionItems.length}
+              revisionGroups={revisionGroups}
+              visibleCount={visibleRevisionCount}
+              revisions={revisions}
+              focusBlock={focusBlock}
+              toggleRevision={(id) => {
+                setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+              }}
+              clearAllRevisions={() => setRevisions([])}
+            />
+          </div>
+        ) : (
+          <button
+            className="style-panel-toggle-pill"
+            onClick={() => setStylePanelOpen(true)}
+            title="Abrir Revisão"
+            style={{ position: 'relative', order: panelsSwapped ? 2 : 0, flexShrink: 0, alignSelf: 'center' }}
+          >
+            <Settings2 size={16} />
+          </button>
+        )
+      )}
+
       {/* ── Main workspace ── */}
       <div className="workspace">
         <div className="toolbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button onClick={() => { setSidebarOpen(v => !v); setStylePanelOpen(v => !v); }} className={`toolbar-tab-btn ${stylePanelOpen || sidebarOpen ? 'active' : ''}`} title="Mostrar/Esconder Painéis">
               <Columns size={16} />
+            </button>
+            <button onClick={() => setPanelsSwapped(v => !v)} className={`toolbar-tab-btn ${panelsSwapped ? 'active' : ''}`} title="Inverter Lado dos Painéis">
+              <MoveHorizontal size={16} />
             </button>
             <div className="toolbar-tabs">
               <button onClick={() => setActiveTab('editor')} className={`toolbar-tab-btn ${activeTab === 'editor' ? 'active' : ''}`}><Edit3 size={14} /><span>Editor</span></button>
@@ -1792,7 +1795,19 @@ setActiveTab('editor');
           </div>
         </div>
 
-        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${stylePanelOpen ? 'style-panel-open' : ''} ${typewriterMode ? 'typewriter-active' : ''}`}>
+        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`}>
+          
+          {/* ── Print Mode Toggle (canto superior direito) ── */}
+          {activeTab === 'editor' && (
+            <button
+              onClick={() => setPrintMode(v => !v)}
+              className={`toolbar-tab-btn ${printMode ? 'active' : ''}`}
+              title={printMode ? 'Desativar Modo Impressão' : 'Ativar Modo Impressão'}
+              style={{ position: 'absolute', top: 8, right: 8, zIndex: 20, padding: '6px' }}
+            >
+              <Printer size={14} />
+            </button>
+          )}
           
           {/* ── A. TEXT EDITOR ── */}
           {activeTab === 'editor' && (
@@ -2256,6 +2271,7 @@ setActiveTab('editor');
         onOutlinerSelect={(item) => focusBlock(item.id, 'start')}
         position={sidebarPosition}
         onPositionToggle={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
+        style={{ order: panelsSwapped ? 0 : 2 }}
       />
 
       {/* ── Autocomplete ── */}

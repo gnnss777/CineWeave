@@ -168,29 +168,29 @@
   opacity: 0.5;
 }
 
-/* ── ESTILO & REVISÃO floating panel ── */
-.style-panel {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
+/* ── REVISÃO floating panel ── */
+.style-panel-wrapper {
+  display: flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.22s ease-out;
+}
+.style-panel-wrapper.open {
   width: 320px;
+}
+.style-panel-wrapper.closed {
+  width: 0;
+}
+.style-panel {
+  width: 320px;
+  min-width: 320px;
+  height: 100%;
   background: linear-gradient(180deg, rgba(15,15,18,0.98) 0%, rgba(10,10,12,0.95) 100%);
   border-right: 1px solid rgba(204,238,0,0.12);
   backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
-  z-index: 50;
-  box-shadow: 20px 0 40px rgba(0,0,0,0.6);
   overflow: hidden;
-  animation: panelSlideIn 0.22s ease-out;
-}
-@keyframes panelSlideIn {
-  from { transform: translateX(-100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-.editor-container.style-panel-open {
-  padding-left: 336px;
 }
 .style-panel-toggle-pill {
   position: absolute;
