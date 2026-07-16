@@ -1,18 +1,18 @@
-import { createEntity } from '../context/EntitiesSchema';
+﻿import { createEntity } from '../context/EntitiesSchema';
 
-const SCENE_HEADING_RE = /^(INT\.|EXT\.|INT\.\/EXT\.|I\/E\.|INT\/EXT\.|EST\.)\s+(.+?)(?:\s*[–—-]\s*(.+))?$/i;
+const SCENE_HEADING_RE = /^(INT\.|EXT\.|INT\.\/EXT\.|I\/E\.|INT\/EXT\.|EST\.)\s+(.+?)(?:\s*[ΓÇôΓÇö-]\s*(.+))?$/i;
 
 const TIME_OF_DAY_OPTIONS = [
   ['DIA', 'DAY'], ['NOITE', 'NIGHT'], ['TARDE', 'AFTERNOON'],
   ['MADRUGADA', 'DAWN'], ['ENTARDECER', 'DUSK'], ['AMANHECER', 'SUNRISE'],
-  ['MANHÃ', 'MORNING'], ['SUNSET'], ['LATE AFTERNOON'],
+  ['MANH├â', 'MORNING'], ['SUNSET'], ['LATE AFTERNOON'],
   ['CONTINUOUS'], ['MOMENTS LATER'],
 ];
 
 const ACT_RE = /^(ATO|ACT)\s+(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/i;
 
 function cleanSceneNumber(text) {
-  let cleaned = text.replace(/\s*[-–—]\s*(?:DIA|DAY|NOITE|NIGHT)?\s*\d+\s*$/i, '').trim();
+  let cleaned = text.replace(/\s*[-ΓÇôΓÇö]\s*(?:DIA|DAY|NOITE|NIGHT)?\s*\d+\s*$/i, '').trim();
   // Safety net: strip trailing standalone digits (scene number without dash prefix)
   cleaned = cleaned.replace(/\s+\d+\s*$/, '').trim();
   return cleaned;
@@ -178,20 +178,17 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
 
     // Fallback: scan ACTION elements for ALL-CAPS character cues
     if (el.type === 'action') {
-      const cleanAction = text.replace(/\(.*\)/, '').trim();
-      if (cleanAction.length >= 2 && cleanAction === cleanAction.toUpperCase() && /^[A-ZÀ-ÿ\s.]+$/.test(cleanAction)) {
-        const prev = i > 0 ? screenplay[i - 1] : null;
-        const prevEmpty = !prev || !prev.text || prev.text.trim() === '';
-        const prevIsScene = prev?.type === 'scene-heading' || prev?.type === 'transition' || prev?.type === 'section';
-        if (prevEmpty || prevIsScene) {
-          const upperName = cleanAction;
-          // Set currentSpeaker for subsequent dialogue detection
-          currentSpeaker = cleanAction.charAt(0).toUpperCase() + cleanAction.slice(1).toLowerCase();
-          if (!seenCharNames.has(upperName) && !existingCharNames.has(upperName)) {
+      if (text.length >= 2 && text === text.toUpperCase() && /^[A-Z├Ç-├┐\s.]+$/.test(text)) {
+        const upperName = text;
+        if (!seenCharNames.has(upperName) && !existingCharNames.has(upperName)) {
+          const prev = i > 0 ? screenplay[i - 1] : null;
+          const prevEmpty = !prev || !prev.text || prev.text.trim() === '';
+          const prevIsScene = prev?.type === 'scene-heading' || prev?.type === 'transition' || prev?.type === 'section';
+          if (prevEmpty || prevIsScene) {
             seenCharNames.add(upperName);
             const avatar = ['amber', 'green', 'blue', 'purple', 'red', 'pink'][characters.length % 6];
             characters.push(createEntity('characters', {
-              name: currentSpeaker,
+              name: text.charAt(0).toUpperCase() + text.slice(1).toLowerCase(),
               avatar,
             }));
             if (currentScene) {
@@ -199,13 +196,6 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
             }
           }
         }
-      } else if (currentSpeaker && cleanAction.length > 0 && cleanAction !== cleanAction.toUpperCase()) {
-        // Not ALL-CAPS → treat as dialogue line following a character
-        dialogues.push(createEntity('dialogues', {
-          speaker: currentSpeaker,
-          line: cleanAction,
-          context: '',
-        }));
       }
     }
   }
