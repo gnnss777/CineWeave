@@ -2202,38 +2202,38 @@ setActiveTab('editor');
           {/* ── F. ESTILO & REVISOES moved into floating editor panel */}
 
         </div>
-      </div>
 
-      <SharedSidebar
-        currentProject={currentProject}
-        activeTab={sidebarTab}
-        onTabChange={setSidebarTab}
-        onEdit={(item, type, mode) => {
-          if (!item) {
-            switch (type) {
-              case 'character': openFicha({ name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, 'character', 'edit'); break;
-              case 'location': openFicha({ name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, 'location', 'edit'); break;
-              case 'object': openFicha({ name: '', description: '', significance: '' }, 'object', 'edit'); break;
-              case 'scene': openFicha({ title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' }, 'scene', 'edit'); break;
-              case 'plot_point': openFicha({ name: 'Novo Plot Point', description: '', impact: '', storyArc: '' }, 'plot_point', 'edit'); break;
-              case 'theme': openFicha({ name: 'Novo Tema', statement: '', description: '', tags: [] }, 'theme', 'edit'); break;
-              case 'act': openFicha({ name: 'Novo Ato', description: '', color: '#ccee00', order: 0 }, 'act', 'edit'); break;
-              default: openFicha({ name: '' }, type, 'edit');
+        <SharedSidebar
+          currentProject={currentProject}
+          activeTab={sidebarTab}
+          onTabChange={setSidebarTab}
+          onEdit={(item, type, mode) => {
+            if (!item) {
+              switch (type) {
+                case 'character': openFicha({ name: '', role: 'Coadjuvante', description: '', traits: [], backstory: '', notes: '' }, 'character', 'edit'); break;
+                case 'location': openFicha({ name: '', type: 'EXT.', description: '', timeOfDay: 'DIA', mood: '' }, 'location', 'edit'); break;
+                case 'object': openFicha({ name: '', description: '', significance: '' }, 'object', 'edit'); break;
+                case 'scene': openFicha({ title: 'Nova Cena', synopsis: '', actId: '', order: 0, status: 'rascunho', characterIds: [], locationId: '', timeOfDay: '' }, 'scene', 'edit'); break;
+                case 'plot_point': openFicha({ name: 'Novo Plot Point', description: '', impact: '', storyArc: '' }, 'plot_point', 'edit'); break;
+                case 'theme': openFicha({ name: 'Novo Tema', statement: '', description: '', tags: [] }, 'theme', 'edit'); break;
+                case 'act': openFicha({ name: 'Novo Ato', description: '', color: '#ccee00', order: 0 }, 'act', 'edit'); break;
+                default: openFicha({ name: '' }, type, 'edit');
+              }
+            } else {
+              openFicha(item, type, mode || 'edit');
             }
-          } else {
-            openFicha(item, type, mode || 'edit');
-          }
-        }}
-        onDelete={handleSidebarDelete}
-        onSelectItem={(item, type) => openFicha(item, type)}
-        tabContext="screenplay"
-        open={sidebarOpen && !zenMode}
-        onToggle={() => { if (zenMode) setZenMode(false); setSidebarOpen(prev => !prev); }}
-        outlinerData={sceneHeadingsList}
-        onOutlinerSelect={(item) => focusBlock(item.id, 'start')}
-        position={sidebarPosition}
-        onPositionToggle={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
-      />
+          }}
+          onDelete={handleSidebarDelete}
+          onSelectItem={(item, type) => openFicha(item, type)}
+          tabContext="screenplay"
+          open={sidebarOpen && !zenMode}
+          onToggle={() => { if (zenMode) setZenMode(false); setSidebarOpen(prev => !prev); }}
+          outlinerData={sceneHeadingsList}
+          onOutlinerSelect={(item) => focusBlock(item.id, 'start')}
+          position={sidebarPosition}
+          onPositionToggle={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
+        />
+      </div>
 
       {/* ── Autocomplete ── */}
       {autocomplete.show && (
