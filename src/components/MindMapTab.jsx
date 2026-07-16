@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { ZoomIn, ZoomOut, Maximize, Plus, Link, Trash, Edit, X, Unlink, User, MapPin, FileText, Edit3, Clock, ArrowLeft, Layout, RefreshCw, ChevronDown, ChevronRight, Folder } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Plus, Link, Trash, Edit, X, Unlink, User, MapPin, FileText, Edit3, Clock, ArrowLeft, Layout, RefreshCw, Columns, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import SharedSidebar from './SharedSidebar';
 import FichaModal from './FichaModal';
 import ConfirmModal from './ConfirmModal';
