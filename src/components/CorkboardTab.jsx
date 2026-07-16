@@ -3,38 +3,37 @@ import { useProject } from '../context/ProjectContext';
 import { useEntities } from '../context/useEntities';
 import FichaModal from './FichaModal';
 import ConfirmModal from './ConfirmModal';
+import { resolveNodeDisplay } from '../lib/mindMapUtils';
+import { getCorkboardData, moveSceneToAct } from '../lib/corkboardFromMindMap';
 import './CorkboardTab.css';
 import { ExternalLink, FileText, User, MapPin, Target, Heart, Plus, MessageSquare, Globe, Layers, Film } from 'lucide-react';
 
 export default function CorkboardTab() {
-  const { currentProject, updateProject, saveEntity, deleteEntityById, navigateTo } = useProject();
-  const { scenes, acts, characters, locations, objects, plotPoints, themes, dialogues, worldElements } = useEntities();
+  const { currentProject, updateProject, saveEntity, deleteEntityById, navigateTo, updateMindMap } = useProject();
+  const { scenes, characters, locations, objects, plotPoints, themes, dialogues, worldElements, acts } = useEntities();
   const [collapsedActs, setCollapsedActs] = useState({});
   const [showRibbon, setShowRibbon] = useState(true);
   const [fichaModal, setFichaModal] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
 
-  const scenesByAct = acts.map(act => ({
-    act,
-    scenes: scenes.filter(s => s.actId === act.id).sort((a, b) => a.order - b.order),
-  }));
-
-  const unassignedScenes = scenes.filter(s => !s.actId);
+  const nodes = currentProject?.mindMapNodes || [];
+  const links = currentProject?.mindMapLinks || [];
+  const { scenesByAct, unlinkedScenes, allEntityNodes, linkMap } = getCorkboardData(nodes, links, currentProject);
 
   const handleDragStart = (e, sceneId) => {
     e.dataTransfer.setData('text/plain', sceneId);
   };
 
-  const handleDrop = (e, targetActId) => {
+  const handleDrop = (e, targetActNodeId) => {
     e.preventDefault();
-    const sceneId = e.dataTransfer.getData('text/plain');
-    if (!sceneId) return;
-    const updatedScenes = scenes.map(s =>
-      s.id === sceneId ? { ...s, actId: targetActId } : s
-    );
-    const proj = { ...currentProject };
-    proj.entities = { ...proj.entities, scenes: updatedScenes };
-    updateProject(proj);
+    const sceneEntityId = e.dataTransfer.getData('text/plain');
+    if (!sceneEntityId) return;
+    const sceneNode = nodes.find(n => n.entityId === sceneEntityId || n.id === sceneEntityId);
+    if (!sceneNode) return;
+    const updatedLinks = moveSceneToAct(links, sceneNode.id, targetActNodeId);
+    if (updatedLinks) {
+      updateMindMap(nodes, updatedLinks);
+    }
   };
 
   const toggleCollapse = (actId) => {
@@ -79,39 +78,49 @@ export default function CorkboardTab() {
     setFichaModal(null);
   };
 
-  const renderCard = (scene) => (
-    <div
-      key={scene.id}
-      className="corkboard-card"
-      draggable
-      onDragStart={(e) => handleDragStart(e, scene.id)}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div className="card-headline" style={{ flex: 1 }}>{scene.title}</div>
-        <button
-          onClick={(e) => { e.stopPropagation(); setFichaModal({ item: scene, type: 'scene', mode: 'view' }); }}
-          style={{ background: 'none', border: 'none', color: '#ccee00', cursor: 'pointer', padding: '2px', marginLeft: '8px', flexShrink: 0 }}
-          title="Ver Ficha"
-        >
-          <FileText size={12} />
-        </button>
-      </div>
-      <div className="card-synopsis">{scene.synopsis}</div>
-      <div className="card-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <span>{scene.characterIds?.length || 0} personagens</span>
-          <span>{scene.status}</span>
+  const renderCard = (sceneResolved) => {
+    const { node: sceneNode, display } = sceneResolved;
+    const entity = display.entity;
+    return (
+      <div key={sceneNode.id}
+        className="corkboard-card"
+        draggable
+        onDragStart={(e) => handleDragStart(e, entity?.id || sceneNode.id)}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div className="card-headline" style={{ flex: 1 }}>{display.label}</div>
+          {entity && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setFichaModal({ item: entity, type: 'scene', mode: 'view' }); }}
+              style={{ background: 'none', border: 'none', color: '#ccee00', cursor: 'pointer', padding: '2px', marginLeft: '8px', flexShrink: 0 }}
+              title="Ver Ficha"
+            >
+              <FileText size={12} />
+            </button>
+          )}
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); navigateTo('screenplay', scene.id); }}
-          style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}
-          title="Ir para o Roteiro"
-        >
-          <ExternalLink size={10} /> Roteiro
-        </button>
+        <div className="card-synopsis">{display.details}</div>
+        <div className="card-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <span>{entity?.characterIds?.length || 0} personagens</span>
+            <span>{entity?.status || ''}</span>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); navigateTo('screenplay', entity?.id); }}
+            style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}
+            title="Ir para o Roteiro"
+          >
+            <ExternalLink size={10} /> Roteiro
+          </button>
+        </div>
+        {!entity && (
+          <div style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
+            Nó sem ficha vinculada
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={{ padding: '24px', height: '100%', overflowY: 'auto', background: '#030304' }}>
@@ -160,15 +169,41 @@ export default function CorkboardTab() {
                 {section.items.length === 0 ? (
                   <p style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic', textAlign: 'center', padding: '8px 0' }}>{section.emptyText}</p>
                 ) : (
-                  section.items.slice(0, 5).map(item => (
-                    <div key={item.id} onClick={() => setFichaModal({ item, type: section.type, mode: 'view' })} style={{ padding: '6px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#d1d1d6', transition: 'background 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                    >
-                      <section.icon size={10} style={{ color: section.color, flexShrink: 0 }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.title || 'Sem nome'}</span>
-                    </div>
-                  ))
+                  {section.items.slice(0, 5).map(item => {
+                    const hasNode = nodes.some(n => n.entityId === item.id);
+                    return (
+                      <div key={item.id}
+                        onClick={() => setFichaModal({ item, type: section.type, mode: 'view' })}
+                        style={{
+                          padding: '6px 8px', borderRadius: '4px',
+                          background: 'rgba(255,255,255,0.03)', cursor: 'pointer',
+                          marginBottom: '4px', display: 'flex', alignItems: 'center',
+                          gap: '6px', fontSize: '11px', color: '#d1d1d6',
+                          transition: 'background 0.15s', opacity: hasNode ? 1 : 0.5
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                      >
+                        <section.icon size={10} style={{ color: section.color, flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          {item.name || item.title || 'Sem nome'}
+                        </span>
+                        {hasNode && (
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ccee00', flexShrink: 0 }} />
+                        )}
+                        {hasNode ? (
+                          <button onClick={(e) => { e.stopPropagation(); navigateTo('mindmap', item.id); }}
+                            style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', fontSize: '9px', flexShrink: 0 }}
+                            title="Ver no Mapa"
+                          >
+                            <ExternalLink size={9} />
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '9px', color: '#6b7280', fontStyle: 'italic' }}>sem nó</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 )}
                 {section.items.length > 5 && (
                   <p style={{ fontSize: '10px', color: '#6b7280', textAlign: 'center', marginTop: '4px' }}>+{section.items.length - 5} mais</p>
@@ -180,54 +215,40 @@ export default function CorkboardTab() {
       </div>
 
       <div className="corkboard-columns">
-        {scenesByAct.map(({ act, scenes: actScenes }) => (
-          <div
-            key={act.id}
+        {scenesByAct.map(({ act, scenes }) => (
+          <div key={act.node?.id || act.label}
             className="corkboard-column"
             style={{ borderTop: `3px solid ${act.color || '#ccee00'}` }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.currentTarget.classList.add('drag-over');
-            }}
-            onDragLeave={(e) => {
-              e.currentTarget.classList.remove('drag-over');
-            }}
-            onDrop={(e) => {
-              e.currentTarget.classList.remove('drag-over');
-              handleDrop(e, act.id);
-            }}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+            onDragLeave={(e) => { e.currentTarget.classList.remove('drag-over'); }}
+            onDrop={(e) => { e.currentTarget.classList.remove('drag-over'); handleDrop(e, act.node?.id); }}
           >
             <div className="act-header">
               <h3 className="act-title" style={{ color: act.color || '#ccee00', margin: 0 }}>
-                {act.name}
+                {act.label}
               </h3>
               <button
-                onClick={() => toggleCollapse(act.id)}
+                onClick={() => toggleCollapse(act.label)}
                 style={{ background: 'none', border: 'none', color: '#7c7c82', cursor: 'pointer', fontSize: '12px' }}
               >
-                {collapsedActs[act.id] ? 'Expandir' : 'Recolher'}
+                {collapsedActs[act.label] ? 'Expandir' : 'Recolher'}
               </button>
             </div>
-
-            {!collapsedActs[act.id] && (
-              actScenes.length === 0 ? (
+            {!collapsedActs[act.label] && (
+              scenes.length === 0 ? (
                 <p style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
                   Arraste cenas para este ato
                 </p>
               ) : (
-                actScenes.map(scene => renderCard(scene))
+                scenes.map(scene => renderCard(scene))
               )
             )}
           </div>
         ))}
-
-        {unassignedScenes.length > 0 && (
-          <div
-            className="corkboard-column"
-            style={{ borderTop: '3px solid #6b7280', opacity: 0.7 }}
-          >
+        {unlinkedScenes.length > 0 && (
+          <div className="corkboard-column" style={{ borderTop: '3px solid #6b7280', opacity: 0.7 }}>
             <h3 className="act-title" style={{ color: '#6b7280' }}>Não Atribuídas</h3>
-            {unassignedScenes.map(scene => renderCard(scene))}
+            {unlinkedScenes.map(scene => renderCard(scene))}
           </div>
         )}
       </div>
