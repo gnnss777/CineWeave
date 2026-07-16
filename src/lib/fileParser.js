@@ -108,20 +108,25 @@ async function parsePDF(file) {
       if ((isHeaderLine || isPageXofY) && line.y < 100) return;
       
       let type = 'action';
-      const isSectionHeader = /^(ATO\b|ACT\b|SEQUÊNCIA\b|SEQUENCE\b|EPISÓDIO\b|EPISODE\b|PRÓLOGO\b|PROLOGUE\b|APRESENTAÇÃO\b|INTRODUÇÃO\b|CLÍMAX\b|RESOLUÇÃO\b|DESFECHO\b|PART\b|CHAPTER\b)/i.test(text);
+      // Strip Beat color tags [[color]] for detection
+      const cleanText = text.replace(/\[\[.*?\]\]/g, '').trim();
+      const isSectionHeader = /^(ATO\b|ACT\b|SEQUÊNCIA\b|SEQUENCE\b|EPISÓDIO\b|EPISODE\b|PRÓLOGO\b|PROLOGUE\b|APRESENTAÇÃO\b|INTRODUÇÃO\b|CLÍMAX\b|RESOLUÇÃO\b|DESFECHO\b|PART\b|CHAPTER\b)/i.test(cleanText);
+      const isAllCaps = cleanText.replace(/\(.*\)/g, '').trim() === cleanText.replace(/\(.*\)/g, '').trim().toUpperCase();
       
       // Screenplay margins heuristics (US Letter 612 units total width)
       if (isSectionHeader) {
         type = 'section';
-      } else if (/^(INT\.|EXT\.|INT\/EXT\.|INT\.\/EXT\.|EST\.|I\/E\.)/i.test(text)) {
+      } else if (/^(INT\.|EXT\.|INT\/EXT\.|INT\.\/EXT\.|EST\.|I\/E\.)/i.test(cleanText)) {
         type = 'scene-heading';
-      } else if (/^(FADE IN|FADE OUT|CUT TO|DISSOLVE TO|SMASH CUT TO|MATCH CUT TO|FADE TO BLACK|FADE TO WHITE)[:\s]?$/i.test(text) || (text === text.toUpperCase() && / TO:$/i.test(text))) {
+      } else if (/^(FADE IN|FADE OUT|CUT TO|DISSOLVE TO|SMASH CUT TO|MATCH CUT TO|FADE TO BLACK|FADE TO WHITE)[:\s]?$/i.test(cleanText) || (cleanText === cleanText.toUpperCase() && / TO:$/i.test(cleanText))) {
         type = 'transition';
-      } else if (x >= 240 && x < 350 && text.replace(/\(.*\)/g, '').trim() === text.replace(/\(.*\)/g, '').trim().toUpperCase() && text.length < 50 && !text.startsWith('(')) {
+      } else if (cleanText.length >= 2 && cleanText.length < 50 && isAllCaps && !cleanText.startsWith('(') && !cleanText.endsWith(':') && type === 'action') {
+        // Character: ALL-CAPS, short text — independent of x-position (handles Beat PDFs with custom margins)
         type = 'character';
-      } else if (x >= 190 && x < 260 && text.startsWith('(')) {
+      } else if (cleanText.startsWith('(')) {
         type = 'parenthetical';
-      } else if (x >= 140 && x < 250) {
+      } else if ((lastType === 'character' || lastType === 'parenthetical' || lastType === 'dialogue') && !isDoubleSpaced) {
+        // Dialogue follows a character/parenthetical without blank line
         type = 'dialogue';
       }
       
