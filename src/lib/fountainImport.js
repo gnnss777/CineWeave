@@ -1,30 +1,65 @@
-const FOUNTAIN_PATTERNS = {
-  sceneHeading: /^(INT\.|EXT\.|INT\.\/EXT\.|I\/E\.)/i,
-  character: /^[A-Z\s\.\'\-]+$/,
-  parenthetical: /^\(/,
-  transition: /^TO:$/i,
-  blank: /^$/,
-};
+const SCENE_HEADING_RE = /^(?:INT\.|EXT\.|INT\.\/EXT\.|I\/E\.|INT\/EXT\.|EST\.)/i;
+const SCENE_HEADING_RE_LEADING_DIGITS = /^\d+\s+(?:INT\.|EXT\.|INT\.\/EXT\.|I\/E\.|INT\/EXT\.|EST\.)/i;
+const BLANK_RE = /^$/;
+const TRANSITION_RE = /^(FADE IN|FADE OUT|CUT TO|DISSOLVE TO|SMASH CUT TO|MATCH CUT TO|JUMP CUT TO|FADE TO BLACK|FADE TO WHITE|IRIS IN|IRIS OUT|WIPE TO|FADE IN:|FADE OUT:|CUT TO:|DISSOLVE TO:|SMASH CUT TO:|MATCH CUT TO:|JUMP CUT TO:)$/i;
+
+function isBlank(text) {
+  return !text || text.trim() === '';
+}
+
+function isAllCaps(text) {
+  if (!text || text.length < 2) return false;
+  const cleaned = text.replace(/[\(\)]/g, '').trim();
+  if (cleaned.length < 2) return false;
+  return cleaned === cleaned.toUpperCase() && /[A-ZÀ-Ú]/.test(cleaned);
+}
 
 export function parseFountain(text) {
   const elements = [];
   const lines = text.split('\n');
 
-  let inMetadata = true;
+  // Only check first 20 lines for metadata separator
+  const firstLines = lines.slice(0, 20).join('\n');
+  const hasMetadataSeparator = /^===/m.test(firstLines);
+  let inMetadata = hasMetadataSeparator;
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : '';
 
-    if (trimmed === '===') {
+    if (/^===/.test(trimmed)) {
       inMetadata = false;
       continue;
     }
 
     if (inMetadata) continue;
 
-    // Scene heading
-    if (FOUNTAIN_PATTERNS.sceneHeading.test(trimmed)) {
+    // Section (starts with #)
+    if (trimmed.startsWith('#')) {
+      const match = trimmed.match(/^(#+)\s*(.*)$/);
+      const level = match ? match[1].length : 1;
+      const text = match ? match[2].trim() : trimmed;
+      elements.push({
+        id: `sc-import-${i}`,
+        type: 'section',
+        level,
+        text,
+      });
+      continue;
+    }
+
+    // Synopsis (starts with = or ==)
+    if (/^={1,2}\s/.test(trimmed)) {
+      elements.push({
+        id: `sc-import-${i}`,
+        type: 'synopsis',
+        text: trimmed.replace(/^={1,2}\s*/, ''),
+      });
+      continue;
+    }
+
+    // Scene heading (with optional leading scene number e.g. "1 EXT. ...")
+    if (SCENE_HEADING_RE.test(trimmed) || SCENE_HEADING_RE_LEADING_DIGITS.test(trimmed)) {
       elements.push({
         id: `sc-import-${i}`,
         type: 'scene-heading',
@@ -33,15 +68,24 @@ export function parseFountain(text) {
       continue;
     }
 
+    // Forced character cue (@ prefix)
+    if (trimmed.startsWith('@') && trimmed.length > 1) {
+      elements.push({
+        id: `sc-import-${i}`,
+        type: 'character',
+        text: trimmed.slice(1).trim(),
+      });
+      continue;
+    }
+
     // Character (all-caps, preceded by blank, followed by non-blank)
     const prevLine = i > 0 ? lines[i - 1].trim() : '';
     if (
-      trimmed.length >= 2 &&
-      trimmed === trimmed.toUpperCase() &&
-      trimmed === trimmed.replace(/[\(\)]/g, '').trim() &&
-      FOUNTAIN_PATTERNS.blank.test(prevLine) &&
-      !FOUNTAIN_PATTERNS.blank.test(nextLine) &&
-      !FOUNTAIN_PATTERNS.blank.test(trimmed)
+      isAllCaps(trimmed) &&
+      isBlank(prevLine) &&
+      !isBlank(nextLine) &&
+      !isBlank(trimmed) &&
+      trimmed.length >= 2
     ) {
       elements.push({
         id: `sc-import-${i}`,
@@ -61,23 +105,52 @@ export function parseFountain(text) {
       continue;
     }
 
-    // Transition
-    if (trimmed.endsWith('TO:') || trimmed.startsWith('>')) {
+    // Transition (> prefix or all-caps known transition)
+    if (trimmed.startsWith('>')) {
       elements.push({
         id: `sc-import-${i}`,
         type: 'transition',
-        text: trimmed.replace(/^>/, ''),
+        text: trimmed.replace(/^>/, '').trim(),
+      });
+      continue;
+    }
+    if (
+      isAllCaps(trimmed) &&
+      trimmed.length >= 4 &&
+      isBlank(prevLine) &&
+      TRANSITION_RE.test(trimmed)
+    ) {
+      elements.push({
+        id: `sc-import-${i}`,
+        type: 'transition',
+        text: trimmed.replace(/:$/, ''),
       });
       continue;
     }
 
-    // Action (default)
-    if (!FOUNTAIN_PATTERNS.blank.test(trimmed)) {
-      elements.push({
-        id: `sc-import-${i}`,
-        type: 'action',
-        text: trimmed,
-      });
+    // Action (default) or Dialogue
+    if (!isBlank(trimmed)) {
+      const lastEl = elements[elements.length - 1];
+      const prevLineRaw = i > 0 ? lines[i - 1] : '';
+      const isPrevLineBlank = isBlank(prevLineRaw);
+      
+      const isDialogue = lastEl && 
+                         (lastEl.type === 'character' || lastEl.type === 'parenthetical' || lastEl.type === 'dialogue') && 
+                         !isPrevLineBlank;
+      
+      if (isDialogue) {
+        elements.push({
+          id: `sc-import-${i}`,
+          type: 'dialogue',
+          text: trimmed,
+        });
+      } else {
+        elements.push({
+          id: `sc-import-${i}`,
+          type: 'action',
+          text: trimmed,
+        });
+      }
     }
   }
 

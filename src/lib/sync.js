@@ -1,7 +1,10 @@
-import { supabase, getCurrentUser } from './supabase';
+import { supabase, getCurrentUser, fetchProfile } from './supabase';
 import * as db from './db';
 
 const ID_MAP_KEY = 'cineweave_sb_ids';
+
+// Track brainstorm document sync status
+const BSB_SYNCED_FLAG = '__bsb_synced';
 
 function isConfigured() {
   const url = import.meta.env.VITE_SUPABASE_URL;
@@ -42,13 +45,36 @@ export async function isLoggedIn() {
   }
 }
 
+export async function getCurrentProfile() {
+  if (!isConfigured()) return null;
+  try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const profile = await fetchProfile(user.id);
+    return profile;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadProjectsFromSupabase() {
   if (!isConfigured()) return null;
   const user = await getCurrentUser().catch(() => null);
   if (!user) return null;
 
+  // Load user's own projects + public projects
   const sbProjects = await db.fetchProjects(user.id);
   if (!sbProjects || sbProjects.length === 0) return [];
+
+  // Also load public projects from other users
+  const publicProjects = await db.fetchPublicProjects(50).catch(() => []);
+
+  const allProjects = [...sbProjects];
+  for (const pp of (publicProjects || [])) {
+    if (!allProjects.find(p => p.id === pp.id)) {
+      allProjects.push(pp);
+    }
+  }
 
   const map = loadIdMap();
   if (!map.projects) map.projects = {};
@@ -58,15 +84,14 @@ export async function loadProjectsFromSupabase() {
 
   const projects = [];
 
-  for (const sbProj of sbProjects) {
-    // Find or create local ID mapping
+  for (const sbProj of allProjects) {
     let localId = Object.entries(map.projects).find(([, v]) => v === sbProj.id)?.[0];
     if (!localId) {
       localId = `sb-${sbProj.id.slice(0, 8)}`;
       map.projects[localId] = sbProj.id;
     }
 
-    const [sbChars, sbLocs, sbObjs, sbScreenplay, sbNodes, sbLinks, sbRecs, sbMedia] = await Promise.all([
+    const [sbChars, sbLocs, sbObjs, sbScreenplay, sbNodes, sbLinks, sbRecs, sbMedia, sbBsd, sbTags, sbIdeas, sbProjectFiles, sbScreenplayImports] = await Promise.all([
       db.fetchCharacters(sbProj.id),
       db.fetchLocations(sbProj.id),
       db.fetchObjects(sbProj.id),
@@ -75,6 +100,11 @@ export async function loadProjectsFromSupabase() {
       db.fetchMindMapLinks(sbProj.id),
       db.fetchRecordings(sbProj.id),
       db.fetchMediaUploads(sbProj.id),
+      db.fetchBrainstormDocuments(sbProj.id),
+      db.fetchProjectTags(sbProj.id),
+      db.fetchIdeas(sbProj.id).catch(() => []),
+      db.fetchProjectFiles(sbProj.id).catch(() => []),
+      db.fetchScreenplayImports(sbProj.id).catch(() => []),
     ]);
 
     const characters = (sbChars || []).map(c => {
@@ -88,6 +118,7 @@ export async function loadProjectsFromSupabase() {
         backstory: c.backstory || '',
         avatar: c.avatar || 'amber',
         notes: c.notes || '',
+        tags: c.tags || [],
       };
     });
 
@@ -100,6 +131,7 @@ export async function loadProjectsFromSupabase() {
         description: l.description || '',
         timeOfDay: l.time_of_day || 'NOITE',
         mood: l.mood || '',
+        tags: l.tags || [],
       };
     });
 
@@ -110,6 +142,7 @@ export async function loadProjectsFromSupabase() {
         name: o.name,
         significance: o.significance || '',
         description: o.description || '',
+        tags: o.tags || [],
       };
     });
 
@@ -117,6 +150,7 @@ export async function loadProjectsFromSupabase() {
       id: `sc-${sbProj.id.slice(0, 8)}-${i}`,
       type: el.element_type,
       text: el.text,
+      tags: el.tags || [],
     }));
 
     const mindMapNodes = (sbNodes || []).map(n => ({
@@ -155,12 +189,39 @@ export async function loadProjectsFromSupabase() {
       _sbSynced: true,
     }));
 
+    const brainstormDocuments = (sbBsd || []).map(d => ({
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      size: d.size,
+      content: d.content,
+      metadata: d.metadata,
+      extractedData: d.extracted_data,
+      status: d.status || 'pending',
+      errorMessage: d.error_message,
+      createdAt: d.created_at,
+      _sbSynced: true,
+    }));
+
+    const projectTags = (sbTags || []).map(t => ({
+      tag_id: t.tag_id,
+      tag_type: t.tag_type,
+      user_id: t.user_id,
+    }));
+
     projects.push({
       id: localId,
       title: sbProj.title,
       tagline: sbProj.tagline || '',
       genre: sbProj.genre || '',
       logline: sbProj.logline || '',
+      visibility: sbProj.visibility || 'private',
+      is_published: sbProj.is_published || false,
+      published_at: sbProj.published_at || null,
+      allow_collaboration: sbProj.allow_collaboration || false,
+      tags: sbProj.tags || [],
+      projectTags,
+      user_id: sbProj.user_id,
       characters,
       locations,
       objects,
@@ -169,9 +230,39 @@ export async function loadProjectsFromSupabase() {
       mindMapLinks,
       recordings,
       mediaUploads,
-      ideas: [],
+      brainstormDocuments,
+      ideas: (sbIdeas || []).map(idea => ({
+        id: idea.id,
+        text: idea.text,
+        category: idea.category || 'general',
+        tags: idea.tags || [],
+        createdAt: new Date(idea.created_at).getTime(),
+        updatedAt: new Date(idea.updated_at).getTime(),
+        _sbSynced: true,
+      })),
+      projectFiles: (sbProjectFiles || []).map(f => ({
+        id: f.id,
+        name: f.name,
+        originalName: f.original_name,
+        mimeType: f.mime_type,
+        fileSize: f.file_size,
+        storagePath: f.storage_path,
+        url: f.url,
+        source: f.source,
+        metadata: f.metadata,
+        createdAt: new Date(f.created_at).getTime(),
+        _sbSynced: true,
+      })),
+      screenplayImports: (sbScreenplayImports || []).map(si => ({
+        id: si.id,
+        fileId: si.file_id,
+        originalFilename: si.original_filename,
+        importType: si.import_type,
+        elementCount: si.element_count,
+        metadata: si.metadata,
+        createdAt: new Date(si.created_at).getTime(),
+      })),
       needsAutoLayout: false,
-      // brainstormData intentionally omitted — not stored in Supabase, preserved from local
     });
   }
 
@@ -208,12 +299,15 @@ export async function syncProjectToSupabase(project) {
       saveIdMap(map);
     }
 
-    // Update project metadata
-    await db.updateProject(sbProjId, {
+    // Update project metadata (including visibility and tags)
+    const projUpdates = {
       tagline: project.tagline || '',
       genre: project.genre || '',
       logline: project.logline || '',
-    });
+    };
+    if (project.visibility) projUpdates.visibility = project.visibility;
+    if (project.tags) projUpdates.tags = project.tags;
+    await db.updateProject(sbProjId, projUpdates);
 
     // 2. Sync characters
     for (const char of (project.characters || [])) {
@@ -308,6 +402,45 @@ export async function syncProjectToSupabase(project) {
       med._sbSynced = true;
     }
 
+    // 9. Sync brainstorm documents (only new/updated ones)
+    if (!project[BSB_SYNCED_FLAG]) {
+      project[BSB_SYNCED_FLAG] = true;
+    }
+    for (const doc of (project.brainstormDocuments || [])) {
+      if (doc._sbSynced) continue;
+      await db.upsertBrainstormDocument(user.id, sbProjId, doc);
+      doc._sbSynced = true;
+    }
+
+    // 10. Sync ideas
+    if (Array.isArray(project.ideas)) {
+      for (const idea of project.ideas) {
+        if (idea._sbSynced) continue;
+        try {
+          const saved = await db.saveIdea(user.id, sbProjId, idea);
+          if (saved) idea._sbSynced = true;
+        } catch (err) {
+          console.warn('[Supabase sync] Failed to sync idea:', err);
+        }
+      }
+    }
+
+    // 11. Sync project files (storage records only; actual upload handled separately)
+    if (Array.isArray(project.projectFiles)) {
+      for (const pf of project.projectFiles) {
+        if (pf._sbSynced) continue;
+        try {
+          const saved = await db.saveProjectFile(user.id, sbProjId, pf);
+          if (saved) {
+            pf._sbSynced = true;
+            pf.id = saved.id;
+          }
+        } catch (err) {
+          console.warn('[Supabase sync] Failed to sync project file:', err);
+        }
+      }
+    }
+
   } catch (err) {
     console.error('[Supabase sync] Error:', err);
   }
@@ -320,6 +453,37 @@ export async function syncAllProjectsToSupabase(projects) {
 
   for (const proj of projects) {
     await syncProjectToSupabase(proj);
+  }
+}
+
+export async function loadPublicProjects() {
+  if (!isConfigured()) return [];
+  try {
+    const sbProjects = await db.fetchPublicProjects(50);
+    if (!sbProjects || sbProjects.length === 0) return [];
+
+    const projects = [];
+    for (const sbProj of sbProjects) {
+      const localId = `pub-${sbProj.id.slice(0, 8)}`;
+      projects.push({
+        id: localId,
+        sbId: sbProj.id,
+        title: sbProj.title,
+        tagline: sbProj.tagline || '',
+        genre: sbProj.genre || '',
+        logline: sbProj.logline || '',
+        visibility: sbProj.visibility,
+        is_published: sbProj.is_published,
+        published_at: sbProj.published_at,
+        tags: sbProj.tags || [],
+        user_id: sbProj.user_id,
+        isPublicView: true,
+      });
+    }
+    return projects;
+  } catch (err) {
+    console.error('[sync] Failed to load public projects:', err);
+    return [];
   }
 }
 

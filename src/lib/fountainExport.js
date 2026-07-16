@@ -8,11 +8,14 @@ export function exportFountain(project) {
   lines.push('===');
   lines.push('');
 
+  let sceneCount = 0;
   screenplay.forEach(el => {
     switch (el.type) {
       case 'scene-heading':
+        sceneCount++;
+        const cleanText = (el.text || '').replace(/\[\[.*?\]\]/g, '').replace(/#([^#]+)#/g, '').trim();
         lines.push('');
-        lines.push(el.text);
+        lines.push(`${cleanText} #${sceneCount}#`);
         lines.push('');
         break;
       case 'action':

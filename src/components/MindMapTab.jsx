@@ -6,6 +6,7 @@ import FichaModal from './FichaModal';
 import ConfirmModal from './ConfirmModal';
 import PromptModal from './PromptModal';
 import { resolveNodeDisplay, createNodeWithEntity, getColorForNodeType } from '../lib/mindMapUtils';
+import { createEntity, findEntityInProject } from '../context/EntitiesSchema';
 import './MindMapTab.css';
 
 export default function MindMapTab() {
@@ -54,7 +55,7 @@ export default function MindMapTab() {
   // Cross-tab navigation: focus on target node
   useEffect(() => {
     if (!tabNavigation || tabNavigation.tab !== 'mindmap' || !tabNavigation.targetId) return;
-    const targetNode = nodes.find(n => n.id === tabNavigation.targetId || n.label === tabNavigation.targetId);
+    const targetNode = nodes.find(n => n.id === tabNavigation.targetId || n.label === tabNavigation.targetId || n.entityId === tabNavigation.targetId);
     if (targetNode) {
       setSelectedNodeId(targetNode.id);
       // Center view on the target node
@@ -95,6 +96,7 @@ export default function MindMapTab() {
 
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarPosition, setSidebarPosition] = useState('right');
   const [sharedSidebarTab, setSharedSidebarTab] = useState('characters');
   const [fichaModal, setFichaModal] = useState(null); // { item, type, mode }
   const [confirmModal, setConfirmModal] = useState(null);
@@ -113,23 +115,37 @@ export default function MindMapTab() {
 
   const svgRef = useRef(null);
 
+  // Map node type (singular) to entity type (plural)
+  const nodeTypeToEntityType = {
+    character: 'characters',
+    location: 'locations',
+    object: 'objects',
+    scene: 'scenes',
+    plot_point: 'plot_points',
+    theme: 'themes',
+    act: 'acts',
+  };
+
+  // Clean nodes for save: only store { id, entityId, x, y } for entity-linked nodes
+  const cleanNodesForSave = (nodes) => nodes.map(n => {
+    if (n.entityId) return { id: n.id, entityId: n.entityId, x: n.x, y: n.y };
+    return n;
+  });
+
   // Drag node or pan canvas handler
   const handleMouseDown = (e) => {
     // If we're in node placing mode, create the node at click position
     if (isPlacingNode && pendingNodeData) {
       const { x, y } = getSvgCoords(e.clientX, e.clientY);
-      const newNode = {
-        id: `n-${Date.now()}`,
-        label: pendingNodeData.label || 'Novo Nó',
-        type: pendingNodeData.type || 'scene',
-        x: Math.round(x),
-        y: Math.round(y),
-        details: pendingNodeData.details || '',
-      };
+      const nodeType = pendingNodeData.type || 'scene';
+      const entityType = nodeTypeToEntityType[nodeType] || 'scenes';
+      const entityData = createEntity(entityType, { name: pendingNodeData.label || 'Novo Nó', description: pendingNodeData.details || '', title: pendingNodeData.label || 'Novo Nó' });
+      saveEntity(entityType, entityData);
+      const newNode = createNodeWithEntity(entityData, entityType, x, y);
       setNodes(prev => [...prev, newNode]);
       setIsPlacingNode(false);
       setPendingNodeData(null);
-      updateMindMap([...nodes, newNode], links);
+      updateMindMap(cleanNodesForSave([...nodes, newNode]), links);
       return;
     }
 
@@ -171,7 +187,7 @@ export default function MindMapTab() {
   const handleMouseUp = (e) => {
     setIsPanning(false);
     if (draggedNodeId) {
-      updateMindMap(nodes, links);
+      updateMindMap(cleanNodesForSave(nodes), links);
       setDraggedNodeId(null);
     }
     if (linkSourceId) {
@@ -221,9 +237,10 @@ export default function MindMapTab() {
     setSelectedNodeId(node.id);
     setSelectedLinkId(null);
     setDraggedNodeId(node.id);
-    if (node.type === 'character') setActiveFichaTab('characters');
-    else if (node.type === 'location') setActiveFichaTab('locations');
-    else if (node.type === 'object') setActiveFichaTab('objects');
+    const nodeDisplay = resolveNodeDisplay(node, currentProject);
+    if (nodeDisplay.type === 'character') setActiveFichaTab('characters');
+    else if (nodeDisplay.type === 'location') setActiveFichaTab('locations');
+    else if (nodeDisplay.type === 'object') setActiveFichaTab('objects');
 
     const { x, y } = getSvgCoords(e.clientX, e.clientY);
     setDragOffset({
@@ -237,9 +254,10 @@ export default function MindMapTab() {
     setLinkSourceId(nodeId);
     setSelectedNodeId(nodeId);
     const n = nodes.find(n => n.id === nodeId);
-    if (n?.type === 'character') setActiveFichaTab('characters');
-    else if (n?.type === 'location') setActiveFichaTab('locations');
-    else if (n?.type === 'object') setActiveFichaTab('objects');
+    const nDisplay = resolveNodeDisplay(n, currentProject);
+    if (nDisplay?.type === 'character') setActiveFichaTab('characters');
+    else if (nDisplay?.type === 'location') setActiveFichaTab('locations');
+    else if (nDisplay?.type === 'object') setActiveFichaTab('objects');
     const { x, y } = getSvgCoords(e.clientX, e.clientY);
     setTempLinkPos({ x, y });
   };
@@ -252,7 +270,7 @@ export default function MindMapTab() {
   const handleDeleteLink = (linkId) => {
     const updatedLinks = links.filter(l => l.id !== linkId);
     setLinks(updatedLinks);
-    updateMindMap(nodes, updatedLinks);
+    updateMindMap(cleanNodesForSave(nodes), updatedLinks);
     setSelectedLinkId(null);
   };
 
@@ -282,17 +300,14 @@ export default function MindMapTab() {
         return;
       }
       const { x, y } = getSvgCoords(e.clientX, e.clientY);
-      const newNode = {
-        id: `n-${Date.now()}`,
-        label: pendingNodeData.label || 'Novo Nó',
-        type: pendingNodeData.type || 'scene',
-        x: Math.round(x),
-        y: Math.round(y),
-        details: pendingNodeData.details || '',
-      };
+      const nodeType = pendingNodeData.type || 'scene';
+      const entityType = nodeTypeToEntityType[nodeType] || 'scenes';
+      const entityData = createEntity(entityType, { name: pendingNodeData.label || 'Novo Nó', description: pendingNodeData.details || '', title: pendingNodeData.label || 'Novo Nó' });
+      saveEntity(entityType, entityData);
+      const newNode = createNodeWithEntity(entityData, entityType, x, y);
       const updatedNodes = [...nodes, newNode];
       setNodes(updatedNodes);
-      updateMindMap(updatedNodes, links);
+      updateMindMap(cleanNodesForSave(updatedNodes), links);
       setIsPlacingNode(false);
       setPendingNodeData(null);
       setSelectedNodeId(newNode.id);
@@ -409,7 +424,7 @@ export default function MindMapTab() {
     });
 
     setNodes(updatedNodes);
-    updateMindMap(updatedNodes, links);
+    updateMindMap(cleanNodesForSave(updatedNodes), links);
     setTimeout(() => handleResetPan(), 50);
   };
 
@@ -425,38 +440,25 @@ export default function MindMapTab() {
   // Selected Node Details
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
 
-  // Open Ficha Editor
+  // Get entity for a node using entityId
   const getEntityForNode = (node) => {
-    if (!node) return null;
-    const patterns = [
-      { prefix: 'n-char-', type: 'character', db: 'characters', labelKey: 'name' },
-      { prefix: 'char-', type: 'character', db: 'characters', labelKey: 'name' },
-      { prefix: 'n-loc-', type: 'location', db: 'locations', labelKey: 'name' },
-      { prefix: 'loc-', type: 'location', db: 'locations', labelKey: 'name' },
-      { prefix: 'n-obj-', type: 'object', db: 'objects', labelKey: 'name' },
-      { prefix: 'obj-', type: 'object', db: 'objects', labelKey: 'name' },
-    ];
-    for (const { prefix, type, db, labelKey } of patterns) {
-      if (node.id.startsWith(prefix)) {
-        const entityId = node.id.replace(prefix, '');
-        const entity = currentProject[db].find(e => e.id === entityId || e[labelKey] === node.label);
-        if (entity) return { type, data: entity };
-        // Fallback: build from node data
-        if (type === 'character') return { type, data: { name: node.label, role: '—', description: node.details, traits: [], backstory: '', notes: '', avatar: 'amber' } };
-        if (type === 'location') return { type, data: { name: node.label, type: 'INT.', description: node.details, timeOfDay: 'NOITE', mood: '' } };
-        if (type === 'object') return { type, data: { name: node.label, significance: node.details, description: '' } };
-      }
+    if (!node?.entityId) return null;
+    const result = findEntityInProject(currentProject, node.entityId);
+    if (result) {
+      const { type, data } = result;
+      const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'plot_points' ? 'plot_point' : type === 'themes' ? 'theme' : type === 'acts' ? 'act' : null;
+      return shortType ? { type: shortType, data } : null;
     }
     return null;
   };
 
   // SharedSidebar callbacks
   const getNodeForEntity = (item, type) => {
-    if (type === 'character') return nodes.find(n => n.type === 'character' && n.label === item.name);
-    if (type === 'location') return nodes.find(n => n.type === 'location' && n.label === item.name);
-    if (type === 'object') return nodes.find(n => n.type === 'object' && n.label === item.name);
-    if (type === 'act') return nodes.find(n => n.type === 'act' && n.label === item.name);
-    return null;
+    return nodes.find(n => {
+      if (!n.entityId) return false;
+      const display = resolveNodeDisplay(n, currentProject);
+      return display.entity?.id === item.id;
+    });
   };
 
   const handleSidebarEdit = (item, type) => {
@@ -486,7 +488,18 @@ export default function MindMapTab() {
       return;
     }
     if (type === 'node' && item) {
-      setPromptModal({ title: 'Editar Nó', message: 'Rótulo do nó:', initialValue: item.label || '', onConfirm: (newLabel) => { setPromptModal({ title: 'Editar Nó', message: 'Detalhes:', initialValue: item.details || '', onConfirm: (newDetails) => { const updated = nodes.map(n => n.id === item.id ? { ...n, label: newLabel.trim(), details: newDetails || '' } : n); setNodes(updated); setTimeout(() => updateMindMap(updated, links), 50); setPromptModal(null); }, onCancel: () => setPromptModal(null) }); }, onCancel: () => setPromptModal(null) });
+      setPromptModal({ title: 'Editar Nó', message: 'Rótulo do nó:', initialValue: item.label || '', onConfirm: (newValue) => {
+        // If node has entityId, update the entity instead
+        if (item.entityId) {
+          const entityType = findEntityInProject(currentProject, item.entityId)?.type;
+          if (entityType) {
+            saveEntity(entityType, { id: item.entityId, name: newValue.trim(), title: newValue.trim() });
+            setPromptModal(null);
+            return;
+          }
+        }
+        setPromptModal({ title: 'Editar Nó', message: 'Detalhes:', initialValue: item.details || '', onConfirm: (newDetails) => { const updated = nodes.map(n => n.id === item.id ? { ...n, label: newValue.trim(), details: newDetails || '' } : n); setNodes(updated); setTimeout(() => updateMindMap(cleanNodesForSave(updated), links), 50); setPromptModal(null); }, onCancel: () => setPromptModal(null) });
+      }, onCancel: () => setPromptModal(null) });
       return;
     } else {
       setFichaModal({ item, type, mode: 'edit' });
@@ -554,7 +567,7 @@ export default function MindMapTab() {
 
   const handleSidebarSendToMap = (item) => {
     // Already in the map, just select
-    const node = nodes.find(n => n.label === (item.name || item.title || item.statement));
+    const node = getNodeForEntity(item);
     if (node) {
       setSelectedNodeId(node.id);
       const vw = window.innerWidth;
@@ -595,11 +608,17 @@ export default function MindMapTab() {
 
   // Node deletion
   const handleDeleteNode = (id) => {
+    const nodeToDelete = nodes.find(n => n.id === id);
+    // If node has entityId, also delete the entity
+    if (nodeToDelete?.entityId) {
+      const found = findEntityInProject(currentProject, nodeToDelete.entityId);
+      if (found) deleteEntityById(found.type, found.data.id);
+    }
     const updatedNodes = nodes.filter(n => n.id !== id);
     const updatedLinks = links.filter(l => l.source !== id && l.target !== id);
     setNodes(updatedNodes);
     setLinks(updatedLinks);
-    updateMindMap(updatedNodes, updatedLinks);
+    updateMindMap(cleanNodesForSave(updatedNodes), updatedLinks);
     setSelectedNodeId(null);
   };
 
@@ -619,7 +638,7 @@ export default function MindMapTab() {
         };
         const updatedLinks = [...links, newLink];
         setLinks(updatedLinks);
-        updateMindMap(nodes, updatedLinks);
+        updateMindMap(cleanNodesForSave(nodes), updatedLinks);
       }
     }
     setLinkSourceId(null);
@@ -630,32 +649,45 @@ export default function MindMapTab() {
     return getColorForNodeType(type);
   };
 
-  const groupedLocations = currentProject?.locations ? currentProject.locations.reduce((acc, loc) => {
+  const groupedLocations = currentProject?.entities?.locations ? currentProject.entities.locations.reduce((acc, loc) => {
     const groupName = loc.group || 'Geral';
     if (!acc[groupName]) acc[groupName] = [];
     acc[groupName].push(loc);
     return acc;
   }, {}) : {};
 
-  const groupedObjects = currentProject?.objects ? currentProject.objects.reduce((acc, obj) => {
+  const groupedObjects = currentProject?.entities?.objects ? currentProject.entities.objects.reduce((acc, obj) => {
     const groupName = obj.group || 'Geral';
     if (!acc[groupName]) acc[groupName] = [];
     acc[groupName].push(obj);
     return acc;
   }, {}) : {};
 
+  if (!currentProject) {
+    return (
+      <div className="mindmap-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ fontSize: '14px' }}>Nenhum projeto selecionado</div>
+        <div style={{ fontSize: '12px', color: '#555' }}>Crie ou selecione um projeto para usar o Mapa Mental</div>
+      </div>
+    );
+  }
+
+  let vpLeft = -Infinity, vpTop = -Infinity, vpRight = Infinity, vpBottom = Infinity;
+  const inView = (n) => n && n.x >= vpLeft && n.x <= vpRight && n.y >= vpTop && n.y <= vpBottom;
+
   return (
     <div className="mindmap-container">
 
-      {/* Shared Sidebar — left side */}
-      <SharedSidebar
-        currentProject={currentProject}
-        onEdit={handleSidebarEdit}
-        onDelete={handleSidebarDelete}
-        onSelectItem={handleSidebarSelect}
-        open={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
+      {/* Viewport bounds for culling */}
+      {(() => {
+        const r = svgRef.current?.getBoundingClientRect();
+        const margin = 300;
+        vpLeft = r ? (-pan.x / zoom) - margin : -Infinity;
+        vpTop = r ? (-pan.y / zoom) - margin : -Infinity;
+        vpRight = r ? vpLeft + (r.width / zoom) + margin * 2 : Infinity;
+        vpBottom = r ? vpTop + (r.height / zoom) + margin * 2 : Infinity;
+        return null;
+      })()}
 
       {/* SVG Drawing Canvas */}
 <svg
@@ -670,6 +702,16 @@ export default function MindMapTab() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Viewport bounds for culling */}
+        {(() => {
+          const r = svgRef.current?.getBoundingClientRect();
+          const margin = 300;
+          vpLeft = r ? (-pan.x / zoom) - margin : -Infinity;
+          vpTop = r ? (-pan.y / zoom) - margin : -Infinity;
+          vpRight = r ? vpLeft + (r.width / zoom) + margin * 2 : Infinity;
+          vpBottom = r ? vpTop + (r.height / zoom) + margin * 2 : Infinity;
+          return null;
+        })()}
         {/* Infinite Grid Background */}
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -694,15 +736,29 @@ export default function MindMapTab() {
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Links / Connections */}
           {(() => {
+            // Viewport culling: only render links connected to visible nodes
+            const svgRect = svgRef.current?.getBoundingClientRect();
+            const margin = 200;
+            const vLeft = svgRect ? (-pan.x / zoom) - margin : -Infinity;
+            const vTop = svgRect ? (-pan.y / zoom) - margin : -Infinity;
+            const vRight = svgRect ? vLeft + (svgRect.width / zoom) + margin * 2 : Infinity;
+            const vBottom = svgRect ? vTop + (svgRect.height / zoom) + margin * 2 : Infinity;
+            const inView = (n) => n.x >= vLeft && n.x <= vRight && n.y >= vTop && n.y <= vBottom;
+            const visibleLinks = links.filter(l => {
+              const sn = nodes.find(n => n.id === l.source);
+              const tn = nodes.find(n => n.id === l.target);
+              return sn && tn && (inView(sn) || inView(tn));
+            });
+
             // Count how many edges share each source-target pair
             const edgeCount = new Map();
-            links.forEach(l => {
+            visibleLinks.forEach(l => {
               const key = [l.source, l.target].sort().join('->');
               edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
             });
             const edgeIndex = new Map();
 
-            return links.map((link) => {
+            return visibleLinks.map((link) => {
               const sourceNode = nodes.find(n => n.id === link.source);
               const targetNode = nodes.find(n => n.id === link.target);
               if (!sourceNode || !targetNode) return null;
@@ -738,8 +794,10 @@ export default function MindMapTab() {
               const cy = my + ny * curvature;
 
               // Adjust endpoints to stop at node edge
-              const srcR = sourceNode.type === 'act' ? 28 : 22;
-              const tgtR = targetNode.type === 'act' ? 28 : 22;
+              const srcDisplay = resolveNodeDisplay(sourceNode, currentProject);
+              const tgtDisplay = resolveNodeDisplay(targetNode, currentProject);
+              const srcR = srcDisplay.type === 'act' ? 28 : 22;
+              const tgtR = tgtDisplay.type === 'act' ? 28 : 22;
 
               // Tangent at start: from start to control
               const sDx = cx - sx0, sDy = cy - sy0;
@@ -849,7 +907,7 @@ export default function MindMapTab() {
           })}
 
           {/* Node Render Loop */}
-          {nodes.map((node) => {
+          {nodes.filter(n => inView(n)).map((node) => {
             const isSelected = node.id === selectedNodeId;
             const isLinkingSource = node.id === linkSourceId;
             const isHovered = node.id === hoveredNodeId;
@@ -1033,6 +1091,25 @@ export default function MindMapTab() {
         <Plus size={14} /> Novo Nó
       </button>
 
+      {/* Shared Sidebar */}
+      {currentProject && (
+        <SharedSidebar
+          currentProject={currentProject}
+          activeTab={sharedSidebarTab}
+          onTabChange={setSharedSidebarTab}
+          onEdit={handleSidebarEdit}
+          onDelete={handleSidebarDelete}
+          onSelectItem={handleSidebarSelect}
+          onSendToScript={handleSidebarSendToScript}
+          onSendToMap={handleSidebarSendToMap}
+          tabContext="mindmap"
+          open={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          position={sidebarPosition}
+          onPositionToggle={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
+        />
+      )}
+
       {/* ── Mobile: Floating action bar ── */}
       {selectedNode && (() => {
         const sd = resolveNodeDisplay(selectedNode, currentProject);
@@ -1079,6 +1156,7 @@ export default function MindMapTab() {
           onDelete={handleDeleteFicha}
           onClose={() => setFichaModal(null)}
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+          onNavigateToMindMap={(id) => navigateTo('mindmap', id)}
         />
       )}
 

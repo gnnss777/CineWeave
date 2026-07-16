@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import FichaModal from './FichaModal';
 import ConfirmModal from './ConfirmModal';
+import CorkboardTab from './CorkboardTab';
 import './EncyclopediaTab.css';
-import { Plus, Edit3, Trash2, BookOpen, Compass, Paperclip, ArrowLeft, FileText, Target, Feather, Layers } from 'lucide-react';
+import { Plus, Edit3, Trash2, BookOpen, Compass, Paperclip, ArrowLeft, FileText, Target, Feather, Layers, Columns } from 'lucide-react';
 
 const ENTITY_TYPE_MAP = {
   characters: 'character',
@@ -33,6 +34,7 @@ export default function EncyclopediaTab() {
   const [activeTab, setActiveTab] = useState('characters');
   const [fichaModal, setFichaModal] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [showCorkboard, setShowCorkboard] = useState(false);
 
   useEffect(() => {
     if (!tabNavigation || tabNavigation.tab !== 'encyclopedia' || !tabNavigation.targetId) return;
@@ -107,9 +109,9 @@ export default function EncyclopediaTab() {
   const getList = () => {
     const e = currentProject?.entities || {};
     switch (activeTab) {
-      case 'characters': return currentProject?.characters || [];
-      case 'locations': return currentProject?.locations || [];
-      case 'objects': return currentProject?.objects || [];
+      case 'characters': return e.characters || [];
+      case 'locations': return e.locations || [];
+      case 'objects': return e.objects || [];
       case 'scenes': return e.scenes || [];
       case 'plot_points': return e.plot_points || [];
       case 'themes': return e.themes || [];
@@ -119,6 +121,15 @@ export default function EncyclopediaTab() {
   };
 
   const list = getList();
+
+  if (!currentProject) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ fontSize: '14px' }}>Nenhum projeto selecionado</div>
+        <div style={{ fontSize: '12px', color: '#555' }}>Crie ou selecione um projeto para usar a Enciclopédia</div>
+      </div>
+    );
+  }
 
   return (
     <div className="encyclopedia-container">
@@ -152,8 +163,14 @@ export default function EncyclopediaTab() {
           <button onClick={openAddForm} className="btn-primary py-2 px-3 text-xs flex items-center gap-1">
             <Plus size={14} /> Adicionar Ficha
           </button>
+          <button onClick={() => setShowCorkboard(!showCorkboard)} className={`btn-secondary py-2 px-3 text-xs flex items-center gap-1 ml-2 ${showCorkboard ? 'active' : ''}`}>
+            <Columns size={14} /> {showCorkboard ? 'Lista' : 'Mural'}
+          </button>
         </div>
 
+        {showCorkboard ? (
+          <CorkboardTab />
+        ) : (
         <div className="card-grid">
           {activeTab === 'characters' && (list.length === 0 ? (
             <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum personagem cadastrado.</p>
@@ -238,7 +255,7 @@ export default function EncyclopediaTab() {
                   <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-3 leading-relaxed">{scene.synopsis}</p>
                   <div className="flex gap-1 mt-2 flex-wrap">
                     <span className="text-[10px] bg-yellow-900/30 text-yellow-400 border border-yellow-800/30 px-1.5 py-0.5 rounded font-mono font-bold">
-                      {scene.actId ? (currentProject.entities?.acts || []).find(a => a.id === scene.actId)?.name || 'Sem ato' : 'Sem ato'}
+                      {scene.actId ? (currentProject?.entities?.acts || []).find(a => a.id === scene.actId)?.name || 'Sem ato' : 'Sem ato'}
                     </span>
                     <span className="text-[10px] bg-blue-900/30 text-blue-400 border border-blue-800/30 px-1.5 py-0.5 rounded font-mono">
                       {scene.characterIds?.length || 0} personagens
@@ -319,6 +336,7 @@ export default function EncyclopediaTab() {
             ))
           ))}
         </div>
+      )}
       </div>
 
       {fichaModal && (
@@ -331,6 +349,7 @@ export default function EncyclopediaTab() {
           onDelete={handleFichaDelete}
           onClose={() => setFichaModal(null)}
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+          onNavigateToMindMap={(id) => navigateTo('mindmap', id)}
         />
       )}
       {confirmModal && <ConfirmModal {...confirmModal} />}

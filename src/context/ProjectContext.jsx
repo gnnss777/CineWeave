@@ -1,237 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { syncProjectToSupabase, syncAllProjectsToSupabase, loadProjectsFromSupabase, isConfigured as isSupabaseConfigured, isLoggedIn } from '../lib/sync';
+import { syncProjectToSupabase, syncAllProjectsToSupabase, loadProjectsFromSupabase } from '../lib/sync';
+import { useSync } from './SyncContext';
 import * as db from '../lib/db';
 import { ensureEntities, updateEntity as updateEntityInProject, deleteEntity as deleteEntityFromProject } from '../lib/migration';
 import { screenplayToBlocks, blocksToScreenplay, mergeBlockStores } from '../lib/diffEngine/hashUtils';
 import { diffBlockOrders, enrichChanges, detectModifications } from '../lib/diffEngine/blockDiff';
+import { extractEntitiesFromScreenplay, linkEntitiesToScreenplay, buildEntityLinkingMap } from '../lib/entityExtractor';
 
 const ProjectContext = createContext();
 
-const initialProjects = [
-  {
-    id: 'smoke-ninja-cat',
-    title: 'Smoke Ninja Cat',
-    tagline: 'Pelos e aço. Instinto e metal. Uma gata vai provar que um coração valente vale mais que qualquer modificação.',
-    genre: 'Cyberpunk Aventura / Animação',
-    logline: 'Fumaça, uma gata branca que nunca precisou lutar, vê seu lar invadido por pássaros cyberpunk com modificações mortais. Sozinha e derrotada, ela busca os lendários macacos da floresta para aprender a arte ninja. No caminho, encontra Baby, uma gata furtiva das sombras que se torna sua aliada. Juntas, terão que unir forças para enfrentar o Rei dos Pássaros e proteger o território que amam.',
-    characters: [
-      { id: 'snc-char-1', name: 'Fumaça', role: 'Protagonista', description: 'Gata branca de olhos azuis, pelagem pura e macia. Começa como uma gata doméstica comum e se transforma em uma guerreira ninja através do treinamento.', traits: ['Determinada', 'Corajosa', 'Curiosa', 'Resiliente', 'Leal'], backstory: 'Sempre viveu no quintal da casa. Nunca precisou lutar até os pássaros cyberpunk aparecerem e ameaçarem seu lar. A jornada a transforma de uma gata doméstica em uma ninja — sua maior força não são as garras, mas a determinação.', avatar: 'blue', notes: 'Tem uma mancha cinza quase imperceptível atrás da orelha esquerda. Seu reflexo é tão rápido que os macacos se impressionaram.' },
-      { id: 'snc-char-2', name: 'Mestre Macaco', role: 'Mentor', description: 'Macaco cinzento sábio, olhos profundos e postura ereta. Líder do grupo de macacos da floresta urbana.', traits: ['Sábio', 'Paciente', 'Exigente', 'Protetor', 'Respeitado'], backstory: 'Líder do grupo de macacos da floresta urbana atrás da casa. Já treinou muitos animais na arte do movimento e da luta. Vê potencial em Fumaça desde o primeiro momento e a aceita como aprendiz.', avatar: 'green', notes: 'Ensina a Arte da Sombra — atacar de onde ninguém espera. Conhece todos os caminhos da floresta como as patas de suas próprias mãos.' },
-      { id: 'snc-char-3', name: 'Baby', role: 'Aliada / Anti-heroína', description: 'Gata de pelagem escura, olhos amarelos. Vive na sacada do andar de cima. Especialista em bombas de fumaça e ataques furtivos.', traits: ['Furtiva', 'Irônica', 'Prática', 'Independente', 'Leal'], backstory: 'Vive na sacada do andar de cima. Aprendeu a sobreviver nas sombras. Cria suas próprias bombas de fumaça com materiais encontrados. Não confia em ninguém, mas respeita quem luta — e Fumaça mostrou que sabe lutar.', avatar: 'purple', notes: 'Seu colar carrega pequenos artefatos metálicos — suas bombas de fumaça improvisadas. Cada bomba é única.' },
-      { id: 'snc-char-4', name: 'Rei dos Pássaros', role: 'Antagonista', description: 'Pássaro grande com modificações cibernéticas: asas mecânicas que brilham vermelho, olhos de sensor, penas de aço afiadas como lâminas.', traits: ['Arrogante', 'Cruel', 'Ambicioso', 'Estrategista', 'Impiedoso'], backstory: 'Líder do bando de pássaros cyberpunk. Expandiu seu território destruindo ninhos e lares de outros animais. Não aceita derrota — sua asa mecânica danificada na batalha final é uma ferida de orgulho que nunca vai sarar.', avatar: 'red', notes: 'Suas penas de aço podem cortar galhos grossos. A modificação nos olhos permite visão térmica e noturna.' }
-    ],
-    locations: [
-      { id: 'snc-loc-1', name: 'O Quintal', type: 'EXT.', description: 'Espaço cercado por muros baixos e árvores altas. Grama alta, um brinquedo velho abandonado, uma mangueira enroscada. É o coração do território de Fumaça — seu lar, seu sol, seu paraíso.', timeOfDay: 'DIA', mood: 'Acolhedor, Familiar, Paraíso Esquecido' },
-      { id: 'snc-loc-2', name: 'A Casa da Família', type: 'INT./EXT.', description: 'Casa modesta com piscina nos fundos. Janelas com tela de proteção. Telhado de telhas vermelhas. O refúgio de Fumaça quando precisa se esconder ou descansar entre batalhas.', timeOfDay: 'DIA', mood: 'Seguro, Familiar, Aconchegante' },
-      { id: 'snc-loc-3', name: 'A Sacada da Baby', type: 'EXT.', description: 'Segundo andar, varanda estreita com vasos quebrados, uma cadeira velha, um tapete desfiado. O território de Baby, cheio de sombras e esconderijos perfeitos para emboscadas.', timeOfDay: 'TARDE', mood: 'Sombrio, Furtivo, Precário' },
-      { id: 'snc-loc-4', name: 'Floresta dos Macacos', type: 'EXT.', description: 'Mata fechada atrás da casa. Árvores enormes com galhos entrelaçados formando pontes naturais. Luz filtrada pelas folhas, sombras dançantes. A academia de treinamento de Fumaça.', timeOfDay: 'DIA', mood: 'Místico, Desafiador, Sábio' },
-      { id: 'snc-loc-5', name: 'Os Telhados', type: 'EXT.', description: 'Vista do alto da casa e das vizinhanças. Telhas vermelhas, antenas enferrujadas, um para-raios. O palco da batalha final contra o Rei dos Pássaros.', timeOfDay: 'ENTARDECER', mood: 'Épico, Perigoso, Crepuscular' }
-    ],
-    objects: [
-      { id: 'snc-obj-1', name: 'Bomba de Fumaça (Baby)', significance: 'Dispositivo favorito de Baby. Feito de latas amassadas, pólvora caseira e fragmentos de metal. Cria uma cortina de fumaça densa que desorienta os inimigos.', description: 'Pequena lata enferrujada envolta em barbante. Quando ativada, libera uma nuvem espessa de fumaça cinzenta com cheiro de pólvora e metal queimado.' },
-      { id: 'snc-obj-2', name: 'Pena de Aço', significance: 'Pena caída de um dos pássaros cyberpunk durante o primeiro ataque no quintal. Serve como prova da ameaça e lembrete do perigo que Fumaça precisa enfrentar.', description: 'Pena de aço oxidado com bordas afiadas. Brilho metálico frio, uma das pontas manchada com sangue — o primeiro ferimento de Fumaça na guerra pelo território.' },
-      { id: 'snc-obj-3', name: 'Amuleto dos Macacos', significance: 'Presente do Mestre Macaco ao final do treinamento. Uma pequena pedra polida com marcações de garras. Símbolo de proteção e da nova identidade de Fumaça como ninja.', description: 'Pequeno seixo cinzento e liso com três riscos paralelos gravados por garra. Pendurado em um cipó fino que Fumaça usa no pescoço como colar.' }
-    ],
-    screenplay: [
-      { id: 'snc-sc-1', type: 'scene-heading', text: 'EXT. O QUINTAL - DIA' },
-      { id: 'snc-sc-2', type: 'action', text: 'O quintal é um paraíso esquecido — grama alta balançando com o vento, um brinquedo velho abandonado, uma mangueira enroscada como uma cobra de plástico. FUMAÇA, uma gata branca de olhos azuis, está no topo do muro observando seu território com olhos semicerrados.' },
-      { id: 'snc-sc-3', type: 'action', text: 'O vento move a grama alta. Fumaça desce com graça felina, cada passo calculado. Ela ama este lugar.' },
-      { id: 'snc-sc-4', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-5', type: 'parenthetical', text: '(observando o horizonte)' },
-      { id: 'snc-sc-6', type: 'dialogue', text: 'Meu território. Meu sol. Meu lar.' },
-      { id: 'snc-sc-7', type: 'action', text: 'Um som metálico corta o ar. Pássaros cyberpunk pousam no muro. Suas penas são de aço oxidado, olhos brilham vermelho como sensores. O REI DOS PÁSSAROS lidera o bando, suas asas mecânicas zumbindo.' },
-      { id: 'snc-sc-8', type: 'character', text: 'REI DOS PÁSSAROS' },
-      { id: 'snc-sc-9', type: 'dialogue', text: 'Este território agora pertence ao bando, gata. Sua era acabou.' },
-      { id: 'snc-sc-10', type: 'action', text: 'Os pássaros atacam. Garras de aço rasgam o ar. Fumaça tenta se defender, mas as lâminas cortam sua pelagem branca. Manchas de sangue brotam.' },
-      { id: 'snc-sc-11', type: 'action', text: 'Fumaça foge para debaixo da casa, ofegante. Sua primeira derrota. Ela lambe os ferimentos, os olhos vidrados.' },
-      { id: 'snc-sc-12', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-13', type: 'parenthetical', text: '(ofegante)' },
-      { id: 'snc-sc-14', type: 'dialogue', text: 'Eu... não posso vencer sozinha. Preciso de ajuda.' },
-      { id: 'snc-sc-15', type: 'action', text: 'Ela lembra dos macacos que viu na floresta além do muro. Os sábios da árvore grande. Dizem que eles conhecem uma arte antiga — a arte do movimento felino.' },
-      { id: 'snc-sc-16', type: 'transition', text: 'CORTA PARA:' },
-      { id: 'snc-sc-17', type: 'scene-heading', text: 'EXT. FLORESTA DOS MACACOS - DIA' },
-      { id: 'snc-sc-18', type: 'action', text: 'A floresta é um labirinto de galhos e sombras. Luzes douradas filtram pelas folhas criando um mosaico no chão. Fumaça caminha cautelosa, cada sentido alerta.' },
-      { id: 'snc-sc-19', type: 'action', text: 'MESTRE MACACO aparece de cima de um galho. Cinzento, olhos profundos como poços, postura ereta que impõe respeito.' },
-      { id: 'snc-sc-20', type: 'character', text: 'MESTRE MACACO' },
-      { id: 'snc-sc-21', type: 'dialogue', text: 'Você veio longe, gatinha. O que uma doméstica quer na floresta dos macacos?' },
-      { id: 'snc-sc-22', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-23', type: 'dialogue', text: 'Quero aprender a lutar. Meu lar está ameaçado por pássaros de metal.' },
-      { id: 'snc-sc-24', type: 'action', text: 'O Mestre Macaco observa Fumaça por um longo momento. Seus olhos percorrem os ferimentos, a postura cansada, mas algo brilha no olhar da gata.' },
-      { id: 'snc-sc-25', type: 'character', text: 'MESTRE MACACO' },
-      { id: 'snc-sc-26', type: 'dialogue', text: 'Seu corpo é mole. Seus olhos não sabem ver. Mas seu coração... seu coração é de guerreira. Fique. Vamos descobrir se o resto acompanha.' },
-      { id: 'snc-sc-27', type: 'action', text: 'Montagem de treinamento: Fumaça escala árvores enormes, cai, levanta e tenta de novo. Seu corpo aprende a pisar sem fazer barulho, a sentir o vento antes do ataque.' },
-      { id: 'snc-sc-28', type: 'action', text: 'Mestre Macaco ensina a Arte da Sombra — atacar de onde ninguém espera. Fumaça desaparece entre as folhas, reaparece do outro lado.' },
-      { id: 'snc-sc-29', type: 'action', text: 'Dia após dia. A gata branca se transforma. Seus movimentos ficam fluidos. Seus olhos aprendem a ver.' },
-      { id: 'snc-sc-30', type: 'action', text: 'Fumaça executa seu primeiro ataque perfeito — um salto silencioso, garra precisa, aterrissagem impecável. Os macacos aplaudem.' },
-      { id: 'snc-sc-31', type: 'character', text: 'MESTRE MACACO' },
-      { id: 'snc-sc-32', type: 'dialogue', text: 'Você está pronta, pequena fumaça. A guerreira dentro de você acordou. Mas lembre-se: a verdadeira batalha não é contra o inimigo — é contra seus próprios limites.' },
-      { id: 'snc-sc-33', type: 'action', text: 'Mestre Macaco entrega a Fumaça um pequeno AMULETO DE PEDRA com marcas de garra. Ela coloca no pescoço.' },
-      { id: 'snc-sc-34', type: 'transition', text: 'CORTA PARA:' },
-      { id: 'snc-sc-35', type: 'scene-heading', text: 'EXT. A SACADA DA BABY - TARDE' },
-      { id: 'snc-sc-36', type: 'action', text: 'Fumaça volta ao território. Mas algo mudou — há cheiro de outro felino no ar. Ela segue o rastro até a sacada do andar de cima.' },
-      { id: 'snc-sc-37', type: 'action', text: 'BABY está deitada em um vaso quebrado. Pelagem escura como carvão, olhos amarelos que brilham na penumbra. Um colar com pequenos artefatos metálicos — bombas de fumaça improvisadas.' },
-      { id: 'snc-sc-38', type: 'character', text: 'BABY' },
-      { id: 'snc-sc-39', type: 'parenthetical', text: '(sem se levantar)' },
-      { id: 'snc-sc-40', type: 'dialogue', text: 'É sua aquele quintal? Os pássaros de ferro estão ficando irritantes. O barulho não deixa ninguém dormir.' },
-      { id: 'snc-sc-41', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-42', type: 'dialogue', text: 'Eles vão ser expulsos. Eu voltei mais forte.' },
-      { id: 'snc-sc-43', type: 'character', text: 'BABY' },
-      { id: 'snc-sc-44', type: 'parenthetical', text: '(rindo)' },
-      { id: 'snc-sc-45', type: 'dialogue', text: 'Você? Uma gata branca contra um exército de metal? Você precisa de alguém que conheça as sombras.' },
-      { id: 'snc-sc-46', type: 'action', text: 'Pássaros atacam a sacada. Baby reage na hora — joga uma bomba de fumaça. O ar se enche de névoa cinzenta. Os pássaros gritam, desorientados.' },
-      { id: 'snc-sc-47', type: 'action', text: 'Fumaça se move na fumaça. Ataque das sombras. Um pássaro cai.' },
-      { id: 'snc-sc-48', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-49', type: 'parenthetical', text: '(impressionada)' },
-      { id: 'snc-sc-50', type: 'dialogue', text: 'Onde aprendeu isso?' },
-      { id: 'snc-sc-51', type: 'character', text: 'BABY' },
-      { id: 'snc-sc-52', type: 'dialogue', text: 'Sobrevivendo. Você quer seu quintal de volta? Eu quero minha sacada em paz. Acho que podemos fazer um acordo.' },
-      { id: 'snc-sc-53', type: 'action', text: 'As duas se encaram. O respeito nasce nos olhos de ambas. Baby estende a pata. Fumaça aceita.' },
-      { id: 'snc-sc-54', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-55', type: 'dialogue', text: 'Nós vamos acabar com eles. Juntas.' },
-      { id: 'snc-sc-56', type: 'transition', text: 'CORTA PARA:' },
-      { id: 'snc-sc-57', type: 'scene-heading', text: 'EXT. OS TELHADOS - ENTARDECER' },
-      { id: 'snc-sc-58', type: 'action', text: 'O sol se põe atrás da casa. O céu é um oceano de laranja e vermelho. Os pássaros cyberpunk se reúnem no telhado — dezenas de olhos vermelhos brilhando na penumbra.' },
-      { id: 'snc-sc-59', type: 'action', text: 'Fumaça está no muro. Seus olhos azuis fixos no horizonte. Baby está na sacada, bombas prontas. É hora.' },
-      { id: 'snc-sc-60', type: 'action', text: 'Fumaça avança primeiro. Seus movimentos são precisos — a dança que os macacos ensinaram. Ela escala o muro em dois saltos, desaparece entre as sombras do telhado.' },
-      { id: 'snc-sc-61', type: 'action', text: 'Baby joga bombas de fumaça. O telhado fica coberto de névoa cinzenta. Os pássaros gritam, desorientados.' },
-      { id: 'snc-sc-62', type: 'action', text: 'Fumaça ataca das sombras. Um a um, os pássaros caem. Garra precisa. Movimento silencioso. A Arte da Sombra em ação.' },
-      { id: 'snc-sc-63', type: 'action', text: 'O REI DOS PÁSSAROS desce do céu. Suas asas mecânicas brilham com luz vermelha intensa. O vento das hélices espalha a fumaça.' },
-      { id: 'snc-sc-64', type: 'character', text: 'REI DOS PÁSSAROS' },
-      { id: 'snc-sc-65', type: 'dialogue', text: 'Você é só uma gata brincando de ninja. Isto não é um jogo.' },
-      { id: 'snc-sc-66', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-67', type: 'dialogue', text: 'Brincando não. Eu sou uma ninja.' },
-      { id: 'snc-sc-68', type: 'action', text: 'Fumaça e o Rei se enfrentam. Golpes de aço contra garras felinas. Penas metálicas voam. Fumaça leva um corte na face mas não recua.' },
-      { id: 'snc-sc-69', type: 'action', text: 'Baby ataca pelas costas — uma bomba direto na asa mecânica do Rei. A explosão danifica o motor. Faíscas voam.' },
-      { id: 'snc-sc-70', type: 'action', text: 'O Rei cai no telhado, sua asa danificada soltando faíscas azuis. Os outros pássaros fogem. O silêncio volta ao entardecer.' },
-      { id: 'snc-sc-71', type: 'character', text: 'REI DOS PÁSSAROS' },
-      { id: 'snc-sc-72', type: 'parenthetical', text: '(derrotado)' },
-      { id: 'snc-sc-73', type: 'dialogue', text: 'Isso não acabou, gata. Voltaremos.' },
-      { id: 'snc-sc-74', type: 'action', text: 'Ele foge, mancando. Fumaça não o persegue. A batalha terminou.' },
-      { id: 'snc-sc-75', type: 'action', text: 'Fumaça e Baby estão no topo do muro, lado a lado. O sol se põe atrás delas. O quintal está silencioso. Em paz.' },
-      { id: 'snc-sc-76', type: 'character', text: 'BABY' },
-      { id: 'snc-sc-77', type: 'dialogue', text: 'Não foi ruim, gata branca.' },
-      { id: 'snc-sc-78', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-79', type: 'parenthetical', text: '(sorrindo)' },
-      { id: 'snc-sc-80', type: 'dialogue', text: 'Você também não, gata escura.' },
-      { id: 'snc-sc-81', type: 'action', text: 'As duas sentam juntas no muro, observando o horizonte. A noite cai sobre o quintal.' },
-      { id: 'snc-sc-82', type: 'character', text: 'FUMAÇA' },
-      { id: 'snc-sc-83', type: 'parenthetical', text: '(para si mesma)' },
-      { id: 'snc-sc-84', type: 'dialogue', text: 'Lar é onde a luta vale a pena.' },
-      { id: 'snc-sc-85', type: 'action', text: 'Fumaça toca o amuleto no pescoço. Fecha os olhos. Uma brisa quente passa. O quintal está seguro.' },
-      { id: 'snc-sc-86', type: 'transition', text: 'FADE A PRETO.' }
-    ],
-    mindMapNodes: [
-      { id: 'snc-act1', label: 'ATO I: A Ameaça', type: 'act', x: 150, y: 80, details: 'Os pássaros cyberpunk invadem o quintal. Fumaça é derrotada e decide buscar ajuda.' },
-      { id: 'snc-act2', label: 'ATO II: O Treinamento', type: 'act', x: 450, y: 80, details: 'Fumaça encontra os macacos. Aprende navegação em árvores, artes marciais felinas e a Arte da Sombra.' },
-      { id: 'snc-act3', label: 'ATO III: A Aliança', type: 'act', x: 750, y: 80, details: 'Fumaça conhece Baby. Rivalidade inicial se transforma em aliança contra os pássaros.' },
-      { id: 'snc-act4', label: 'ATO IV: A Batalha Final', type: 'act', x: 1050, y: 80, details: 'Confronto épico nos telhados. Fumaça e Baby derrotam o Rei dos Pássaros.' },
-      { id: 'snc-char-1', label: 'Fumaça', type: 'character', x: 150, y: 280, details: 'Protagonista. Gata branca ninja. Determinada e resiliente.' },
-      { id: 'snc-char-2', label: 'Mestre Macaco', type: 'character', x: 350, y: 280, details: 'Mentor. Macaco sábio que ensina a Arte da Sombra.' },
-      { id: 'snc-char-3', label: 'Baby', type: 'character', x: 750, y: 280, details: 'Aliada. Gata furtiva das sombras, especialista em bombas de fumaça.' },
-      { id: 'snc-char-4', label: 'Rei dos Pássaros', type: 'character', x: 950, y: 280, details: 'Antagonista. Pássaro cyberpunk com asas mecânicas e penas de aço.' },
-      { id: 'snc-loc-1', label: 'O Quintal', type: 'location', x: 150, y: 480, details: 'EXT. DIA. Território de Fumaça. O lar que ela protege.' },
-      { id: 'snc-loc-2', label: 'Casa da Família', type: 'location', x: 350, y: 480, details: 'INT./EXT. DIA. Refúgio de Fumaça. Piscina e telhado.' },
-      { id: 'snc-loc-3', label: 'Sacada da Baby', type: 'location', x: 750, y: 480, details: 'EXT. TARDE. Território de Baby. Cheio de sombras.' },
-      { id: 'snc-loc-4', label: 'Floresta dos Macacos', type: 'location', x: 550, y: 480, details: 'EXT. DIA. Academia de treinamento. Árvores gigantes.' },
-      { id: 'snc-loc-5', label: 'Os Telhados', type: 'location', x: 950, y: 480, details: 'EXT. ENTARDECER. Palco da batalha final.' },
-      { id: 'snc-obj-1', label: 'Bomba de Fumaça', type: 'object', x: 650, y: 380, details: 'Dispositivo de Baby. Cortina de fumaça densa.' },
-      { id: 'snc-obj-2', label: 'Pena de Aço', type: 'object', x: 850, y: 380, details: 'Prova da ameaça. Primeiro ferimento de Fumaça.' },
-      { id: 'snc-obj-3', label: 'Amuleto dos Macacos', type: 'object', x: 250, y: 380, details: 'Presente do Mestre Macaco. Símbolo de proteção.' },
-      { id: 'snc-scene-1', label: 'Cena 1: A Invasão', type: 'scene', x: 170, y: 600, details: 'Pássaros atacam o quintal. Fumaça é derrotada.' },
-      { id: 'snc-scene-2', label: 'Cena 2: O Treinamento', type: 'scene', x: 470, y: 600, details: 'Fumaça aprende com os macacos na floresta.' },
-      { id: 'snc-scene-3', label: 'Cena 3: A Aliança', type: 'scene', x: 770, y: 600, details: 'Fumaça e Baby unem forças na sacada.' },
-      { id: 'snc-scene-4', label: 'Cena 4: A Batalha', type: 'scene', x: 1070, y: 600, details: 'Confronto final nos telhados ao entardecer.' },
-      { id: 'snc-plot-1', label: 'A Derrota', type: 'plot_point', x: 170, y: 180, details: 'Fumaça perde o território para os pássaros.' },
-      { id: 'snc-plot-2', label: 'O Aprendizado', type: 'plot_point', x: 470, y: 180, details: 'Fumaça domina a Arte da Sombra.' },
-      { id: 'snc-plot-3', label: 'A Aliança', type: 'plot_point', x: 770, y: 180, details: 'Baby e Fumaça criam o plano de ataque.' },
-      { id: 'snc-plot-4', label: 'A Vitória', type: 'plot_point', x: 1070, y: 180, details: 'Fumaça derrota o Rei dos Pássaros.' },
-      { id: 'snc-world-1', label: 'Pássaros Cyberpunk', type: 'world', x: 350, y: 680, details: 'Ameaça tecnológica. Modificações de aço e sensores.' },
-      { id: 'snc-world-2', label: 'Modificações de Aço', type: 'world', x: 650, y: 680, details: 'Asas mecânicas, penas-lâmina, visão térmica.' },
-      { id: 'snc-world-3', label: 'A Floresta Urbana', type: 'world', x: 950, y: 680, details: 'Onde a natureza e a cidade se encontram.' },
-      { id: 'snc-theme-1', label: 'Tema: Coragem', type: 'theme', x: 1200, y: 280, details: 'Coragem não é ausência de medo, mas a escolha de enfrentá-lo.' },
-      { id: 'snc-theme-2', label: 'Tema: União', type: 'theme', x: 1200, y: 380, details: 'Inimigas podem se tornar aliadas diante de uma ameaça maior.' }
-    ],
-    mindMapLinks: [
-      { id: 'snc-l-act1-2', source: 'snc-act1', target: 'snc-act2' },
-      { id: 'snc-l-act2-3', source: 'snc-act2', target: 'snc-act3' },
-      { id: 'snc-l-act3-4', source: 'snc-act3', target: 'snc-act4' },
-      { id: 'snc-l-act1-char1', source: 'snc-act1', target: 'snc-char-1' },
-      { id: 'snc-l-act2-char2', source: 'snc-act2', target: 'snc-char-2' },
-      { id: 'snc-l-act3-char3', source: 'snc-act3', target: 'snc-char-3' },
-      { id: 'snc-l-act4-char4', source: 'snc-act4', target: 'snc-char-4' },
-      { id: 'snc-l-char1-loc1', source: 'snc-char-1', target: 'snc-loc-1' },
-      { id: 'snc-l-char1-loc2', source: 'snc-char-1', target: 'snc-loc-2' },
-      { id: 'snc-l-char2-loc4', source: 'snc-char-2', target: 'snc-loc-4' },
-      { id: 'snc-l-char3-loc3', source: 'snc-char-3', target: 'snc-loc-3' },
-      { id: 'snc-l-char3-loc5', source: 'snc-char-3', target: 'snc-loc-5' },
-      { id: 'snc-l-char4-loc5', source: 'snc-char-4', target: 'snc-loc-5' },
-      { id: 'snc-l-char1-obj3', source: 'snc-char-1', target: 'snc-obj-3' },
-      { id: 'snc-l-char3-obj1', source: 'snc-char-3', target: 'snc-obj-1' },
-      { id: 'snc-l-char4-obj2', source: 'snc-char-4', target: 'snc-obj-2' },
-      { id: 'snc-l-act1-scene1', source: 'snc-act1', target: 'snc-scene-1' },
-      { id: 'snc-l-act2-scene2', source: 'snc-act2', target: 'snc-scene-2' },
-      { id: 'snc-l-act3-scene3', source: 'snc-act3', target: 'snc-scene-3' },
-      { id: 'snc-l-act4-scene4', source: 'snc-act4', target: 'snc-scene-4' },
-      { id: 'snc-l-act1-plot1', source: 'snc-act1', target: 'snc-plot-1' },
-      { id: 'snc-l-act2-plot2', source: 'snc-act2', target: 'snc-plot-2' },
-      { id: 'snc-l-act3-plot3', source: 'snc-act3', target: 'snc-plot-3' },
-      { id: 'snc-l-act4-plot4', source: 'snc-act4', target: 'snc-plot-4' },
-      { id: 'snc-l-scene1-world1', source: 'snc-scene-1', target: 'snc-world-1' },
-      { id: 'snc-l-scene2-world3', source: 'snc-scene-2', target: 'snc-world-3' },
-      { id: 'snc-l-scene4-world2', source: 'snc-scene-4', target: 'snc-world-2' },
-      { id: 'snc-l-plot1-theme1', source: 'snc-plot-1', target: 'snc-theme-1' },
-      { id: 'snc-l-plot3-theme2', source: 'snc-plot-3', target: 'snc-theme-2' },
-      { id: 'snc-l-char1-theme1', source: 'snc-char-1', target: 'snc-theme-1' },
-      { id: 'snc-l-char3-theme2', source: 'snc-char-3', target: 'snc-theme-2' }
-    ],
-    recordings: [
-      { id: 'snc-rec-1', title: 'Brainstorm: Smoke Ninja Cat', duration: '32:07', date: '12/07/2026', transcript: 'Sessão de brainstorming para Smoke Ninja Cat, uma história sobre uma gata branca chamada Fumaça que se torna ninja para proteger seu território de pássaros cyberpunk.\n\nEstrutura em 4 atos:\n- Ato I: A Ameaça no Quintal — pássaros cyberpunk invadem, Fumaça é derrotada\n- Ato II: Treinamento com os Macacos — Fumaça aprende a Arte da Sombra\n- Ato III: Encontro com Baby — rivalidade vira aliança\n- Ato IV: Batalha Final nos telhados\n\nPersonagens: Fumaça (protagonista determinada), Mestre Macaco (mentor sábio), Baby (aliada furtiva), Rei dos Pássaros (antagonista cruel).\n\nTom: aventura séria. Só os pássaros têm modificações cyberpunk. Fumaça vence usando instinto e treinamento — natureza sobre tecnologia.', processed: true }
-    ],
-    mediaUploads: [
-      { id: 'snc-med-1', name: 'ConceptArt_Fumaca.jpg', date: '12/07/2026', type: 'image', url: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=400&q=80', processed: true },
-      { id: 'snc-med-2', name: 'Notas_Passaros_Cyberpunk.txt', date: '12/07/2026', type: 'note', url: '', content: 'Os pássaros cyberpunk têm modificações de aço: asas mecânicas com motores que zumbem, penas de aço oxidado afiadas como lâminas, olhos com sensores vermelhos (visão térmica e noturna). O Rei dos Pássaros é o maior e mais forte — sua asa direita tem um motor extra que dá mais velocidade. A fraqueza deles é a fumaça: sem visão, os sensores ficam perdidos. É por isso que as bombas de Baby são tão eficazes.', processed: true }
-    ],
-    ideas: [
-      { id: 'snc-idea-1', title: 'A Jornada da Gata Branca', content: 'Fumaça começa como uma gata doméstica comum e se transforma em uma ninja através do treinamento com os macacos. Sua maior força não são as garras, mas a determinação.', category: 'character', tags: ['jornada', 'evolução', 'protagonista'], color: 'blue', createdAt: Date.now() - 86400000, updatedAt: Date.now() - 86400000 },
-      { id: 'snc-idea-2', title: 'Bombas de Fumaça como Extensão', content: 'Baby não só usa bombas de fumaça — ela as cria, modifica e aperfeiçoa. Cada bomba é única, e ela as trata como extensões do próprio corpo.', category: 'world', tags: ['gadget', 'furtividade', 'personagem'], color: 'purple', createdAt: Date.now() - 43200000, updatedAt: Date.now() - 43200000 },
-      { id: 'snc-idea-3', title: 'Natureza vs Tecnologia', content: 'Os pássaros cyberpunk representam a tecnologia que oprime a natureza. Fumaça, uma gata sem modificações, vence usando apenas instinto e treinamento — natureza sobre tecnologia.', category: 'theme', tags: ['natureza', 'tecnologia', 'simbologia'], color: 'green', createdAt: Date.now() - 21600000, updatedAt: Date.now() - 21600000 },
-      { id: 'snc-idea-4', title: 'Inimiga Que Vira Aliada', content: 'Baby e Fumaça começam como rivais — uma do quintal, outra da sacada. Mas ao reconhecerem a ameaça maior, unem forças. A amizade nasce do respeito conquistado em batalha.', category: 'plot', tags: ['aliada', 'rivalidade', 'amizade'], color: 'purple', createdAt: Date.now() - 10800000, updatedAt: Date.now() - 10800000 }
-    ],
-    brainstormData: {
-      plot_points: [
-        { id: 'snc-bd-plot-1', title: 'A Invasão do Quintal', description: 'Os pássaros cyberpunk atacam o quintal de Fumaça. Ela tenta defender mas é derrotada e ferida.', act: 'I', tags: ['invasão', 'derrota', 'perigo'] },
-        { id: 'snc-bd-plot-2', title: 'O Treinamento na Floresta', description: 'Fumaça encontra os macacos. Mestre Macaco a treina na Arte da Sombra, navegação em árvores e ataques furtivos.', act: 'II', tags: ['treinamento', 'aprendizado', 'superação'] },
-        { id: 'snc-bd-plot-3', title: 'O Encontro na Sacada', description: 'Fumaça conhece Baby na sacada. Após um confronto inicial e um ataque dos pássaros, elas formam uma aliança.', act: 'III', tags: ['encontro', 'aliança', 'rivalidade'] },
-        { id: 'snc-bd-plot-4', title: 'A Batalha nos Telhados', description: 'Fumaça e Baby enfrentam o Rei dos Pássaros e seu bando nos telhados ao entardecer. Vitória com dano na asa do Rei.', act: 'IV', tags: ['clímax', 'batalha', 'vitória'] }
-      ],
-      scenes: [
-        { id: 'snc-bd-sc-1', title: 'O Ataque no Quintal', description: 'Pássaros cyberpunk invadem o território. Fumaça é derrotada e decide buscar ajuda na floresta.', act: 'I', tags: ['ataque', 'derrota', 'decisão'] },
-        { id: 'snc-bd-sc-2', title: 'O Treinamento na Floresta', description: 'Fumaça escala árvores, aprende a pisar sem barulho e domina a Arte da Sombra. Recebe o amuleto dos macacos.', act: 'II', tags: ['treinamento', 'superação', 'mentor'] },
-        { id: 'snc-bd-sc-3', title: 'O Encontro na Sacada', description: 'Fumaça encontra Baby. Demonstração de habilidade com bombas de fumaça. Formação da aliança.', act: 'III', tags: ['encontro', 'aliança', 'ação'] },
-        { id: 'snc-bd-sc-4', title: 'A Batalha nos Telhados', description: 'Batalha épica no entardecer. Fumaça usa a Arte da Sombra. Baby danifica a asa do Rei. Vitória e paz.', act: 'IV', tags: ['clímax', 'batalha', 'catarse'] }
-      ],
-      dialogues: [
-        { id: 'snc-bd-dia-1', speaker: 'Fumaça', line: 'Meu território. Meu sol. Meu lar.', context: 'Fumaça observa o quintal antes do ataque.', tags: ['apego', 'lar', 'identidade'] },
-        { id: 'snc-bd-dia-2', speaker: 'Rei dos Pássaros', line: 'Este território agora pertence ao bando, gata. Sua era acabou.', context: 'Os pássaros invadem o quintal.', tags: ['ameaça', 'conflito', 'invasão'] },
-        { id: 'snc-bd-dia-3', speaker: 'Mestre Macaco', line: 'Seu corpo é mole. Seus olhos não sabem ver. Mas seu coração... seu coração é de guerreira.', context: 'Mestre Macaco aceita Fumaça como aprendiz.', tags: ['sabedoria', 'aceitação', 'potencial'] },
-        { id: 'snc-bd-dia-4', speaker: 'Baby', line: 'Você quer seu quintal de volta? Eu quero minha sacada em paz. Acho que podemos fazer um acordo.', context: 'Baby propõe aliança a Fumaça.', tags: ['aliança', 'acordo', 'união'] },
-        { id: 'snc-bd-dia-5', speaker: 'Fumaça', line: 'Brincando não. Eu sou uma ninja.', context: 'Fumaça enfrenta o Rei dos Pássaros.', tags: ['determinação', 'identidade', 'coragem'] },
-        { id: 'snc-bd-dia-6', speaker: 'Fumaça', line: 'Lar é onde a luta vale a pena.', context: 'Fumaça reflete após a vitória.', tags: ['catarse', 'lar', 'propósito'] }
-      ],
-      world_elements: [
-        { id: 'snc-bd-world-1', name: 'Pássaros Cyberpunk', type: 'threat', description: 'Pássaros com modificações de aço: asas mecânicas, penas-lâmina, visão térmica. Liderados pelo Rei dos Pássaros.', tags: ['ameaça', 'tecnologia', 'cyberpunk'] },
-        { id: 'snc-bd-world-2', name: 'A Arte da Sombra', type: 'technique', description: 'Estilo de luta ensinado pelos macacos. Baseado em furtividade, movimento silencioso e ataque de onde não esperam.', tags: ['técnica', 'ninja', 'treinamento'] },
-        { id: 'snc-bd-world-3', name: 'Territórios do Lar', type: 'setting', description: 'O quintal, a casa, a sacada, a floresta e os telhados formam o mapa do mundo de Fumaça. Cada lugar tem seu papel.', tags: ['cenário', 'território', 'mapa'] }
-      ],
-      themes: [
-        { id: 'snc-bd-theme-1', statement: 'Coragem não é ausência de medo, mas a escolha de enfrentá-lo.', evidence: 'Fumaça sente medo dos pássaros, mas escolhe lutar pelo seu lar.', relevance: 'Central' },
-        { id: 'snc-bd-theme-2', statement: 'A união transforma rivais em aliados — juntas somos mais fortes.', evidence: 'Baby e Fumaça começam como rivais e se tornam aliadas contra a ameaça maior.', relevance: 'Central' },
-        { id: 'snc-bd-theme-3', statement: 'A natureza é mais forte que a tecnologia quando guiada pelo coração.', evidence: 'Fumaça, sem modificações, vence os pássaros cyberpunk usando instinto e treinamento.', relevance: 'Secundário' }
-      ],
-      brainstormDocuments: []
-    }
-  },
-];
+// Projects loaded from Supabase
 
 function migrateProjectVersions(proj) {
   if (proj.versions) return proj;
@@ -272,134 +50,38 @@ function initVersionStore() {
 }
 
 export const ProjectProvider = ({ children }) => {
-  const [projects, setProjects] = useState(() => {
-    const saved = localStorage.getItem('cineweave_projects');
-    if (!saved) return initialProjects.map(p => migrateProjectVersions(ensureEntities(p)));
-    try {
-      const savedList = JSON.parse(saved);
-      // Apply migration to all projects
-      const migratedList = savedList.map(p => migrateProjectVersions(ensureEntities(p)));
-      // Merge initial projects with migration
-      const mergedList = [...migratedList];
-      initialProjects.forEach(initP => {
-        const migrated = ensureEntities(initP);
-        const index = mergedList.findIndex(p => p.id === migrated.id);
-        if (index === -1) {
-          } else {
-            // Preserve user changes, fill missing data from mock
-            const saved = mergedList[index];
-          let savedChars = saved.characters || [];
-          let savedBD = saved.brainstormData || {};
-          if (!savedChars.length && savedBD.characters?.length) {
-            savedChars = savedBD.characters;
-          }
-          if (savedBD && typeof savedBD === 'object') {
-            delete savedBD.characters;
-          }
-          const hasBD = savedBD && Object.keys(savedBD).length > 0;
-          
-          mergedList[index] = {
-            ...initP,
-            ...saved,
-            characters: savedChars.length > 0 ? savedChars : initP.characters,
-            locations: saved.locations?.length > 0 ? saved.locations : initP.locations,
-            objects: saved.objects?.length > 0 ? saved.objects : initP.objects,
-            screenplay: saved.screenplay?.length > 0 ? saved.screenplay : initP.screenplay,
-            recordings: saved.recordings?.length > 0 ? saved.recordings : initP.recordings,
-            mediaUploads: saved.mediaUploads?.length > 0 ? saved.mediaUploads : initP.mediaUploads,
-            ideas: saved.ideas?.length > 0 ? saved.ideas : initP.ideas,
-            mindMapNodes: saved.mindMapNodes?.length > 0 ? saved.mindMapNodes : initP.mindMapNodes,
-            mindMapLinks: saved.mindMapLinks?.length > 0 ? saved.mindMapLinks : initP.mindMapLinks,
-            brainstormData: hasBD ? savedBD : initP.brainstormData || {
-              plot_points: [], scenes: [], dialogues: [], world_elements: [], themes: []
-            },
-          };
-        }
-      });
-      for (let i = 0; i < mergedList.length; i++) {
-        const p = mergedList[i];
-        if (!p.characters?.length && p.brainstormData?.characters?.length) {
-          mergedList[i] = { ...p, characters: p.brainstormData.characters };
-          delete mergedList[i].brainstormData.characters;
-        }
-      }
-      return mergedList.map(p => migrateProjectVersions(ensureEntities(p)));
-    } catch (e) {
-      return initialProjects.map(p => migrateProjectVersions(ensureEntities(p)));
-    }
-  });
+  const [projects, setProjects] = useState([]);
   
-  const [currentProjectId, setCurrentProjectId] = useState(() => {
-    return projects[0]?.id || '';
-  });
+  const [currentProjectId, setCurrentProjectId] = useState('');
 
+  // Cache to localStorage (offline fallback only)
   useEffect(() => {
-    localStorage.setItem('cineweave_projects', JSON.stringify(projects));
+    if (projects.length > 0) {
+      localStorage.setItem('cineweave_projects', JSON.stringify(projects));
+    }
   }, [projects]);
 
-  const syncTimeoutRef = useRef(null);
-  const syncingRef = useRef(false);
+  const { syncProject } = useSync();
 
-  const triggerSupabaseSync = useCallback((proj) => {
-    if (!isSupabaseConfigured()) return;
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(async () => {
-      if (syncingRef.current) return;
-      syncingRef.current = true;
-      try {
-        await syncProjectToSupabase(proj);
-      } catch (err) {
-        console.error('[ProjectContext] Supabase sync error:', err);
-      } finally {
-        syncingRef.current = false;
-      }
-    }, 1500);
-  }, []);
-
-  // Load from Supabase on startup if logged in
+  // Load projects from Supabase on startup (cloud-first)
   useEffect(() => {
     (async () => {
-      if (!isSupabaseConfigured()) return;
       try {
-        const loggedIn = await isLoggedIn();
-        if (!loggedIn) return;
         const sbProjects = await loadProjectsFromSupabase();
-        if (!sbProjects || sbProjects.length === 0) return;
-
-        setProjects(prev => {
-          const merged = [...prev];
-          for (const sbProj of sbProjects) {
-            const existingIdx = merged.findIndex(p => p.title === sbProj.title);
-            if (existingIdx >= 0) {
-              const local = merged[existingIdx];
-              merged[existingIdx] = ensureEntities({
-                ...local,
-                ...sbProj,
-                id: local.id,
-                characters: sbProj.characters.length > 0 ? sbProj.characters : local.characters,
-                locations: sbProj.locations.length > 0 ? sbProj.locations : local.locations,
-                objects: sbProj.objects.length > 0 ? sbProj.objects : local.objects,
-                screenplay: sbProj.screenplay.length > 0 ? sbProj.screenplay : local.screenplay,
-                recordings: sbProj.recordings.length > 0 ? sbProj.recordings : local.recordings,
-                mediaUploads: sbProj.mediaUploads.length > 0 ? sbProj.mediaUploads : local.mediaUploads,
-                mindMapNodes: sbProj.mindMapNodes?.length > 0 ? sbProj.mindMapNodes : local.mindMapNodes,
-                mindMapLinks: sbProj.mindMapLinks?.length > 0 ? sbProj.mindMapLinks : local.mindMapLinks,
-                brainstormData: (() => {
-                  const sbBD = sbProj.brainstormData;
-                  const hasSB = sbBD && Object.values(sbBD).some(arr => Array.isArray(arr) && arr.length > 0);
-                  return hasSB ? sbBD : (local.brainstormData || {
-                    plot_points: [], scenes: [], dialogues: [], world_elements: [], themes: []
-                  });
-                })(),
-              });
-            } else {
-              merged.push(ensureEntities(sbProj));
-            }
-          }
-          return merged;
-        });
+        if (sbProjects && sbProjects.length > 0) {
+          setProjects(sbProjects.map(p => ensureEntities(p)));
+          return;
+        }
       } catch (err) {
         console.error('[ProjectContext] Failed to load from Supabase:', err);
+      }
+      // Fallback to localStorage cache if cloud fails
+      const cached = localStorage.getItem('cineweave_projects');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed.length > 0) setProjects(parsed);
+        } catch {}
       }
     })();
   }, []);
@@ -408,7 +90,7 @@ export const ProjectProvider = ({ children }) => {
 
   const updateProject = (updatedProj) => {
     setProjects(prev => prev.map(p => p.id === updatedProj.id ? updatedProj : p));
-    triggerSupabaseSync(updatedProj);
+    syncProject(updatedProj);
   };
 
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState(0);
@@ -675,7 +357,11 @@ export const ProjectProvider = ({ children }) => {
   };
 
   const linkNodeToFirstAct = (proj, nodeId) => {
-    const firstAct = proj.mindMapNodes.find(n => n.type === 'act');
+    const firstAct = proj.mindMapNodes.find(n => {
+      if (n.type === 'act') return true;
+      if (n.entityId && proj.entities?.acts?.some(a => a.id === n.entityId)) return true;
+      return false;
+    });
     if (firstAct) {
       const exists = proj.mindMapLinks.some(l =>
         (l.source === firstAct.id && l.target === nodeId) ||
@@ -691,13 +377,15 @@ export const ProjectProvider = ({ children }) => {
     }
   };
 
-  const addProject = (title, tagline = '', genre = '', logline = '') => {
+  const addProject = (title, tagline = '', genre = '', logline = '', visibility = 'private') => {
     const newProj = {
       id: `proj-${Date.now()}`,
       title,
       tagline,
       genre,
       logline,
+      visibility,
+      tags: [],
       characters: [],
       locations: [],
       objects: [],
@@ -720,6 +408,8 @@ export const ProjectProvider = ({ children }) => {
       mediaUploads: [],
       brainstormDocuments: [],
       ideas: [],
+      projectFiles: [],
+      screenplayImports: [],
       needsAutoLayout: true,
       versions: initVersionStore()
     };
@@ -758,28 +448,46 @@ export const ProjectProvider = ({ children }) => {
     }
   };
 
+  // ── VISIBILITY & TAGS ──
+  const setProjectVisibility = (projectId, visibility) => {
+    setProjects(prev => prev.map(p =>
+      p.id === projectId ? { ...p, visibility } : p
+    ));
+  };
+
+  const setProjectTags = (projectId, tags) => {
+    setProjects(prev => prev.map(p =>
+      p.id === projectId ? { ...p, tags } : p
+    ));
+  };
+
   // Add / Edit elements in project database
   const saveCharacter = (character) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Ficha');
+    const now = Date.now();
     if (character.id) {
-      proj.characters = proj.characters.map(c => c.id === character.id ? character : c);
+      // Update existing character in entities
+      proj.entities = proj.entities || {};
+      proj.entities.characters = proj.entities.characters.map(c => c.id === character.id ? { ...c, ...character, updatedAt: now } : c);
+      // Update mind map nodes (both legacy and entityId-linked)
       proj.mindMapNodes = proj.mindMapNodes.map(node => {
-        if (node.type === 'character' && (node.id === `n-${character.id}` || node.id === character.id)) {
-          return { ...node, label: character.name, details: `${character.role}. ${character.description}` };
+        if (node.entityId === character.id || node.id === `n-${character.id}` || node.id === character.id) {
+          return { ...node, entityId: character.id, label: character.name, details: `${character.role}. ${character.description}` };
         }
         return node;
       });
     } else {
-      const newChar = { ...character, id: `char-${Date.now()}` };
-      proj.characters.push(newChar);
+      const newChar = { ...character, id: `char-${now}`, createdAt: now, updatedAt: now };
+      proj.entities = proj.entities || {};
+      if (!proj.entities.characters) proj.entities.characters = [];
+      proj.entities.characters.push(newChar);
+      // Create clean mind map node with entityId
       proj.mindMapNodes.push({
         id: `n-${newChar.id}`,
-        label: newChar.name,
-        type: 'character',
-        x: 300 + Math.random() * 400,
-        y: 300 + Math.random() * 200,
-        details: `${newChar.role}. ${newChar.description}`
+        entityId: newChar.id,
+        x: Math.round(300 + Math.random() * 400),
+        y: Math.round(300 + Math.random() * 200),
       });
       linkNodeToFirstAct(proj, `n-${newChar.id}`);
     }
@@ -789,32 +497,35 @@ export const ProjectProvider = ({ children }) => {
   const deleteCharacter = (id) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Ficha');
-    proj.characters = proj.characters.filter(c => c.id !== id);
-    proj.mindMapNodes = proj.mindMapNodes.filter(node => node.id !== `n-${id}` && node.id !== id);
+    proj.entities = proj.entities || {};
+    proj.entities.characters = (proj.entities.characters || []).filter(c => c.id !== id);
+    proj.mindMapNodes = proj.mindMapNodes.filter(node => node.entityId !== id && node.id !== `n-${id}` && node.id !== id);
     updateProject(proj);
   };
 
   const saveLocation = (location) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Ficha');
+    const now = Date.now();
     if (location.id) {
-      proj.locations = proj.locations.map(l => l.id === location.id ? location : l);
+      proj.entities = proj.entities || {};
+      proj.entities.locations = proj.entities.locations.map(l => l.id === location.id ? { ...l, ...location, updatedAt: now } : l);
       proj.mindMapNodes = proj.mindMapNodes.map(node => {
-        if (node.type === 'location' && (node.id === `n-${location.id}` || node.id === location.id)) {
-          return { ...node, label: location.name, details: `${location.type} ${location.name}. ${location.description}` };
+        if (node.entityId === location.id || node.id === `n-${location.id}` || node.id === location.id) {
+          return { ...node, entityId: location.id, label: location.name, details: `${location.type} ${location.name}. ${location.description}` };
         }
         return node;
       });
     } else {
-      const newLoc = { ...location, id: `loc-${Date.now()}` };
-      proj.locations.push(newLoc);
+      const newLoc = { ...location, id: `loc-${now}`, createdAt: now, updatedAt: now };
+      proj.entities = proj.entities || {};
+      if (!proj.entities.locations) proj.entities.locations = [];
+      proj.entities.locations.push(newLoc);
       proj.mindMapNodes.push({
         id: `n-${newLoc.id}`,
-        label: newLoc.name,
-        type: 'location',
-        x: 300 + Math.random() * 400,
-        y: 400 + Math.random() * 200,
-        details: `${newLoc.type} ${newLoc.name}. ${newLoc.description}`
+        entityId: newLoc.id,
+        x: Math.round(300 + Math.random() * 400),
+        y: Math.round(400 + Math.random() * 200),
       });
       linkNodeToFirstAct(proj, `n-${newLoc.id}`);
     }
@@ -824,32 +535,35 @@ export const ProjectProvider = ({ children }) => {
   const deleteLocation = (id) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Ficha');
-    proj.locations = proj.locations.filter(l => l.id !== id);
-    proj.mindMapNodes = proj.mindMapNodes.filter(node => node.id !== `n-${id}` && node.id !== id);
+    proj.entities = proj.entities || {};
+    proj.entities.locations = (proj.entities.locations || []).filter(l => l.id !== id);
+    proj.mindMapNodes = proj.mindMapNodes.filter(node => node.entityId !== id && node.id !== `n-${id}` && node.id !== id);
     updateProject(proj);
   };
 
   const saveObject = (obj) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Ficha');
+    const now = Date.now();
     if (obj.id) {
-      proj.objects = proj.objects.map(o => o.id === obj.id ? obj : o);
+      proj.entities = proj.entities || {};
+      proj.entities.objects = proj.entities.objects.map(o => o.id === obj.id ? { ...o, ...obj, updatedAt: now } : o);
       proj.mindMapNodes = proj.mindMapNodes.map(node => {
-        if (node.type === 'object' && (node.id === `n-${obj.id}` || node.id === obj.id)) {
-          return { ...node, label: obj.name, details: obj.significance };
+        if (node.entityId === obj.id || node.id === `n-${obj.id}` || node.id === obj.id) {
+          return { ...node, entityId: obj.id, label: obj.name, details: obj.significance };
         }
         return node;
       });
     } else {
-      const newObj = { ...obj, id: `obj-${Date.now()}` };
-      proj.objects.push(newObj);
+      const newObj = { ...obj, id: `obj-${now}`, createdAt: now, updatedAt: now };
+      proj.entities = proj.entities || {};
+      if (!proj.entities.objects) proj.entities.objects = [];
+      proj.entities.objects.push(newObj);
       proj.mindMapNodes.push({
         id: `n-${newObj.id}`,
-        label: newObj.name,
-        type: 'object',
-        x: 300 + Math.random() * 400,
-        y: 350 + Math.random() * 200,
-        details: newObj.significance
+        entityId: newObj.id,
+        x: Math.round(300 + Math.random() * 400),
+        y: Math.round(350 + Math.random() * 200),
       });
       linkNodeToFirstAct(proj, `n-${newObj.id}`);
     }
@@ -859,8 +573,9 @@ export const ProjectProvider = ({ children }) => {
   const deleteObject = (id) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Ficha');
-    proj.objects = proj.objects.filter(o => o.id !== id);
-    proj.mindMapNodes = proj.mindMapNodes.filter(node => node.id !== `n-${id}` && node.id !== id);
+    proj.entities = proj.entities || {};
+    proj.entities.objects = (proj.entities.objects || []).filter(o => o.id !== id);
+    proj.mindMapNodes = proj.mindMapNodes.filter(node => node.entityId !== id && node.id !== `n-${id}` && node.id !== id);
     updateProject(proj);
   };
 
@@ -991,14 +706,14 @@ export const ProjectProvider = ({ children }) => {
         avatar: 'green',
         notes: 'Extraído automaticamente da gravação de áudio.'
       };
-      proj.characters.push(newChar);
+      proj.entities = proj.entities || {};
+      if (!proj.entities.characters) proj.entities.characters = [];
+      proj.entities.characters.push({ ...newChar, relationships: [], createdAt: Date.now(), updatedAt: Date.now() });
       proj.mindMapNodes.push({
         id: `n-${newChar.id}`,
-        label: newChar.name,
-        type: 'character',
+        entityId: newChar.id,
         x: 450,
         y: 400,
-        details: `${newChar.role}. ${newChar.description}`
       });
       linkNodeToFirstAct(proj, `n-${newChar.id}`);
       changed = true;
@@ -1011,11 +726,12 @@ export const ProjectProvider = ({ children }) => {
         timeOfDay: 'NOITE',
         mood: 'Caótico, Perigoso, Luminoso'
       };
-      proj.locations.push(newLoc);
+      proj.entities = proj.entities || {};
+      if (!proj.entities.locations) proj.entities.locations = [];
+      proj.entities.locations.push({ ...newLoc, group: '', createdAt: Date.now(), updatedAt: Date.now() });
       proj.mindMapNodes.push({
         id: `n-${newLoc.id}`,
-        label: newLoc.name,
-        type: 'location',
+        entityId: newLoc.id,
         x: 650,
         y: 420,
         details: `EXT. ${newLoc.name}. ${newLoc.description}`
@@ -1111,15 +827,28 @@ export const ProjectProvider = ({ children }) => {
     const sortedActs = Array.from(llmActs).sort((a, b) => romanToInt(a) - romanToInt(b));
     
     sortedActs.forEach((actStr, index) => {
-      const exists = actNodes.some(n => n.label.toUpperCase().includes(actStr));
+      const actLabel = `ATO ${actStr.toUpperCase()}`;
+      const exists = actNodes.some(n => {
+        if (n.entityId && proj.entities?.acts?.some(a => a.id === n.entityId && `ATO ${a.name}`.toUpperCase().includes(actStr))) return true;
+        return n.label?.toUpperCase().includes(actStr);
+      });
       if (!exists) {
+        const actEntity = {
+          id: `act-${Date.now()}-${actStr.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+          name: `ATO ${actStr.toUpperCase()}`,
+          order: index + 1,
+          description: `Estrutura do Ato ${actStr.toUpperCase()}`,
+          color: '#ccee00',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        if (!proj.entities.acts) proj.entities.acts = [];
+        proj.entities.acts.push(actEntity);
         actNodes.push({
-          id: `n-${Date.now()}-act${actStr.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-          label: `ATO ${actStr.toUpperCase()}`,
-          type: 'act',
+          id: `n-${actEntity.id}`,
+          entityId: actEntity.id,
           x: 150 + index * 250,
           y: 150,
-          details: `Estrutura do Ato ${actStr.toUpperCase()}`
         });
       }
     });
@@ -1130,7 +859,11 @@ export const ProjectProvider = ({ children }) => {
       y: 150
     }));
 
-    proj.mindMapNodes = proj.mindMapNodes.filter(n => n.type !== 'act');
+    proj.mindMapNodes = proj.mindMapNodes.filter(n => {
+      if (n.type === 'act') return false;
+      if (n.entityId && proj.entities?.acts?.some(a => a.id === n.entityId)) return false;
+      return true;
+    });
     proj.mindMapNodes.push(...actNodes);
 
     for (let index = 0; index < actNodes.length - 1; index++) {
@@ -1153,44 +886,36 @@ export const ProjectProvider = ({ children }) => {
     })).filter(c => c.name);
 
     newCharacters.forEach(newChar => {
-      const existingIdx = proj.characters.findIndex(c => c.name.toLowerCase() === newChar.name.toLowerCase());
+      const existingIdx = (proj.entities.characters || []).findIndex(c => c.name.toLowerCase() === newChar.name.toLowerCase());
       if (existingIdx >= 0) {
         // Merge: update existing with new info (preserve user edits in notes/avatar)
-        proj.characters[existingIdx] = {
-          ...proj.characters[existingIdx],
+        proj.entities.characters[existingIdx] = {
+          ...proj.entities.characters[existingIdx],
           role: newChar.role,
-          description: newChar.description || proj.characters[existingIdx].description,
-          traits: [...new Set([...(proj.characters[existingIdx].traits || []), ...newChar.traits])],
-          backstory: newChar.backstory || proj.characters[existingIdx].backstory,
+          description: newChar.description || proj.entities.characters[existingIdx].description,
+          traits: [...new Set([...(proj.entities.characters[existingIdx].traits || []), ...newChar.traits])],
+          backstory: newChar.backstory || proj.entities.characters[existingIdx].backstory,
+          updatedAt: Date.now(),
         };
-        // Also update in entities
-        const charEntityIdx = proj.entities.characters.findIndex(c => c.id === proj.characters[existingIdx].id);
-        if (charEntityIdx >= 0) {
-          proj.entities.characters[charEntityIdx] = { ...proj.entities.characters[charEntityIdx], ...proj.characters[existingIdx] };
-        }
         // Update mindMap node
-        const nodeIdx = proj.mindMapNodes.findIndex(n => n.id === `n-${proj.characters[existingIdx].id}`);
+        const nodeIdx = proj.mindMapNodes.findIndex(n => n.entityId === proj.entities.characters[existingIdx].id || n.id === `n-${proj.entities.characters[existingIdx].id}`);
         if (nodeIdx >= 0) {
           proj.mindMapNodes[nodeIdx] = {
             ...proj.mindMapNodes[nodeIdx],
-            label: proj.characters[existingIdx].name,
-            details: `${proj.characters[existingIdx].role}. ${proj.characters[existingIdx].description}`
+            entityId: proj.entities.characters[existingIdx].id,
           };
         }
       } else {
         // Create new
         const id = `char-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        const fullChar = { ...newChar, id };
-        proj.characters.push(fullChar);
-        // Also add to entities
-        proj.entities.characters.push({ ...fullChar, avatar: fullChar.avatar || 'amber', relationships: [], createdAt: Date.now(), updatedAt: Date.now() });
+        const fullChar = { ...newChar, id, avatar: newChar.avatar || 'amber', relationships: [], createdAt: Date.now(), updatedAt: Date.now() };
+        if (!proj.entities.characters) proj.entities.characters = [];
+        proj.entities.characters.push(fullChar);
         proj.mindMapNodes.push({
           id: `n-${id}`,
-          label: fullChar.name,
-          type: 'character',
-          x: 300 + Math.random() * 400,
-          y: 300 + Math.random() * 200,
-          details: `${fullChar.role}. ${fullChar.description}`
+          entityId: id,
+          x: Math.round(300 + Math.random() * 400),
+          y: Math.round(300 + Math.random() * 200),
         });
         linkNodeToFirstAct(proj, `n-${id}`);
       }
@@ -1212,37 +937,28 @@ export const ProjectProvider = ({ children }) => {
       };
       if (!newLoc.name) return;
 
-      const existingIdx = proj.locations.findIndex(l => 
+      const existingIdx = (proj.entities.locations || []).findIndex(l => 
         l.name.toLowerCase() === newLoc.name.toLowerCase() && l.type === newLoc.type
       );
       if (existingIdx >= 0) {
-        proj.locations[existingIdx] = { ...proj.locations[existingIdx], ...newLoc };
-        // Also update in entities
-        const locEntityIdx = proj.entities.locations.findIndex(l => l.id === proj.locations[existingIdx].id);
-        if (locEntityIdx >= 0) {
-          proj.entities.locations[locEntityIdx] = { ...proj.entities.locations[locEntityIdx], ...proj.locations[existingIdx] };
-        }
-        const nodeIdx = proj.mindMapNodes.findIndex(n => n.id === `n-${proj.locations[existingIdx].id}`);
+        proj.entities.locations[existingIdx] = { ...proj.entities.locations[existingIdx], ...newLoc, updatedAt: Date.now() };
+        const nodeIdx = proj.mindMapNodes.findIndex(n => n.entityId === proj.entities.locations[existingIdx].id || n.id === `n-${proj.entities.locations[existingIdx].id}`);
         if (nodeIdx >= 0) {
           proj.mindMapNodes[nodeIdx] = {
             ...proj.mindMapNodes[nodeIdx],
-            label: proj.locations[existingIdx].name,
-            details: `${proj.locations[existingIdx].type} ${proj.locations[existingIdx].name}. ${proj.locations[existingIdx].description}`
+            entityId: proj.entities.locations[existingIdx].id,
           };
         }
       } else {
         const id = `loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        const fullLoc = { ...newLoc, id };
-        proj.locations.push(fullLoc);
-        // Also add to entities
-        proj.entities.locations.push({ ...fullLoc, group: '', createdAt: Date.now(), updatedAt: Date.now() });
+        const fullLoc = { ...newLoc, id, group: '', createdAt: Date.now(), updatedAt: Date.now() };
+        if (!proj.entities.locations) proj.entities.locations = [];
+        proj.entities.locations.push(fullLoc);
         proj.mindMapNodes.push({
           id: `n-${id}`,
-          label: fullLoc.name,
-          type: 'location',
-          x: 300 + Math.random() * 400,
-          y: 300 + Math.random() * 200,
-          details: `${fullLoc.type} ${fullLoc.name}. ${fullLoc.description}`
+          entityId: id,
+          x: Math.round(300 + Math.random() * 400),
+          y: Math.round(300 + Math.random() * 200),
         });
         linkNodeToFirstAct(proj, `n-${id}`);
       }
@@ -1262,35 +978,26 @@ export const ProjectProvider = ({ children }) => {
       };
       if (!newObj.name) return;
 
-      const existingIdx = proj.objects.findIndex(o => o.name.toLowerCase() === newObj.name.toLowerCase());
+      const existingIdx = (proj.entities.objects || []).findIndex(o => o.name.toLowerCase() === newObj.name.toLowerCase());
       if (existingIdx >= 0) {
-        proj.objects[existingIdx] = { ...proj.objects[existingIdx], ...newObj };
-        // Also update in entities
-        const objEntityIdx = proj.entities.objects.findIndex(o => o.id === proj.objects[existingIdx].id);
-        if (objEntityIdx >= 0) {
-          proj.entities.objects[objEntityIdx] = { ...proj.entities.objects[objEntityIdx], ...proj.objects[existingIdx] };
-        }
-        const nodeIdx = proj.mindMapNodes.findIndex(n => n.id === `n-${proj.objects[existingIdx].id}`);
+        proj.entities.objects[existingIdx] = { ...proj.entities.objects[existingIdx], ...newObj, updatedAt: Date.now() };
+        const nodeIdx = proj.mindMapNodes.findIndex(n => n.entityId === proj.entities.objects[existingIdx].id || n.id === `n-${proj.entities.objects[existingIdx].id}`);
         if (nodeIdx >= 0) {
           proj.mindMapNodes[nodeIdx] = {
             ...proj.mindMapNodes[nodeIdx],
-            label: proj.objects[existingIdx].name,
-            details: proj.objects[existingIdx].significance
+            entityId: proj.entities.objects[existingIdx].id,
           };
         }
       } else {
         const id = `obj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        const fullObj = { ...newObj, id };
-        proj.objects.push(fullObj);
-        // Also add to entities
-        proj.entities.objects.push({ ...fullObj, group: '', createdAt: Date.now(), updatedAt: Date.now() });
+        const fullObj = { ...newObj, id, group: '', createdAt: Date.now(), updatedAt: Date.now() };
+        if (!proj.entities.objects) proj.entities.objects = [];
+        proj.entities.objects.push(fullObj);
         proj.mindMapNodes.push({
           id: `n-${id}`,
-          label: fullObj.name,
-          type: 'object',
-          x: 300 + Math.random() * 400,
-          y: 300 + Math.random() * 200,
-          details: fullObj.significance
+          entityId: id,
+          x: Math.round(300 + Math.random() * 400),
+          y: Math.round(300 + Math.random() * 200),
         });
         linkNodeToFirstAct(proj, `n-${id}`);
       }
@@ -1415,14 +1122,16 @@ export const ProjectProvider = ({ children }) => {
 
       proj.mindMapNodes.push({
         id: `n-${id}`,
-        label: pp.title,
-        type: 'plot_point',
-        x: colX,
-        y: rowY,
-        details: pp.description || ''
+        entityId: id,
+        x: Math.round(colX),
+        y: Math.round(rowY),
       });
 
-      const targetAct = proj.mindMapNodes.find(n => n.type === 'act' && n.label.toUpperCase().includes(`ATO ${actLetter}`));
+      const targetAct = proj.mindMapNodes.find(n => {
+        if (n.type === 'act') return n.label?.toUpperCase().includes(`ATO ${actLetter}`);
+        if (n.entityId && proj.entities?.acts?.some(a => a.id === n.entityId && `ATO ${a.name}`.includes(`ATO ${actLetter}`))) return true;
+        return false;
+      });
       if (targetAct) {
         proj.mindMapLinks.push({
           id: `l-plot-${id}`,
@@ -1449,11 +1158,9 @@ export const ProjectProvider = ({ children }) => {
 
       proj.mindMapNodes.push({
         id: `n-${id}`,
-        label: `Tema: ${t.statement.substring(0, 50)}${t.statement.length > 50 ? '...' : ''}`,
-        type: 'theme',
-        x: 800 + Math.random() * 200,
-        y: 150 + i * 80,
-        details: `${t.statement}\nEvidência: ${t.evidence}\nRelevância: ${t.relevance}`
+        entityId: id,
+        x: Math.round(800 + Math.random() * 200),
+        y: Math.round(150 + i * 80),
       });
       linkNodeToFirstAct(proj, `n-${id}`);
     });
@@ -1486,6 +1193,151 @@ export const ProjectProvider = ({ children }) => {
     };
   };
 
+  const importScreenplayWithEntities = (importedElements) => {
+    const proj = { ...currentProject };
+    autoSaveVersionIfNeeded(proj, 'Importação Roteiro');
+
+    // Extract entities from screenplay text
+    const extracted = extractEntitiesFromScreenplay(importedElements, proj.entities);
+
+    // Merge extracted entities into project
+    const entityTypes = [
+      { key: 'characters', items: extracted.characters },
+      { key: 'locations', items: extracted.locations },
+      { key: 'objects', items: extracted.objects },
+      { key: 'scenes', items: extracted.scenes },
+      { key: 'acts', items: extracted.acts },
+    ];
+
+    for (const { key, items } of entityTypes) {
+      for (const item of items) {
+        if (key === 'characters') {
+          proj.entities = proj.entities || {};
+          if (!proj.entities.characters) proj.entities.characters = [];
+          const exists = proj.entities.characters.find(
+            c => c.name?.toUpperCase() === item.name?.toUpperCase()
+          );
+          if (!exists) {
+            proj.entities.characters.push({ ...item, id: item.id || `char-import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
+          }
+        } else if (key === 'locations') {
+          proj.entities = proj.entities || {};
+          if (!proj.entities.locations) proj.entities.locations = [];
+          const exists = proj.entities.locations.find(
+            l => l.name?.toUpperCase() === item.name?.toUpperCase() && l.type === item.type
+          );
+          if (!exists) {
+            proj.entities.locations.push({ ...item, id: item.id || `loc-import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
+          }
+        } else if (key === 'scenes') {
+          proj.entities = proj.entities || {};
+          if (!proj.entities.scenes) proj.entities.scenes = [];
+          const exists = proj.entities.scenes.find(
+            s => s.title?.toUpperCase() === item.title?.toUpperCase()
+          );
+          if (!exists) {
+            proj.entities.scenes.push({ ...item, id: item.id || `scn-import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
+          }
+        } else {
+          proj.entities = proj.entities || {};
+          const arrKey = key;
+          if (!proj.entities[arrKey]) proj.entities[arrKey] = [];
+          proj.entities[arrKey].push(item);
+        }
+      }
+    }
+
+    // Build linking map and link entities to screenplay
+    const entityMaps = buildEntityLinkingMap(proj.entities, extracted);
+    const linkedScreenplay = linkEntitiesToScreenplay(importedElements, entityMaps);
+
+    // Update screenplay
+    proj.screenplay = linkedScreenplay;
+    updateProject(proj);
+
+    return {
+      characters: extracted.characters.length,
+      locations: extracted.locations.length,
+      scenes: extracted.scenes.length,
+      acts: extracted.acts.length,
+    };
+  };
+
+  const enrichWithLLM = (llmData) => {
+    const proj = { ...currentProject };
+    autoSaveVersionIfNeeded(proj, 'Extração IA Roteiro');
+
+    // Process plot_points
+    (llmData.plot_points || []).forEach((pp, i) => {
+      if (!pp.title) return;
+      proj.entities = proj.entities || {};
+      if (!proj.entities.plot_points) proj.entities.plot_points = [];
+      const exists = proj.entities.plot_points.find(
+        p => p.title?.toUpperCase() === pp.title?.toUpperCase()
+      );
+      if (!exists) {
+        proj.entities.plot_points.push({
+          id: `plot-import-${Date.now()}-${i}`,
+          title: pp.title,
+          description: pp.description || '',
+          act: pp.act || 'I',
+          tags: pp.tags || [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+    });
+
+    // Process themes
+    (llmData.themes || []).forEach((t, i) => {
+      if (!t.statement) return;
+      proj.entities = proj.entities || {};
+      if (!proj.entities.themes) proj.entities.themes = [];
+      const exists = proj.entities.themes.find(
+        th => th.statement?.toUpperCase() === t.statement?.toUpperCase()
+      );
+      if (!exists) {
+        proj.entities.themes.push({
+          id: `theme-import-${Date.now()}-${i}`,
+          statement: t.statement,
+          evidence: t.evidence || '',
+          relevance: t.relevance || 'Central',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+    });
+
+    // Process objects/world_elements
+    const worldElements = llmData.world_elements || llmData.objects || [];
+    worldElements.forEach((obj, i) => {
+      if (!obj.name) return;
+      proj.entities = proj.entities || {};
+      if (!proj.entities.objects) proj.entities.objects = [];
+      const exists = proj.entities.objects.find(
+        o => o.name?.toUpperCase() === obj.name?.toUpperCase()
+      );
+      if (!exists) {
+        proj.entities.objects.push({
+          id: `obj-import-${Date.now()}-${i}`,
+          name: obj.name,
+          description: obj.description || '',
+          significance: obj.significance || '',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+    });
+
+    updateProject(proj);
+
+    return {
+      plot_points: (llmData.plot_points || []).length,
+      themes: (llmData.themes || []).length,
+      objects: worldElements.length,
+    };
+  };
+
   const rebuildSemanticLinks = (proj) => {
     // Clear existing relationship links
     proj.mindMapLinks = proj.mindMapLinks.filter(l => l.type !== 'relationship');
@@ -1500,8 +1352,8 @@ export const ProjectProvider = ({ children }) => {
     const nodeAttractions = {};
 
     // Character <-> Location
-    proj.characters.forEach(char => {
-      proj.locations.forEach(loc => {
+    (proj.entities?.characters || []).forEach(char => {
+      (proj.entities?.locations || []).forEach(loc => {
         const charMentionLoc = mentions(char.description, loc.name) || mentions(char.backstory, loc.name);
         const locMentionChar = mentions(loc.description, char.name);
         if (charMentionLoc || locMentionChar) {
@@ -1519,8 +1371,8 @@ export const ProjectProvider = ({ children }) => {
     });
 
     // Character <-> Object
-    proj.characters.forEach(char => {
-      proj.objects.forEach(obj => {
+    (proj.entities?.characters || []).forEach(char => {
+      (proj.entities?.objects || []).forEach(obj => {
         const charMentionObj = mentions(char.description, obj.name) || mentions(char.backstory, obj.name);
         const objMentionChar = mentions(obj.description, char.name) || mentions(obj.significance, char.name);
         if (charMentionObj || objMentionChar) {
@@ -1538,8 +1390,8 @@ export const ProjectProvider = ({ children }) => {
     });
 
     // Object <-> Location
-    proj.locations.forEach(loc => {
-      proj.objects.forEach(obj => {
+    (proj.entities?.objects || []).forEach(obj => {
+      (proj.entities?.locations || []).forEach(loc => {
         const locMentionObj = mentions(loc.description, obj.name);
         const objMentionLoc = mentions(obj.description, loc.name) || mentions(obj.significance, loc.name);
         if (locMentionObj || objMentionLoc) {
@@ -1634,6 +1486,8 @@ export const ProjectProvider = ({ children }) => {
       addProject,
       deleteProject,
       syncAllToCloud,
+      setProjectVisibility,
+      setProjectTags,
       saveCharacter,
       deleteCharacter,
       saveLocation,
@@ -1652,6 +1506,8 @@ export const ProjectProvider = ({ children }) => {
       removeBrainstormDocument,
       processBrainstorm,
       processLLMToProject,
+      importScreenplayWithEntities,
+      enrichWithLLM,
       markRecordingsProcessed,
       updateScreenplay,
       updateMindMap,

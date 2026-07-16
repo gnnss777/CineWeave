@@ -320,14 +320,36 @@ server.tool(
   }
 );
 
-// ── SQL Query (admin) ──
+// ── SQL Query (admin via Management API) ──
+function getProjectRef() {
+  const match = SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/);
+  if (!match) throw new Error('Cannot extract project ref from SUPABASE_URL');
+  return match[1];
+}
+
 server.tool(
   'run_query',
-  'Run a raw SQL query via Supabase RPC (admin only)',
+  'Run a raw SQL query via Supabase Management API (admin only)',
   { query: z.string() },
   async ({ query }) => {
-    const { data, error } = await supabase.rpc('exec_sql', { query_text: query });
-    if (error) throw new Error(error.message);
+    const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+    if (!accessToken) {
+      throw new Error('SUPABASE_ACCESS_TOKEN not set. Create one at https://supabase.com/dashboard/account/tokens');
+    }
+    const projectRef = getProjectRef();
+    const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Management API error (${response.status}): ${text.substring(0, 500)}`);
+    }
+    const data = await response.json();
     return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
   }
 );

@@ -378,3 +378,381 @@ export async function saveMediaUpload(userId, projectId, media) {
   if (error) throw error;
   return data;
 }
+
+// ── BRAINSTORM DOCUMENTS ────────────────────────────────────
+
+export async function fetchBrainstormDocuments(projectId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('brainstorm_documents')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertBrainstormDocument(userId, projectId, document) {
+  if (!isConfigured()) return null;
+  const record = {
+    user_id: userId,
+    project_id: projectId,
+    name: document.name,
+    type: document.type,
+    size: document.size,
+    content: document.content,
+    metadata: document.metadata,
+    extracted_data: document.extractedData,
+    status: document.status || 'pending',
+    error_message: document.errorMessage,
+  };
+
+  if (document.id) {
+    const { data, error } = await supabase
+      .from('brainstorm_documents')
+      .update(record)
+      .eq('id', document.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } else {
+    const { data, error } = await supabase
+      .from('brainstorm_documents')
+      .insert(record)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+}
+
+export async function deleteBrainstormDocument(id) {
+  if (!isConfigured()) return null;
+  const { error } = await supabase.from('brainstorm_documents').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+// ── PROJECT FILES ──────────────────────────────────────────
+
+export async function fetchProjectFiles(projectId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('project_files')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function saveProjectFile(userId, projectId, fileRecord) {
+  if (!isConfigured()) return null;
+  const record = {
+    user_id: userId,
+    project_id: projectId,
+    name: fileRecord.name,
+    original_name: fileRecord.originalName || fileRecord.name,
+    mime_type: fileRecord.mimeType || 'application/octet-stream',
+    file_size: fileRecord.fileSize || 0,
+    storage_path: fileRecord.storagePath || '',
+    url: fileRecord.url || '',
+    source: fileRecord.source || 'brainstorm',
+    metadata: fileRecord.metadata || {},
+  };
+
+  if (fileRecord.id) {
+    const { data, error } = await supabase
+      .from('project_files')
+      .update(record)
+      .eq('id', fileRecord.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } else {
+    const { data, error } = await supabase
+      .from('project_files')
+      .insert(record)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+}
+
+export async function deleteProjectFile(id) {
+  if (!isConfigured()) return null;
+  const { error } = await supabase.from('project_files').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+// ── IDEAS ──────────────────────────────────────────────────
+
+export async function fetchIdeas(projectId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('ideas')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function saveIdea(userId, projectId, idea) {
+  if (!isConfigured()) return null;
+  const record = {
+    user_id: userId,
+    project_id: projectId,
+    text: idea.text || '',
+    category: idea.category || 'general',
+    tags: idea.tags || [],
+  };
+
+  if (idea.id) {
+    const { data, error } = await supabase
+      .from('ideas')
+      .update(record)
+      .eq('id', idea.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } else {
+    const { data, error } = await supabase
+      .from('ideas')
+      .insert(record)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+}
+
+export async function deleteIdea(id) {
+  if (!isConfigured()) return null;
+  const { error } = await supabase.from('ideas').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+// ── SCREENPLAY IMPORTS ────────────────────────────────────
+
+export async function fetchScreenplayImports(projectId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('screenplay_imports')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function saveScreenplayImport(userId, projectId, importRecord) {
+  if (!isConfigured()) return null;
+  const record = {
+    user_id: userId,
+    project_id: projectId,
+    file_id: importRecord.fileId || null,
+    original_filename: importRecord.originalFilename || '',
+    import_type: importRecord.importType || 'fountain',
+    element_count: importRecord.elementCount || 0,
+    metadata: importRecord.metadata || {},
+  };
+
+  const { data, error } = await supabase
+    .from('screenplay_imports')
+    .insert(record)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteScreenplayImport(id) {
+  if (!isConfigured()) return null;
+  const { error } = await supabase.from('screenplay_imports').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+// ── PUBLIC PROJECTS ────────────────────────────────────────
+
+export async function fetchPublicProjects(limit = 50) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('visibility', 'public')
+    .eq('is_published', true)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchProjectsByTags(tagIds, limit = 50) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('project_tags')
+    .select('project_id')
+    .in('tag_id', tagIds)
+    .limit(limit);
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+  const projectIds = [...new Set(data.map(d => d.project_id))];
+  const { data: projects, error: pError } = await supabase
+    .from('projects')
+    .select('*')
+    .in('id', projectIds)
+    .order('updated_at', { ascending: false });
+  if (pError) throw pError;
+  return projects;
+}
+
+export async function updateProjectVisibility(projectId, visibility) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ visibility })
+    .eq('id', projectId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ── TAGS ───────────────────────────────────────────────────
+
+export async function fetchProjectTags(projectId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('project_tags')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) throw error;
+  return data;
+}
+
+export async function addProjectTag(projectId, tagId, tagType = 'custom', userId = null) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('project_tags')
+    .insert({ project_id: projectId, tag_id: tagId, tag_type: tagType, user_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function removeProjectTag(projectId, tagId, tagType = 'custom') {
+  if (!isConfigured()) return null;
+  const { error } = await supabase
+    .from('project_tags')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('tag_id', tagId)
+    .eq('tag_type', tagType);
+  if (error) throw error;
+  return true;
+}
+
+export async function fetchUserTags(userId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('user_tags')
+    .select('*')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return data;
+}
+
+export async function saveUserTag(userId, tagId, color = '#ccee00') {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('user_tags')
+    .upsert({ user_id: userId, tag_id: tagId, tag_color: color }, { onConflict: 'user_id,tag_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteUserTag(userId, tagId) {
+  if (!isConfigured()) return null;
+  const { error } = await supabase
+    .from('user_tags')
+    .delete()
+    .eq('user_id', userId)
+    .eq('tag_id', tagId);
+  if (error) throw error;
+  return true;
+}
+
+// ── INVITATIONS ────────────────────────────────────────────
+
+export async function findUserByEmail(email) {
+  if (!isConfigured()) return null;
+  try {
+    const { data, error } = await supabase.rpc('find_user_by_email', { email_text: email });
+    if (!error && data) return Array.isArray(data) ? data[0] : data;
+  } catch {}
+  // Fallback: profiles by username
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .ilike('username', email.split('@')[0])
+    .limit(1)
+    .single();
+  if (error) return null;
+  return data;
+}
+
+export async function fetchProjectInvitations(projectId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('user_project_invitations')
+    .select('*, profiles!user_id(id, username, display_name, avatar_url)')
+    .eq('project_id', projectId);
+  if (error) throw error;
+  return data;
+}
+
+export async function inviteUserToProject(projectId, userId, role = 'viewer', invitedBy) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('user_project_invitations')
+    .insert({ project_id: projectId, user_id: userId, role, invited_by: invitedBy, status: 'pending' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function acceptInvitation(invitationId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('user_project_invitations')
+    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+    .eq('id', invitationId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function declineInvitation(invitationId) {
+  if (!isConfigured()) return null;
+  const { data, error } = await supabase
+    .from('user_project_invitations')
+    .update({ status: 'declined' })
+    .eq('id', invitationId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}

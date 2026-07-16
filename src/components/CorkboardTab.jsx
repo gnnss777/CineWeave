@@ -234,6 +234,7 @@ export default function CorkboardTab() {
           onDelete={handleDeleteFicha}
           onClose={() => setFichaModal(null)}
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+          onNavigateToMindMap={(id) => navigateTo('mindmap', id)}
         />
       )}
       {confirmModal && <ConfirmModal {...confirmModal} />}

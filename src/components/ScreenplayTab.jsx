@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { getLLMApiKey, extractEnrichmentFromScreenplay } from '../lib/llm';
 import { exportFountain, downloadFountain } from '../lib/fountainExport';
@@ -6,9 +6,13 @@ import { parseFountain } from '../lib/fountainImport';
 import { parseFile } from '../lib/fileParser';
 import { exportScreenplayPDF } from '../lib/pdfExport';
 import { linkScreenplayToEntities, parseSceneHeading } from '../lib/entityExtractor';
+import { uploadProjectFile } from '../lib/storage';
+import * as db from '../lib/db';
 import FichaModal from './FichaModal';
 import SharedSidebar from './SharedSidebar';
 import ConfirmModal from './ConfirmModal';
+import CoverageReport from './CoverageReport';
+import ScriptBrowser from './ScriptBrowser';
 import { 
   User, MapPin, Columns, FileText, Edit3,
   Sparkles, Printer, Plus, Download, Upload,
@@ -16,7 +20,8 @@ import {
   Trash2, BarChart2, Cpu, Grid, Layers,
   Compass, ShieldAlert, Award, Target, Heart,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Eye, EyeOff, Filter, ListChecks, Star, Settings2, Circle, AlertTriangle
+  Eye, EyeOff, Filter, ListChecks, Star, Settings2, Circle, AlertTriangle,
+  Clock, GitBranch
 } from 'lucide-react';
 import './ScreenplayTab.css';
 
@@ -285,6 +290,52 @@ const generateBeatBlock = (metadata) => {
   return `/* If you're seeing this, you can remove the following stuff - BEAT:\n${json}\nEND_BEAT*/`;
 };
 
+function VersionPanelView({ onClose }) {
+  const { currentProject, saveVersion, restoreVersion, approveStaging, rejectStaging, getPendingStagingCount } = useProject();
+  const versions = currentProject?.versions;
+  const allVersions = versions?.all || [];
+  const staging = versions?.staging || [];
+  const pendingCount = getPendingStagingCount();
+  const [versionName, setVersionName] = useState('');
+
+  return (
+    <div className="flex flex-col gap-4">
+      {staging.length > 0 && (
+        <div className="glass p-4 border border-yellow-500/30 rounded-xl">
+          <h4 className="text-xs font-bold text-yellow-500 mb-3 flex items-center gap-1">
+            <AlertTriangle size={12} /> {pendingCount} alteração(ões) pendente(s)
+          </h4>
+          <div className="flex gap-2">
+            <button onClick={() => { approveStaging(); }} className="btn-primary py-1 px-3 text-xs">Aprovar Todas</button>
+            <button onClick={() => { rejectStaging(); }} className="btn-secondary py-1 px-3 text-xs">Rejeitar Todas</button>
+          </div>
+        </div>
+      )}
+      <div className="glass p-4 flex flex-col gap-3">
+        <h4 className="text-xs font-bold text-white">Salvar Versão</h4>
+        <div className="flex gap-2">
+          <input value={versionName} onChange={e => setVersionName(e.target.value)} placeholder="Nome da versão..." className="p-2 border border-white/10 rounded-md text-xs text-white flex-1 focus:outline-none focus:border-yellow-500" style={{ background: 'var(--bg-input)' }} />
+          <button onClick={() => { saveVersion(versionName); setVersionName(''); }} className="btn-primary py-1 px-3 text-xs">Salvar</button>
+        </div>
+      </div>
+      {allVersions.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <h4 className="text-xs font-bold text-gray-500 mb-1">Histórico ({allVersions.length})</h4>
+          {allVersions.slice(-10).reverse().map(v => (
+            <div key={v.id} className="glass p-3 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-gray-200">{v.name}</span>
+                <span className="text-[10px] text-gray-500 ml-2">{new Date(v.timestamp).toLocaleDateString('pt-BR')}</span>
+              </div>
+              <button onClick={() => restoreVersion(v.id)} className="btn-secondary py-0.5 px-2 text-[10px]">Restaurar</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ScreenplayTab() {
   const {
     currentProject,
@@ -302,6 +353,7 @@ export default function ScreenplayTab() {
     tabNavigation,
     importScreenplayWithEntities,
     enrichWithLLM,
+    updateProject,
     stageProposedChanges,
     setProjects,
     getPendingStagingCount
@@ -311,11 +363,44 @@ export default function ScreenplayTab() {
   const [activeTab, setActiveTab] = useState('editor');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [zenMode, setZenMode] = useState(false);
+  const [typewriterMode, setTypewriterMode] = useState(false);
+
+  /* ── Typewriter scroll manager ── */
+  const typewriterRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  useEffect(() => {
+    if (!typewriterMode) { typewriterRef.current = null; return; }
+    const container = document.querySelector('.editor-container');
+    if (!container) return;
+    scrollContainerRef.current = container;
+    const handler = () => {
+      const active = document.activeElement;
+      if (!active || !container.contains(active)) return;
+      const rect = active.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const centerY = containerRect.top + containerRect.height / 2;
+      const offset = rect.top - centerY + rect.height / 2;
+      if (Math.abs(offset) > 50) {
+        container.scrollBy({ top: offset, behavior: 'smooth' });
+      }
+    };
+    // Initial centering
+    requestAnimationFrame(handler);
+    // Re-center on selection changes
+    document.addEventListener('selectionchange', handler);
+    return () => {
+      document.removeEventListener('selectionchange', handler);
+      typewriterRef.current = null;
+    };
+  }, [typewriterMode]);
 
   const [sidebarTab, setSidebarTab] = useState('outliner');
   const [sidebarPosition, setSidebarPosition] = useState('right');
   const [fichaModal, setFichaModal] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [coverageModal, setCoverageModal] = useState(false);
+  const [classicScriptsModal, setClassicScriptsModal] = useState(false);
+  const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [showCompileModal, setShowCompileModal] = useState(false);
@@ -352,10 +437,68 @@ export default function ScreenplayTab() {
   const ceInitSet = useRef(new Set());
   const fountainInputRef = useRef(null);
   const [pendingAutoTypes, setPendingAutoTypes] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMatchIdx, setSearchMatchIdx] = useState(0);
+  const [activeSceneIdx, setActiveSceneIdx] = useState(-1);
+
+  /* ── Search matches ── */
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return elements
+      .map((el, idx) => ({ ...el, originalIndex: idx }))
+      .filter(el => el.text?.toLowerCase().includes(q))
+      .map(el => el.id);
+  }, [elements, searchQuery]);
+
+  const performSearch = useCallback((dir = 1) => {
+    if (searchMatches.length === 0) return;
+    let next = searchMatchIdx + dir;
+    if (next < 0) next = searchMatches.length - 1;
+    if (next >= searchMatches.length) next = 0;
+    setSearchMatchIdx(next);
+    const id = searchMatches[next];
+    const el = elementRefs.current[id];
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [searchMatches, searchMatchIdx]);
+
+  /* ── Scene headings list for minimap + jump ── */
+  const sceneHeadings = useMemo(() => {
+    return elements
+      .map((el, idx) => ({ ...el, originalIndex: idx }))
+      .filter(el => (pendingAutoTypes[el.id] || el.type) === 'scene-heading');
+  }, [elements, pendingAutoTypes]);
+
+  /* ── IntersectionObserver for minimap highlight ── */
+  const sceneObserverRef = useRef(null);
+  useEffect(() => {
+    sceneObserverRef.current?.disconnect();
+    const obs = new IntersectionObserver((entries) => {
+      let maxRatio = 0;
+      let maxIdx = -1;
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
+          const idx = sceneHeadings.findIndex(sh => sh.id === entry.target.dataset.sceneId);
+          if (idx >= 0) { maxRatio = entry.intersectionRatio; maxIdx = idx; }
+        }
+      });
+      if (maxIdx >= 0) setActiveSceneIdx(maxIdx);
+    }, { rootMargin: '-80px 0px -60% 0px' });
+
+    sceneHeadings.forEach(sh => {
+      const el = elementRefs.current[sh.id];
+      if (el) {
+        el.dataset.sceneId = sh.id;
+        obs.observe(el);
+      }
+    });
+    sceneObserverRef.current = obs;
+    return () => obs.disconnect();
+  }, [sceneHeadings]);
 
   const handleFountainExport = () => {
     const content = exportFountain(currentProject);
-    downloadFountain(content, currentProject.title);
+    downloadFountain(content, currentProject?.title || 'roteiro');
   };
 
   const handlePDFExport = () => {
@@ -366,7 +509,37 @@ export default function ScreenplayTab() {
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = '';
+    
+    let fileStorageRecord = null;
+    
     try {
+      // Upload file to Storage
+      const importType = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'fountain';
+      try {
+        const { getCurrentUser } = await import('../lib/supabase');
+        const user = await getCurrentUser();
+        if (user && currentProject?.id) {
+          const uploadResult = await uploadProjectFile(currentProject.id, user.id, file, 'screenplay');
+          if (uploadResult) {
+            // Save project_files record in DB
+            const savedFile = await db.saveProjectFile(user.id, currentProject.id, {
+              ...uploadResult,
+              source: 'screenplay',
+            });
+            if (savedFile) {
+              fileStorageRecord = savedFile;
+              // Track in project state
+              const proj = { ...currentProject };
+              if (!proj.projectFiles) proj.projectFiles = [];
+              proj.projectFiles.push({ ...uploadResult, id: savedFile.id, _sbSynced: true });
+              updateProject(proj);
+            }
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('[FountainImport] File upload failed (non-fatal):', uploadErr);
+      }
+
       let fountainText;
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         const parsed = await parseFile(file);
@@ -379,6 +552,23 @@ export default function ScreenplayTab() {
       console.log('[FountainImport] element types:', imported.map(el => `${el.type}: "${el.text?.slice(0, 60)}"`));
       const result = importScreenplayWithEntities(imported);
       console.log('[FountainImport] extracted entity counts:', result);
+
+      // Save screenplay import record
+      try {
+        const { getCurrentUser } = await import('../lib/supabase');
+        const user = await getCurrentUser();
+        if (user && currentProject?.id) {
+          await db.saveScreenplayImport(user.id, currentProject.id, {
+            fileId: fileStorageRecord?.id || null,
+            originalFilename: file.name,
+            importType,
+            elementCount: imported.length,
+            metadata: { entityCounts: result },
+          });
+        }
+      } catch (importRecErr) {
+        console.warn('[FountainImport] Failed to save import record:', importRecErr);
+      }
 
       const lines = [];
       if (result?.characters) lines.push(`• ${result.characters} ficha(s) de personagem`);
@@ -422,7 +612,6 @@ export default function ScreenplayTab() {
         if (enrichResult.objects) allLines.push(`• ${enrichResult.objects} objeto(s)`);
         if (enrichResult.plot_points) allLines.push(`• ${enrichResult.plot_points} plot point(s)`);
         if (enrichResult.themes) allLines.push(`• ${enrichResult.themes} tema(s)`);
-        if (enrichResult.acts) allLines.push(`• ${enrichResult.acts} ato(s)`);
 
         setConfirmModal({
           title: 'Importação completa!',
@@ -469,7 +658,7 @@ export default function ScreenplayTab() {
   }, [currentProject]);
 
   const saveScreenplay = (updatedElements) => {
-    const entities = currentProject.entities;
+    const entities = currentProject?.entities;
     const withoutMeta = updatedElements.filter(el => el.type !== 'beat-metadata');
 
     // Use unified linking function
@@ -530,11 +719,6 @@ export default function ScreenplayTab() {
       'Revision Mode': revisionMode,
       'PrintMode': printMode,
       'BlockRevisions': revisions.reduce((acc, id) => { acc[id] = revisionGeneration; return acc; }, {}),
-      'CharacterGenders': (entities?.characters || []).reduce((acc, c) => {
-        const gender = (c.notes || '').toLowerCase().includes('feminino') ? 'Feminino' : 'Masculino';
-        acc[c.name.toUpperCase()] = gender;
-        return acc;
-      }, {}),
       'DocumentStyle': printMode ? 'print' : 'screenplay'
     };
     const metaBlock = { id: 'beat-metadata', type: 'beat-metadata', text: generateBeatBlock(meta) };
@@ -633,7 +817,7 @@ export default function ScreenplayTab() {
     if (type === 'character') {
       const query = text.trim().toUpperCase();
       if (query.length > 0) {
-        const matching = currentProject.characters
+        const matching = (currentProject?.entities?.characters || [])
           .filter(c => c.name.toUpperCase().startsWith(query))
           .map(c => c.name);
         if (matching.length > 0) {
@@ -653,7 +837,7 @@ export default function ScreenplayTab() {
       if (query.length > 0) {
         const prefixes = ['INT.', 'EXT.', 'INT./EXT.'];
         const matchedPrefixes = prefixes.filter(p => p.startsWith(query) && p !== query);
-        const matchedLocations = currentProject.locations
+        const matchedLocations = (currentProject?.entities?.locations || [])
           .filter(l => l.name.toUpperCase().startsWith(query) || `${l.type} ${l.name}`.toUpperCase().startsWith(query))
           .map(l => `${l.type} ${l.name.toUpperCase()}`);
         const matching = [...matchedPrefixes, ...matchedLocations];
@@ -930,9 +1114,9 @@ export default function ScreenplayTab() {
   };
 
   const findMatchingCharacter = (nameText) => {
-    if (!nameText || !currentProject || !currentProject.characters) return null;
+    if (!nameText || !currentProject || !currentProject?.entities?.characters) return null;
     const cleanText = nameText.trim().toUpperCase();
-    return currentProject.characters.find(char => cleanText === char.name.toUpperCase() || char.name.toUpperCase().includes(cleanText));
+    return currentProject?.entities?.characters?.find(char => cleanText === char.name.toUpperCase() || char.name.toUpperCase().includes(cleanText));
   };
 
   const handleGripClick = (e, blockId, index) => {
@@ -990,7 +1174,7 @@ export default function ScreenplayTab() {
       const currentIdx = elements.findIndex(el => el.id === blockId);
       const contextSlice = elements.slice(Math.max(0, currentIdx - 4), currentIdx + 1);
       const formattedContext = contextSlice.map(item => `${item.type.toUpperCase()}: ${item.text}`).join('\n');
-      const systemPrompt = `Você é um co-roteirista profissional.\nEscreva a continuação do roteiro. Adicione exatamente 2 ou 3 novos elementos que continuem a história de forma orgânica.\nUse o contexto de personagens e locações do projeto para manter a coerência.\nPERSONAGENS CADASTRADOS: ${currentProject.characters.map(c => c.name).join(', ')}\nLOCAÇÕES CADASTRADAS: ${currentProject.locations.map(l => l.name).join(', ')}\n\nRetorne APENAS um array JSON válido contendo os novos elementos, no formato exato:\n[\n  { "type": "action" | "character" | "parenthetical" | "dialogue", "text": "..." }\n]\nNÃO retorne markdown, NÃO adicione blocos de código com \`\`\`, e NÃO insira textos introdutórios ou explicativos. Apenas o JSON puro.`;
+      const systemPrompt = `Você é um co-roteirista profissional.\nEscreva a continuação do roteiro. Adicione exatamente 2 ou 3 novos elementos que continuem a história de forma orgânica.\nUse o contexto de personagens e locações do projeto para manter a coerência.\nPERSONAGENS CADASTRADOS: ${(currentProject?.entities?.characters || []).map(c => c.name).join(', ')}\nLOCAÇÕES CADASTRADAS: ${(currentProject?.entities?.locations || []).map(l => l.name).join(', ')}\n\nRetorne APENAS um array JSON válido contendo os novos elementos, no formato exato:\n[\n  { "type": "action" | "character" | "parenthetical" | "dialogue", "text": "..." }\n]\nNÃO retorne markdown, NÃO adicione blocos de código com \`\`\`, e NÃO insira textos introdutórios ou explicativos. Apenas o JSON puro.`;
       const userPrompt = `Abaixo está o final da cena escrita até agora. Escreva os próximos 2-3 blocos do roteiro de forma brilhante e cinematográfica:\n\n${formattedContext}`;
       const res = await fetch('/api/nvidia/chat/completions', {
         method: 'POST',
@@ -1231,7 +1415,7 @@ export default function ScreenplayTab() {
           j++;
         }
         characterWords[charName] = (characterWords[charName] || 0) + dialogueWordsSum;
-        const matchingChar = currentProject.characters.find(c => c.name.toUpperCase() === charName);
+        const matchingChar = (currentProject?.entities?.characters || []).find(c => c.name.toUpperCase() === charName);
         if (matchingChar && (matchingChar.notes?.toLowerCase().includes('feminino') || matchingChar.description?.toLowerCase().includes('gata'))) {
           femaleSpeakers.add(charName);
         }
@@ -1338,13 +1522,13 @@ export default function ScreenplayTab() {
     setAiLoading(true); setAiError(''); setShowCompileModal(false);
     setTimeout(() => {
       try {
-        const projEntities = currentProject.entities || {};
+        const projEntities = currentProject?.entities || {};
         const plotPoints = projEntities.plot_points || [];
         const bdScenes = projEntities.scenes || [];
         const dialogues = projEntities.dialogues || [];
         const compiledElements = [];
         compiledElements.push(
-          { id: `tp-1`, type: 'title-page', key: 'title', value: currentProject.title || 'Smoke Ninja Cat', text: `Title: ${currentProject.title || 'Smoke Ninja Cat'}` },
+          { id: `tp-1`, type: 'title-page', key: 'title', value: currentProject?.title || 'Sem título', text: `Title: ${currentProject?.title || 'Sem título'}` },
           { id: `tp-2`, type: 'title-page', key: 'credit', value: 'Written by', text: 'Credit: Written by' },
           { id: `tp-3`, type: 'title-page', key: 'author', value: 'CineWeave Creator', text: 'Author: CineWeave Creator' },
           { id: `tp-4`, type: 'title-page', key: 'draft date', value: new Date().toLocaleDateString('pt-BR'), text: `Draft date: ${new Date().toLocaleDateString('pt-BR')}` }
@@ -1478,17 +1662,26 @@ setActiveTab('editor');
   const findMatchingScene = (text) => {
     if (!text || !currentProject?.entities?.scenes) return null;
     const clean = text.trim().toUpperCase();
-    return currentProject.entities.scenes.find(s => s.title.toUpperCase() === clean);
+    return currentProject?.entities?.scenes?.find(s => s.title.toUpperCase() === clean);
   };
   const findMatchingLocationFromHeading = (text) => {
     if (!text) return null;
     const clean = text.trim().toUpperCase();
-    const all = [...(currentProject?.entities?.locations || []), ...(currentProject?.locations || [])];
+    const all = [...(currentProject?.entities?.locations || [])];
     return all.find(l =>
       l.name.toUpperCase() === clean ||
       `${l.type || 'INT.'} ${l.name}`.toUpperCase() === clean
     );
   };
+
+  if (!currentProject) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666', flexDirection: 'column', gap: '12px', background: '#050505' }}>
+        <div style={{ fontSize: '14px' }}>Nenhum projeto selecionado</div>
+        <div style={{ fontSize: '12px', color: '#555' }}>Crie ou selecione um projeto para editar o roteiro</div>
+      </div>
+    );
+  }
 
   return (
     <div className={`screenplay-layout-container ${zenMode ? 'zen-active' : ''}`} style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#050505', color: '#fff' }}>
@@ -1528,7 +1721,9 @@ setActiveTab('editor');
       <div className="workspace">
         <div className="toolbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="toolbar-tab-btn" title="Alternar Painel Lateral"><Columns size={16} /></button>
+            <button onClick={() => { setSidebarOpen(v => !v); setStylePanelOpen(v => !v); }} className={`toolbar-tab-btn ${stylePanelOpen || sidebarOpen ? 'active' : ''}`} title="Mostrar/Esconder Painéis">
+              <Columns size={16} />
+            </button>
             <div className="toolbar-tabs">
               <button onClick={() => setActiveTab('editor')} className={`toolbar-tab-btn ${activeTab === 'editor' ? 'active' : ''}`}><Edit3 size={14} /><span>Editor</span></button>
               <button onClick={() => setActiveTab('cards')} className={`toolbar-tab-btn ${activeTab === 'cards' ? 'active' : ''}`}><Grid size={14} /><span>Fichas</span></button>
@@ -1536,6 +1731,21 @@ setActiveTab('editor');
               <button onClick={() => setActiveTab('stats')} className={`toolbar-tab-btn ${activeTab === 'stats' ? 'active' : ''}`}><BarChart2 size={14} /><span>Estatisticas</span></button>
               <button onClick={() => setActiveTab('plugins')} className={`toolbar-tab-btn ${activeTab === 'plugins' ? 'active' : ''}`}><Cpu size={14} /><span>Plugins</span></button>
               <button onClick={() => setStylePanelOpen(v => !v)} className={`toolbar-tab-btn ${stylePanelOpen ? 'active' : ''}`} title="Abrir painel de Estilo & Revisao"><Settings2 size={14} /><span>Estilo</span></button>
+              {sceneHeadings.length > 0 && (
+                <select
+                  value={activeSceneIdx >= 0 ? activeSceneIdx : ''}
+                  onChange={(e) => { const idx = parseInt(e.target.value); if (idx >= 0) focusBlock(sceneHeadings[idx].id, 'start'); }}
+                  className="toolbar-tab-btn"
+                  style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#ccc', cursor: 'pointer', maxWidth: '140px' }}
+                  title="Ir para Cena"
+                >
+                  {sceneHeadings.map((sh, i) => (
+                    <option key={sh.id} value={i}>
+                      #{i + 1} {sh.text?.slice(0, 40)}
+                    </option>
+                  ))}
+                </select>
+              )}
               <div className="toolbar-separator" />
               <button onClick={() => { setPageViewMode('continuous'); setCurrentPage(1); }} className={`toolbar-tab-btn ${pageViewMode === 'continuous' ? 'active' : ''}`} title="Pagina continua">
                 <FileText size={14} /><span>Continuo</span>
@@ -1546,6 +1756,25 @@ setActiveTab('editor');
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Search bar */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchMatchIdx(0); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) performSearch(-1); else performSearch(1); } if (e.key === 'Escape') setSearchQuery(''); }}
+                placeholder="🔍 Buscar..."
+                style={{ width: 120, padding: '4px 8px', fontSize: '11px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#ccc', outline: 'none' }}
+              />
+              {searchQuery && (
+                <span style={{ position: 'absolute', right: 4, fontSize: '10px', color: '#888', pointerEvents: 'none' }}>
+                  {searchMatches.length > 0 ? `${searchMatchIdx + 1}/${searchMatches.length}` : '0'}
+                </span>
+              )}
+            </div>
+            <button onClick={() => setVersionPanelOpen(v => !v)} className={`toolbar-tab-btn ${versionPanelOpen ? 'active' : ''}`} title="Painel de Versões"><Clock size={14} /><span>Versões</span></button>
+            <button onClick={() => setCoverageModal(true)} className="toolbar-tab-btn" title="Análise de Roteiro"><BarChart2 size={14} /><span>Análise</span></button>
+            <button onClick={() => setClassicScriptsModal(true)} className="toolbar-tab-btn" title="Importar Roteiros Clássicos"><BookOpen size={14} /><span>Clássicos</span></button>
             <input
               ref={fountainInputRef}
               type="file"
@@ -1558,16 +1787,30 @@ setActiveTab('editor');
             <button onClick={handlePDFExport} className="toolbar-tab-btn" title="Exportar PDF"><Printer size={14} /></button>
             <button onClick={handleAIFeedback} disabled={aiLoading} className="toolbar-tab-btn" title="Feedback da IA"><Award size={14} /><span>Feedback IA</span></button>
             <button onClick={() => setShowCompileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(204,238,0,0.1)', border: '1px solid rgba(204,238,0,0.3)', color: '#ccee00', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}><Sparkles size={12} /><span>Compilar</span></button>
+            <button onClick={() => setTypewriterMode(!typewriterMode)} className={`toolbar-tab-btn ${typewriterMode ? 'active' : ''}`} title="Modo Typewriter"><Edit3 size={14} /></button>
             <button onClick={() => setZenMode(!zenMode)} className={`toolbar-tab-btn ${zenMode ? 'active' : ''}`} title="Modo Zen Distracao Zero"><Minimize2 size={14} /></button>
           </div>
         </div>
 
-        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''}`}>
+        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${stylePanelOpen ? 'style-panel-open' : ''} ${typewriterMode ? 'typewriter-active' : ''}`}>
           
           {/* ── A. TEXT EDITOR ── */}
           {activeTab === 'editor' && (
             pageViewMode === 'continuous' ? (
               <div className={`screenplay-container continuous-mode dark-paper ${printMode ? 'print-mode' : ''}`} style={{ width: '100%' }}>
+                {/* Minimap — scene navigation strip */}
+                {sceneHeadings.length > 1 && (
+                  <div className="minimap">
+                    {sceneHeadings.map((sh, i) => (
+                      <div
+                        key={sh.id}
+                        onClick={() => focusBlock(sh.id, 'start')}
+                        title={sh.text}
+                        className={`minimap-dot ${i === activeSceneIdx ? 'active' : ''}`}
+                      />
+                    ))}
+                  </div>
+                )}
                 {elements.filter(el => el.type !== 'beat-metadata').length === 0 ? (
                   <div style={{ padding: '60px', textAlign: 'center', color: '#7c7c82' }}>
                     <FileText size={48} style={{ margin: '0 auto 16px auto', opacity: 0.5 }} />
@@ -1596,8 +1839,9 @@ setActiveTab('editor');
                     const gen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
                     const cleanText = cleanSceneText(el.text);
                     const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';
+                    const isSearchMatch = searchQuery && searchMatches.includes(el.id);
                     return (
-                      <div key={el.id} className="script-element-wrapper">
+                      <div key={el.id} className={`script-element-wrapper ${isSearchMatch ? 'search-match' : ''} ${isSearchMatch && searchMatches[searchMatchIdx] === el.id ? 'search-match-current' : ''}`}>
                         <span className="format-badge">{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
                         {isSceneHeading && (
                           <span className="scene-marker">#{sceneNumberMap[item.originalIndex] || item.originalIndex + 1}</span>
@@ -1693,8 +1937,9 @@ setActiveTab('editor');
                           const origIndex = elements.indexOf(el);
                           const cleanText = cleanSceneText(el.text);
                           const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';
+                          const isSearchMatch = searchQuery && searchMatches.includes(el.id);
                           return (
-                            <div key={el.id} className="script-element-wrapper">
+                            <div key={el.id} className={`script-element-wrapper ${isSearchMatch ? 'search-match' : ''} ${isSearchMatch && searchMatches[searchMatchIdx] === el.id ? 'search-match-current' : ''}`}>
                               <span className="format-badge">{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
                               {isSceneHeading && (
                                 <span className="scene-marker">#{sceneNumberMap[origIndex] || origIndex + 1}</span>
@@ -2077,6 +2322,7 @@ setActiveTab('editor');
           onDelete={handleFichaDelete}
           onClose={() => setFichaModal(null)}
           onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
+          onNavigateToMindMap={(id) => navigateTo('mindmap', id)}
           onNavigateToScreenplay={(id) => {
             setActiveTab('editor');
             // The entityId will be linked in the screenplay elements
@@ -2086,6 +2332,57 @@ setActiveTab('editor');
         />
       )}
       {confirmModal && <ConfirmModal {...confirmModal} />}
+
+      {/* ── VERSION PANEL ── */}
+      {versionPanelOpen && (
+        <div className="modal-overlay" onClick={() => setVersionPanelOpen(false)}>
+          <div className="form-modal glass bg-black/95 max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="form-modal-header">
+              <h3 className="modal-title font-bold text-base text-white flex items-center gap-2">
+                <Clock size={16} /> Versões
+              </h3>
+              <button onClick={() => setVersionPanelOpen(false)} className="btn-secondary py-1 px-2 text-xs">Fechar</button>
+            </div>
+            <div className="p-4">
+              <VersionPanelView onClose={() => setVersionPanelOpen(false)} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── COVERAGE MODAL ── */}
+      {coverageModal && (
+        <div className="modal-overlay" onClick={() => setCoverageModal(false)}>
+          <div className="form-modal glass bg-black/95 max-w-2xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="form-modal-header">
+              <h3 className="modal-title font-bold text-base text-white flex items-center gap-2">
+                <BarChart2 size={16} /> Análise de Roteiro
+              </h3>
+              <button onClick={() => setCoverageModal(false)} className="btn-secondary py-1 px-2 text-xs">Fechar</button>
+            </div>
+            <div className="p-4">
+              <CoverageReport />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CLASSIC SCRIPTS MODAL ── */}
+      {classicScriptsModal && (
+        <div className="modal-overlay" onClick={() => setClassicScriptsModal(false)}>
+          <div className="form-modal glass bg-black/95 max-w-2xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="form-modal-header">
+              <h3 className="modal-title font-bold text-base text-white flex items-center gap-2">
+                <BookOpen size={16} /> Roteiros Clássicos
+              </h3>
+              <button onClick={() => setClassicScriptsModal(false)} className="btn-secondary py-1 px-2 text-xs">Fechar</button>
+            </div>
+            <div className="p-4">
+              <ScriptBrowser />
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

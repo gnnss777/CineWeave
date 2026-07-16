@@ -1,16 +1,52 @@
-# React + Vite
+# CineWeave
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Aplicação de roteirismo colaborativo com unificação de dados entre Brainstorm, Enciclopédia, Roteiro e Mapa Mental.
 
-Currently, two official plugins are available:
+## Arquitetura de Dados Unificada
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+O sistema utiliza `project.entities` como **úNICA fonte da verdade**:
 
-## React Compiler
+```
+project.entities  ← ÚNICA FONTE DA VERDADE
+├── characters    ← fichas completas
+├── locations     ← fichas completas
+├── objects       ← fichas completas
+├── scenes        ← (synopsis, actId, characterIds, order, status)
+├── plot_points   ← fichas
+├── themes        ← fichas
+├── acts          ← fichas (name, order, description, color)
+├── dialogues     ← 🆕 (speaker, line, context, tags, sceneId)
+└── world_elements ← 🆕 (name, type, description, tags)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+project.screenplay[]   ← blocos SEMPRE com entityId
+project.mindMapNodes[] ← só layout (entityId + x,y)
+project.ideas[]        ← notas soltas criativas
+project.recordings[]   ← áudio gravado
+project.mediaUploads[] ← concept art, referências
+```
 
-## Expanding the Oxlint configuration
+## Status de Implementação
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- ✅ **Fase 1**: Eliminação de `brainstormData`, unificação em `entities`
+- ✅ **Fase 2**: Linkagem bidirecional `screenplay ↔ entities`
+- ⏳ **Fase 3**: Mind Map como view pura de `entities`
+- ⏳ **Fase 4**: Limpeza de arrays legados
+- ⏳ **Fase 5**: Navegação cruzada entre abas
+- ⏳ **Fase 6**: Consolidar 8 abas em 4
+
+## Navegação Cruzada
+
+- Botão "Ver no Roteiro" em cada ficha (`FichaModal`) navega para o bloco correspondente no roteiro.
+- Edições no roteiro atualizam automaticamente as entidades relacionadas (`saveScreenplay` em `ScreenplayTab`).
+
+## Desenvolvimento
+
+```bash
+npm install
+npm run dev
+npm run build
+```
+
+## Backend
+
+O aplicativo usa Supabase para sincronização de dados. Consulte `supabase/migration.sql` para o esquema.

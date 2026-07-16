@@ -12,6 +12,7 @@ export function exportScreenplayPDF(project) {
 
   let y = marginTop;
   let page = 1;
+  let sceneCount = 0;
 
   const addPage = () => {
     doc.addPage();
@@ -34,7 +35,9 @@ export function exportScreenplayPDF(project) {
   screenplay.forEach(el => {
     switch (el.type) {
       case 'scene-heading':
-        writeLine(el.text.toUpperCase(), 0, 12, true);
+        sceneCount++;
+        const cleanText = (el.text || '').replace(/\[\[.*?\]\]/g, '').replace(/#([^#]+)#/g, '').trim();
+        writeLine(`${sceneCount}. ${cleanText.toUpperCase()}`, 0, 12, true);
         y += 0.05;
         break;
       case 'action':

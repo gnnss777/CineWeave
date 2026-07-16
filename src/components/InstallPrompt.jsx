@@ -125,7 +125,7 @@ export default function InstallPrompt() {
             </button>
             <button onClick={handleInstall} style={{
               flex: 1, padding: '10px', borderRadius: '10px', border: 'none',
-              background: 'linear-gradient(135deg, #ccee00, #b38542)', color: '#070709',
+              background: 'linear-gradient(135deg, #ccee00, #b3d400)', color: '#070709',
               fontSize: '13px', fontWeight: 700, cursor: 'pointer'
             }}>
               Instalar App

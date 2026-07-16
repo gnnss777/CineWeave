@@ -15,15 +15,19 @@ export const supabase = createClient(
   supabaseAnonKey || 'placeholder-key'
 );
 
-export async function signUp(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
+export async function signUp(email, password, username) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { username, display_name: username } }
+  });
   if (error) throw error;
-  // Auto-login imediatamente após cadastro, sem exigir confirmação de email
   if (!data.session) {
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) throw signInError;
     return signInData;
   }
+  // Profile is auto-created by the DB trigger handle_new_user
   return data;
 }
 
@@ -48,6 +52,113 @@ export async function getCurrentUser() {
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error) throw error;
   return user;
+}
+
+// ── Profile ──
+
+export async function fetchProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateProfile(userId, updates) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ── Tags ──
+
+export async function fetchProjectTags(projectId) {
+  const { data, error } = await supabase
+    .from('project_tags')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) throw error;
+  return data;
+}
+
+export async function addProjectTag(projectId, tagId, tagType = 'custom', userId = null) {
+  const { data, error } = await supabase
+    .from('project_tags')
+    .insert({ project_id: projectId, tag_id: tagId, tag_type: tagType, user_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function removeProjectTag(projectId, tagId, tagType = 'custom') {
+  const { error } = await supabase
+    .from('project_tags')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('tag_id', tagId)
+    .eq('tag_type', tagType);
+  if (error) throw error;
+}
+
+export async function fetchUserTags(userId) {
+  const { data, error } = await supabase
+    .from('user_tags')
+    .select('*')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return data;
+}
+
+export async function saveUserTag(userId, tagId, color = '#ccee00') {
+  const { data, error } = await supabase
+    .from('user_tags')
+    .upsert({ user_id: userId, tag_id: tagId, tag_color: color }, { onConflict: 'user_id,tag_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteUserTag(userId, tagId) {
+  const { error } = await supabase
+    .from('user_tags')
+    .delete()
+    .eq('user_id', userId)
+    .eq('tag_id', tagId);
+  if (error) throw error;
+}
+
+// ── Avatar Upload ──
+
+export async function uploadAvatar(userId, file) {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const filePath = `${userId}/avatar.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file, { upsert: true });
+  if (uploadError) throw uploadError;
+  const { data: { publicUrl } } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(filePath);
+  return publicUrl;
+}
+
+export async function deleteAvatar(userId) {
+  const { data: list } = await supabase.storage
+    .from('avatars')
+    .list(userId);
+  if (list?.length > 0) {
+    const files = list.map(f => `${userId}/${f.name}`);
+    await supabase.storage.from('avatars').remove(files);
+  }
 }
 
 export default supabase;

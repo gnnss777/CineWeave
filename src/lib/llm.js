@@ -253,18 +253,106 @@ export async function extractStructureFromDocuments(documents, onProgress, exist
   };
 }
 
+const SCREENPLAY_ENRICH_PROMPT = `Você é um analisador de roteiro especializado em extrair objetos, eventos da trama e temas de roteiros no formato Fountain.
+
+Analise o roteiro abaixo e extraia:
+
+1. world_elements (OBJETOS): Itens físicos, objetos de cena, tecnologia, documentos, armas, veículos, etc. que aparecem nas ações ou diálogos. Ex: "celular", "chave do carro", "facas", "gol branco", "foto de família", "caderno A3", "lápis 6B", "incenso". INCLUA APENAS itens relevantes para a história (não inclua itens genéricos como "mesa", "cadeira" a menos que tenham significado especial).
+
+2. plot_points: Eventos-chave da história em ordem cronológica. Cada plot point deve ter um título curto, descrição, e o ato (ACT I, ACT II ou ACT III) em que ocorre. Ex: "Duda descobre o dinheiro no balcão", "Maria mostra o desenho para Duda", "As irmãs decidem ir à festa juntas".
+
+3. themes: Temas centrais do roteiro. Ex: "Relações familiares", "Diferenças de geração", "Amadurecimento", "Perdão", "Tradição vs modernidade". Cada tema deve ter uma frase-tema (statement), evidência extraída do texto (evidence), e relevância (Central, Secundário ou Menor).
+
+REGRAS:
+- Extraia APENAS o que está EXPLICITAMENTE no texto. NÃO invente.
+- Para objetos, inclua o nome, tipo ("object"), descrição curta e significado (opcional).
+- Para plot points, estime o ato baseado na posição no roteiro.
+- Retorne APENAS JSON válido, sem markdown.
+
+Esquema do JSON:
+{
+  "world_elements": [
+    { "name": "nome do objeto", "type": "object", "description": "descrição", "significance": "importância na história" }
+  ],
+  "plot_points": [
+    { "title": "Título do evento", "description": "Descrição", "act": "I", "order": 0 }
+  ],
+  "themes": [
+    { "statement": "Frase-tema", "evidence": "Evidência do texto", "relevance": "Central" }
+  ]
+}`;
+
+export async function extractEnrichmentFromScreenplay(screenplayText, onProgress) {
+  if (!screenplayText || screenplayText.trim().length < 50) {
+    throw new Error('Texto do roteiro muito curto para extração.');
+  }
+
+  const key = getLLMApiKey();
+  if (!key) {
+    throw new Error('Configure a chave da API NVIDIA primeiro.');
+  }
+
+  onProgress?.('Enviando roteiro para extrair objetos, plot points e temas...');
+
+  const body = {
+    model: DEFAULT_MODEL,
+    messages: [
+      { role: 'system', content: SCREENPLAY_ENRICH_PROMPT },
+      { role: 'user', content: `ROTEIRO:\n\n${screenplayText}` }
+    ],
+    temperature: 0.1,
+    max_tokens: 4096,
+    top_p: 0.95,
+    response_format: { type: "json_object" }
+  };
+
+  const response = await fetch(`${NVIDIA_PROXY_URL}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.error?.message || `Erro na API (${response.status})`);
+  }
+
+  onProgress?.('Processando resposta da IA...');
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+
+  if (!content) {
+    throw new Error('Resposta vazia da API.');
+  }
+
+  const json = extractJSON(content);
+
+  if (!json) {
+    throw new Error('Não foi possível extrair JSON válido da resposta.');
+  }
+
+  const worldElements = json.world_elements || [];
+  const plotPoints = json.plot_points || [];
+  const themes = json.themes || [];
+
+  onProgress?.(`Extraídos ${worldElements.length} objetos, ${plotPoints.length} plot points, ${themes.length} temas`);
+
+  return { world_elements: worldElements, plot_points: plotPoints, themes };
+}
+
 function summarizeExistingProject(project) {
   if (!project) return 'Projeto vazio.';
   
   const parts = [];
-  if (project.characters?.length) {
-    parts.push(`Personagens existentes: ${project.characters.map(c => c.name).join(', ')}`);
+  if (project.entities?.characters?.length) {
+    parts.push(`Personagens existentes: ${project.entities.characters.map(c => c.name).join(', ')}`);
   }
-  if (project.locations?.length) {
-    parts.push(`Locais existentes: ${project.locations.map(l => l.name).join(', ')}`);
+  if (project.entities?.locations?.length) {
+    parts.push(`Locais existentes: ${project.entities.locations.map(l => l.name).join(', ')}`);
   }
-  if (project.objects?.length) {
-    parts.push(`Objetos existentes: ${project.objects.map(o => o.name).join(', ')}`);
+  if (project.entities?.objects?.length) {
+    parts.push(`Objetos existentes: ${project.entities.objects.map(o => o.name).join(', ')}`);
   }
   if (project.screenplay?.length) {
     const sceneHeadings = project.screenplay

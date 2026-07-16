@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Edit3, Check, Trash2, MapPin, FileText, Target, Feather, Layers } from 'lucide-react';
+import TagSelector from './TagSelector';
 
 const TYPE_LABELS = {
   character: 'Personagem',
@@ -11,7 +12,7 @@ const TYPE_LABELS = {
   act: 'Ato',
 };
 
-export default function FichaModal({ item, type, mode: initialMode, onSave, onDelete, onClose, acts = [], onNavigateToEncyclopedia, onNavigateToScreenplay }) {
+export default function FichaModal({ item, type, mode: initialMode, onSave, onDelete, onClose, acts = [], onNavigateToEncyclopedia, onNavigateToScreenplay, onNavigateToMindMap }) {
   const [isEditing, setIsEditing] = useState(initialMode === 'edit');
 
   const [form, setForm] = useState({
@@ -27,6 +28,7 @@ export default function FichaModal({ item, type, mode: initialMode, onSave, onDe
     mood: item?.mood || '',
     group: item?.group || '',
     significance: item?.significance || '',
+    tags: item?.tags || [],
 
     sceneTitle: item?.title || '',
     sceneSynopsis: item?.synopsis || '',
@@ -50,7 +52,15 @@ export default function FichaModal({ item, type, mode: initialMode, onSave, onDe
     actColor: item?.color || '#ccee00',
   });
 
-  const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const set = (field) => (e) => {
+    if (Array.isArray(e)) {
+      setForm(prev => ({ ...prev, [field]: e }));
+    } else if (e?.target) {
+      setForm(prev => ({ ...prev, [field]: e.target.value }));
+    } else {
+      setForm(prev => ({ ...prev, [field]: e }));
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -66,16 +76,19 @@ export default function FichaModal({ item, type, mode: initialMode, onSave, onDe
           ...base, name: form.name, role: form.role, avatar: form.avatar,
           traits: form.traits.split(',').map(t => t.trim()).filter(Boolean),
           description: form.description, backstory: form.backstory, notes: form.notes,
+          tags: form.tags || [],
         };
       case 'location':
         return {
           ...base, name: form.name, type: form.locType, timeOfDay: form.timeOfDay,
           mood: form.mood, group: form.group, description: form.description,
+          tags: form.tags || [],
         };
       case 'object':
         return {
           ...base, name: form.name, group: form.group,
           description: form.description, significance: form.significance,
+          tags: form.tags || [],
         };
       case 'scene':
         return {
@@ -170,9 +183,25 @@ export default function FichaModal({ item, type, mode: initialMode, onSave, onDe
         
         {/* Botão "Ver no Roteiro" */}
         {item?.id && onNavigateToScreenplay && (
-          <div className="ficha-actions mt-4">
+          <div className="ficha-actions mt-4 flex gap-2">
             <button className="btn btn-primary" onClick={() => onNavigateToScreenplay(item.id)}>
               Ver no Roteiro
+            </button>
+            {onNavigateToMindMap && (
+              <button type="button" onClick={() => { onNavigateToMindMap(item.id); onClose(); }}
+                className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 rounded-lg">
+                <MapPin size={12} />
+                <span>Ver no Mapa</span>
+              </button>
+            )}
+          </div>
+        )}
+        {item?.id && !onNavigateToScreenplay && onNavigateToMindMap && (
+          <div className="ficha-actions mt-4">
+            <button type="button" onClick={() => { onNavigateToMindMap(item.id); onClose(); }}
+              className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 rounded-lg">
+              <MapPin size={12} />
+              <span>Ver no Mapa</span>
             </button>
           </div>
         )}
@@ -232,6 +261,10 @@ function renderEditForm(type, form, set, acts) {
             <label className="text-xs text-gray-400 font-bold uppercase mb-1">Notas</label>
             <textarea value={form.notes} onChange={set('notes')} rows={3} placeholder="Observações para o roteirista..." />
           </div>
+          <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Tags</label>
+            <TagSelector tags={form.tags || []} onChange={v => set('tags')(v)} placeholder="Ex: protagonista, misterioso..." />
+          </div>
         </>
       )}
       {type === 'location' && (
@@ -269,6 +302,10 @@ function renderEditForm(type, form, set, acts) {
             <input type="text" value={form.group} onChange={set('group')} placeholder="Ex: Territórios, Zonas de Perigo..." />
           </div>
           <div className="field-group">
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Tags</label>
+            <TagSelector tags={form.tags || []} onChange={v => set('tags')(v)} placeholder="Ex: externa, noturna..." />
+          </div>
+          <div className="field-group">
             <label className="text-xs text-gray-400 font-bold uppercase mb-1">Descrição</label>
             <textarea value={form.description} onChange={set('description')} rows={5} placeholder="Descreva o ambiente..." />
           </div>
@@ -278,19 +315,19 @@ function renderEditForm(type, form, set, acts) {
         <>
           <div className="field-group">
             <label className="text-xs text-gray-400 font-bold uppercase mb-1">Nome</label>
-            <input type="text" value={form.name} onChange={set('name')} required placeholder="Ex: Bomba de Fumaça" />
+            <input type="text" value={form.name} onChange={set('name')} required placeholder="Ex: Bombas de Fumaça" />
           </div>
           <div className="field-group">
-            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Grupo / Categoria</label>
-            <input type="text" value={form.group} onChange={set('group')} placeholder="Ex: Itens, Armas, Pistas..." />
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Significância</label>
+            <input type="text" value={form.significance} onChange={set('significance')} placeholder="Ex: Única esperança contra os pássaros..." />
           </div>
           <div className="field-group">
-            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Descrição Física</label>
-            <textarea value={form.description} onChange={set('description')} rows={4} placeholder="Aparência, textura, peso..." />
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Tags</label>
+            <TagSelector tags={form.tags || []} onChange={v => set('tags')(v)} placeholder="Ex: tecnologia, chave..." />
           </div>
           <div className="field-group">
-            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Significado na Trama</label>
-            <textarea value={form.significance} onChange={set('significance')} rows={5} placeholder="Qual a relevância deste item para a história?" />
+            <label className="text-xs text-gray-400 font-bold uppercase mb-1">Descrição</label>
+            <textarea value={form.description} onChange={set('description')} rows={5} placeholder="Descreva o objeto..." />
           </div>
         </>
       )}
@@ -440,6 +477,14 @@ function renderViewCard(type, item, acts, getActName) {
               <p className="text-sm text-gray-300 mt-1">{item.notes}</p>
             </div>
           )}
+          {(item?.tags || []).length > 0 && (
+            <div className="readonly-section">
+              <label className="text-xs text-gray-500 uppercase font-bold">Tags</label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {item.tags.map((t, i) => <span key={i} className="trait-tag text-xs">{t}</span>)}
+              </div>
+            </div>
+          )}
         </>
       )}
       {type === 'location' && (
@@ -463,6 +508,14 @@ function renderViewCard(type, item, acts, getActName) {
             <div className="readonly-section">
               <label className="text-xs text-gray-500 uppercase font-bold">Mood / Atmosfera</label>
               <p className="text-sm text-gray-300 mt-1">{item.mood}</p>
+            </div>
+          )}
+          {(item?.tags || []).length > 0 && (
+            <div className="readonly-section">
+              <label className="text-xs text-gray-500 uppercase font-bold">Tags</label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {item.tags.map((t, i) => <span key={i} className="trait-tag text-xs">{t}</span>)}
+              </div>
             </div>
           )}
           <div className="readonly-section">
@@ -496,6 +549,14 @@ function renderViewCard(type, item, acts, getActName) {
             <div className="readonly-section">
               <label className="text-xs text-gray-500 uppercase font-bold">Importância na Trama</label>
               <p className="text-sm text-gray-300 mt-1">{item.significance}</p>
+            </div>
+          )}
+          {(item?.tags || []).length > 0 && (
+            <div className="readonly-section">
+              <label className="text-xs text-gray-500 uppercase font-bold">Tags</label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {item.tags.map((t, i) => <span key={i} className="trait-tag text-xs">{t}</span>)}
+              </div>
             </div>
           )}
         </>

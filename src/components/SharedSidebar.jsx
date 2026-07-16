@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { User, MapPin, FileText, Sparkle, Target, Film, MessageSquare, Globe, Heart, Layers, Search, Edit, Trash2, Send, Compass, Plus, X } from 'lucide-react';
+import { User, MapPin, FileText, Sparkle, Target, Film, MessageSquare, Globe, Heart, Layers, Search, Edit, Trash2, Send, Compass, Plus, X, ArrowLeftFromLine, ArrowRightFromLine } from 'lucide-react';
 
 const SIDEBAR_TABS = {
   characters: { label: 'Personagens', icon: User },
@@ -50,22 +50,25 @@ function AvatarCircle({ item, type, size = 32 }) {
 }
 
 function SidebarCard({ item, type, tags, secondary, actions, onClick }) {
+  const [hover, setHover] = useState(false);
   return (
-    <div className="sidebar-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '6px 8px', minHeight: 0 }}>
-      <div className="sidebar-card-left" style={{ gap: 8 }}>
-        <AvatarCircle item={item} type={type} size={24} />
-        <div className="sidebar-card-info" style={{ minWidth: 0 }}>
-          <span className="sidebar-card-name" style={{ fontSize: 11, lineHeight: 1.2 }}>{item.name || item.title || item.statement || item.label || 'Sem nome'}</span>
-          {secondary && <span className="sidebar-card-secondary" style={{ fontSize: 9, lineHeight: 1.2, marginTop: 1 }}>{typeof secondary === 'string' ? secondary.substring(0, 60) : secondary}</span>}
-          {tags && tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-0.5">
-              {tags.slice(0, 2).map((t, i) => <TagChip key={i} tag={t} />)}
-              {tags.length > 2 && <span className="trait-tag text-[10px] px-1.5 py-0.5">+{tags.length - 2}</span>}
-            </div>
-          )}
+    <div className="sidebar-card" onClick={onClick}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ cursor: onClick ? 'pointer' : 'default', padding: '8px 10px', minHeight: 0, borderRadius: 10, background: hover ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', transition: 'all 0.15s ease', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <AvatarCircle item={item} type={type} size={26} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name || item.title || item.statement || item.label || 'Sem nome'}</span>
+          {secondary && <span style={{ fontSize: 9, color: '#ccee00', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80 }}>{typeof secondary === 'string' ? secondary.substring(0, 60) : secondary}</span>}
         </div>
+        {tags && tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 2 }}>
+            {tags.slice(0, 2).map((t, i) => <TagChip key={i} tag={t} />)}
+            {tags.length > 2 && <span className="trait-tag" style={{ fontSize: 9, padding: '0 5px', borderRadius: 4, background: 'rgba(204,238,0,0.08)', border: '1px solid rgba(204,238,0,0.15)', color: '#ccee00' }}>+{tags.length - 2}</span>}
+          </div>
+        )}
       </div>
-      <div className="sidebar-card-actions" onClick={(e) => e.stopPropagation()} style={{ gap: 1 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 1, opacity: hover ? 1 : 0, transition: 'opacity 0.15s ease', flexShrink: 0 }}>
         {actions}
       </div>
     </div>
@@ -86,36 +89,41 @@ export default function SharedSidebar({
   onToggle,
   extraTabs,
   extraTabData,
+  outlinerData,
+  onOutlinerSelect,
+  position = 'right',
+  onPositionToggle,
 }) {
   const [search, setSearch] = useState('');
   const [bsCat, setBsCat] = useState('all');
 
-  const baseKeys = tabContext === 'screenplay' 
-    ? ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts', 'brainstorm', 'outliner'] 
-    : tabContext === 'encyclopedia' 
-    ? ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts'] 
-    : ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts', 'brainstorm'];
+  const baseKeys = tabContext === 'encyclopedia'
+    ? ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts']
+    : ['characters', 'locations', 'objects', 'scenes', 'plot_points', 'themes', 'acts', 'brainstorm', 'outliner'];
   const tabKeys = [...baseKeys, ...(extraTabs || []).map(t => t.id)];
 
   const characters = currentProject?.characters || [];
   const locations = currentProject?.locations || [];
   const objects = currentProject?.objects || [];
-  const brainstormData = currentProject?.brainstormData || {};
-  const screenplay = currentProject?.screenplay || [];
   const entities = currentProject?.entities || {};
   const allScenes = entities.scenes || [];
   const allPlotPoints = entities.plot_points || [];
   const allThemes = entities.themes || [];
   const allActs = entities.acts || [];
+  const allDialogues = entities.dialogues || [];
+  const allWorldElements = entities.world_elements || [];
 
   const brainstormItems = useMemo(() => {
-    if (bsCat === 'all') {
-      return Object.entries(brainstormData).flatMap(([catId, items]) =>
-        (items || []).map(item => ({ ...item, _bsCategory: catId }))
-      );
-    }
-    return (brainstormData[bsCat] || []).map(item => ({ ...item, _bsCategory: bsCat }));
-  }, [brainstormData, bsCat]);
+    const items = [
+      ...(allPlotPoints.map(p => ({ ...p, _bsCategory: 'plot_points' }))),
+      ...(allScenes.map(s => ({ ...s, _bsCategory: 'scenes' }))),
+      ...(allDialogues.map(d => ({ ...d, _bsCategory: 'dialogues' }))),
+      ...(allWorldElements.map(w => ({ ...w, _bsCategory: 'world_elements' }))),
+      ...(allThemes.map(t => ({ ...t, _bsCategory: 'themes' }))),
+    ];
+    if (bsCat === 'all') return items;
+    return items.filter(item => item._bsCategory === bsCat);
+  }, [allPlotPoints, allScenes, allDialogues, allWorldElements, allThemes, bsCat]);
 
   const filteredCharacters = useMemo(() => {
     if (!search) return characters;
@@ -144,13 +152,13 @@ export default function SharedSidebar({
   const filteredPlotPoints = useMemo(() => {
     if (!search) return allPlotPoints;
     const q = search.toLowerCase();
-    return allPlotPoints.filter(p => p.name?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+    return allPlotPoints.filter(p => p.title?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
   }, [allPlotPoints, search]);
 
   const filteredThemes = useMemo(() => {
     if (!search) return allThemes;
     const q = search.toLowerCase();
-    return allThemes.filter(t => t.name?.toLowerCase().includes(q) || t.statement?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q));
+    return allThemes.filter(t => t.statement?.toLowerCase().includes(q) || t.evidence?.toLowerCase().includes(q));
   }, [allThemes, search]);
 
   const filteredActs = useMemo(() => {
@@ -170,13 +178,14 @@ export default function SharedSidebar({
   }, [brainstormItems, search]);
 
   const outlinerItems = useMemo(() => {
-    return screenplay.filter(el => el.type === 'scene-heading');
-  }, [screenplay]);
+    if (outlinerData) return outlinerData;
+    return (currentProject?.screenplay || []).filter(el => el.type === 'scene-heading');
+  }, [currentProject?.screenplay, outlinerData]);
 
   if (!open) {
     return (
-      <div className="reference-sidebar-toggle" style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
-        <button onClick={onToggle} className="btn-secondary py-2 px-1 text-xs rounded-l-lg rounded-r-none" title="Abrir painel">
+      <div className="reference-sidebar-toggle" style={{ position: 'absolute', [position === 'left' ? 'left' : 'right']: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
+        <button onClick={onToggle} className={`btn-secondary py-2 px-1 text-xs ${position === 'left' ? 'rounded-r-lg rounded-l-none' : 'rounded-l-lg rounded-r-none'}`} title="Abrir painel">
           <Compass size={16} />
         </button>
       </div>
@@ -274,23 +283,25 @@ export default function SharedSidebar({
       }
       case 'outliner':
         return outlinerItems.map((el, i) => (
-          <div key={el.id || i} className="sidebar-card" onClick={() => onSelectItem?.(el, 'scene')} style={{ cursor: 'pointer' }}>
-            <div className="sidebar-card-left">
-              <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-act)', flexShrink: 0 }} />
-              <div className="sidebar-card-info">
-                <span className="sidebar-card-name">{el.text}</span>
-              </div>
-            </div>
+          <div key={el.id || i} onClick={() => onOutlinerSelect ? onOutlinerSelect(el) : onSelectItem?.(el, 'scene')}
+            style={{ cursor: 'pointer', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 8, transition: 'background 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-act)', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ color: '#f59e0b', marginRight: 4 }}>#{el.sceneNumber || i + 1}</span>
+              {el.cleanText || el.text || el.name || el.title || ''}
+            </span>
           </div>
         ));
       case 'scenes':
-        return filteredScenes.map(scene => (
+        return filteredScenes.map((scene, idx) => (
           <SidebarCard
             key={scene.id}
             item={scene}
             type="scene"
             tags={[]}
-            secondary={scene.synopsis ? scene.synopsis.substring(0, 60) : ''}
+            secondary={`#${scene.order !== undefined ? scene.order + 1 : idx + 1}${scene.synopsis ? ' · ' + scene.synopsis.substring(0, 50) : ''}`}
             onClick={() => onSelectItem?.(scene, 'scene')}
             actions={
               <>
@@ -360,9 +371,10 @@ export default function SharedSidebar({
   };
 
   return (
-    <div className="reference-sidebar open" style={{ width: '300px', minWidth: '300px', borderLeft: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className="reference-sidebar open" style={{ width: '320px', minWidth: '320px', borderLeft: position === 'right' ? '1px solid rgba(255,255,255,0.06)' : 'none', borderRight: position === 'left' ? '1px solid rgba(255,255,255,0.06)' : 'none', backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', order: position === 'left' ? -1 : 0 }}>
+      <div className="sidebar-drag-handle" />
       <div className="reference-sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <div className="reference-tabs" style={{ display: 'flex', gap: '1px', overflow: 'auto', flex: 1 }}>
+        <div className="reference-tabs" style={{ display: 'flex', gap: '1px', overflow: 'hidden', flex: 1 }}>
           {tabKeys.map(key => {
             const tab = SIDEBAR_TABS[key];
             const extra = (extraTabs || []).find(t => t.id === key);
@@ -371,10 +383,9 @@ export default function SharedSidebar({
             const label = tab?.label || extra?.label;
             const isActive = activeTab === key;
             return (
-              <button key={key} onClick={() => onTabChange(key)} className={`reference-tab ${isActive ? 'active' : ''}`}
-                style={{ whiteSpace: 'nowrap', padding: '3px 6px', fontSize: '10px', fontWeight: isActive ? 700 : 500, borderRadius: '3px', border: 'none', background: isActive ? 'rgba(204, 238, 0, 0.15)' : 'transparent', color: isActive ? '#ccee00' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                <Icon size={10} />
-                  <span>{label}</span>
+              <button key={key} onClick={() => onTabChange(key)} title={label} className={`reference-tab ${isActive ? 'active' : ''}`}
+                style={{ padding: '5px 7px', fontSize: '10px', fontWeight: isActive ? 700 : 500, borderRadius: '6px', border: 'none', background: isActive ? 'rgba(204, 238, 0, 0.15)' : 'transparent', color: isActive ? '#ccee00' : '#666', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}>
+                <Icon size={14} />
               </button>
             );
           })}
@@ -382,6 +393,11 @@ export default function SharedSidebar({
         <button onClick={onToggle} className="reference-toggle-close" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px', flexShrink: 0 }} title="Fechar painel">
           <X size={12} />
         </button>
+        {onPositionToggle && (
+          <button onClick={onPositionToggle} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px', flexShrink: 0 }} title={position === 'right' ? 'Mover para esquerda' : 'Mover para direita'}>
+            {position === 'right' ? <ArrowRightFromLine size={12} /> : <ArrowLeftFromLine size={12} />}
+          </button>
+        )}
       </div>
 
       <div style={{ padding: '4px 8px', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>

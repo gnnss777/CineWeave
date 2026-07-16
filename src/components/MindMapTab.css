@@ -413,6 +413,22 @@
           .mobile-node-actions {
             display: flex !important;
           }
+          .mindmap-container {
+            padding-bottom: 64px;
+          }
+          .canvas-svg {
+            touch-action: manipulation;
+          }
+          .node-text {
+            font-size: 14px;
+          }
+          .node-circle {
+            stroke-width: 2.5px;
+          }
+          .canvas-btn,
+          .add-node-btn {
+            margin-bottom: 72px;
+          }
         }
 
         /* ── Modal refinements (ScreenplayTab pattern) ── */

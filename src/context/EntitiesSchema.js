@@ -177,20 +177,6 @@ export function findEntityInProject(project, entityId) {
     }
   }
 
-  // Fallback para lists legacy (characters, locations, objects)
-  if (Array.isArray(project.characters)) {
-    const found = project.characters.find(e => e.id === entityId);
-    if (found) return { type: 'characters', data: found };
-  }
-  if (Array.isArray(project.locations)) {
-    const found = project.locations.find(e => e.id === entityId);
-    if (found) return { type: 'locations', data: found };
-  }
-  if (Array.isArray(project.objects)) {
-    const found = project.objects.find(e => e.id === entityId);
-    if (found) return { type: 'objects', data: found };
-  }
-
   return null;
 }
 

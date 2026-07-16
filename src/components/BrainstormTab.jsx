@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { useEntities } from '../context/useEntities';
+import { createEntity } from '../context/EntitiesSchema';
+import { createNodeWithEntity, resolveNodeDisplay } from '../lib/mindMapUtils';
 import { extractStructureFromDocuments } from '../lib/llm';
 import { parseFiles } from '../lib/fileParser';
+import { uploadProjectFilesBatch } from '../lib/storage';
 import ConfirmModal from './ConfirmModal';
 import PromptModal from './PromptModal';
 import {
@@ -405,6 +408,7 @@ export default function BrainstormTab() {
 
     // Get current user for projectId/userId
     let currentUserId = null;
+    let currentProjectIdVal = currentProject?.id;
     try {
       const { getCurrentUser } = await import('../lib/supabase');
       const user = await getCurrentUser();
@@ -413,20 +417,35 @@ export default function BrainstormTab() {
       console.warn('Could not get current user:', e);
     }
 
-    const newDocs = supportedFiles.map(file => ({
-      id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      file,
-      name: file.name,
-      type: getTypeFromExtension(file.name),
-      size: file.size,
-      status: 'pending',
-      content: '',
-      metadata: null,
-      extractedData: null,
-      createdAt: Date.now(),
-      projectId: currentProject?.id,
-      userId: currentUserId
-    }));
+    // Upload files to Supabase Storage
+    let uploadResults = [];
+    if (currentUserId && currentProjectIdVal) {
+      uploadResults = await uploadProjectFilesBatch(currentProjectIdVal, currentUserId, supportedFiles, 'brainstorm');
+      for (const ur of uploadResults) {
+        if (ur.error) console.warn('Upload failed for', ur.file.name, ur.error);
+      }
+    }
+
+    const newDocs = supportedFiles.map((file, idx) => {
+      const uploadResult = uploadResults[idx]?.result;
+      return {
+        id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        file,
+        name: file.name,
+        type: getTypeFromExtension(file.name),
+        size: file.size,
+        status: 'pending',
+        content: '',
+        metadata: null,
+        extractedData: null,
+        createdAt: Date.now(),
+        projectId: currentProjectIdVal,
+        userId: currentUserId,
+        storagePath: uploadResult?.storagePath || '',
+        fileUrl: uploadResult?.url || '',
+        fileId: null,
+      };
+    });
 
     // Add all docs at once via project spread to avoid closure issues
     const proj = { ...currentProject };
@@ -923,9 +942,11 @@ export default function BrainstormTab() {
 
     // Character items already exist in mind map — just navigate
     if (effectiveCat === 'characters') {
-      const existingNode = (currentProject?.mindMapNodes || []).find(n =>
-        n.type === 'character' && (n.label === item.name || n.id === `n-${item.id}`)
-      );
+      const existingNode = (currentProject?.mindMapNodes || []).find(n => {
+        if (!n.entityId) return n.type === 'character' && n.label === item.name;
+        const disp = resolveNodeDisplay(n, currentProject);
+        return disp.entity?.id === item.id;
+      });
       navigateTo('mindmap', existingNode?.id || item.id);
       return;
     }
@@ -942,16 +963,33 @@ export default function BrainstormTab() {
       themes: 'theme',
     };
     const nodeType = typeMap[effectiveCat] || 'plot_point';
-    const label = item.name || item.title || item.statement || 'Item';
-    const details = item.description || item.evidence || item.context || item.relevance || '';
+    const entityTypeMap = {
+      plot_point: 'plot_points',
+      scene: 'scenes',
+      world: 'world_elements',
+      theme: 'themes',
+    };
+    const entityType = entityTypeMap[nodeType] || 'plot_points';
+
+    // Create entity from item data
+    const entityData = createEntity(entityType, { 
+      name: item.name || item.title || item.statement || 'Item',
+      title: item.name || item.title || item.statement || 'Item',
+      description: item.description || item.evidence || item.context || item.relevance || '',
+    });
+    saveEntity(entityType, entityData);
 
     const nodeId = `n-bs-${Date.now()}`;
-    nodes.push({
-      id: nodeId, label, type: nodeType,
-      x: 300 + Math.random() * 400, y: 300 + Math.random() * 300, details,
-    });
+    const newNode = createNodeWithEntity(entityData, entityType, 300 + Math.random() * 400, 300 + Math.random() * 300);
+    nodes.push(newNode);
 
-    const firstAct = nodes.find(n => n.type === 'act');
+    const firstAct = nodes.find(n => {
+      if (n.entityId) {
+        const disp = resolveNodeDisplay(n, currentProject);
+        return disp.type === 'act';
+      }
+      return n.type === 'act';
+    });
     if (firstAct && !links.some(l =>
       (l.source === firstAct.id && l.target === nodeId) ||
       (l.source === nodeId && l.target === firstAct.id)
@@ -997,7 +1035,7 @@ export default function BrainstormTab() {
           <div className="header-title">
             <BrainIcon className="header-icon" size={24} />
             <div>
-              <h1>Brainstorm</h1>
+              <h1>Ideias</h1>
               <span className="idea-count">{plotPoints.length + scenes.length + dialogues.length + themes.length + worldElements.length} itens extraídos</span>
             </div>
           </div>
@@ -1145,7 +1183,7 @@ export default function BrainstormTab() {
                   />
                   <div className="flex gap-2">
                     <button onClick={handleSaveRecording} className="btn-primary py-2 text-xs flex-1 justify-center rounded-lg">
-                      Salvar Brainstorm
+                        Salvar Ideias
                     </button>
                     <button onClick={() => setAudioUrl(null)} className="btn-secondary py-2 text-xs rounded-lg">
                       Descartar
@@ -1173,7 +1211,7 @@ export default function BrainstormTab() {
             </div>
             <div className="recordings-list">
               {currentProject?.recordings?.length > 0 ? (
-                currentProject.recordings.slice(0, 5).map((rec) => (
+                (currentProject?.recordings || []).slice(0, 5).map((rec) => (
                   <div key={rec.id} className="recording-item">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
