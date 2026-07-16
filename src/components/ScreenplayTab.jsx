@@ -21,7 +21,7 @@ import {
   Compass, ShieldAlert, Award, Target, Heart,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Eye, EyeOff, Filter, ListChecks, Star, Settings2, Circle, AlertTriangle,
-  Clock, GitBranch, MoveHorizontal
+  Clock, GitBranch
 } from 'lucide-react';
 import './ScreenplayTab.css';
 
@@ -379,7 +379,6 @@ export default function ScreenplayTab() {
   /* ── Print / Style panel state ── */
   const [printMode, setPrintMode] = useState(false);
   const [stylePanelOpen, setStylePanelOpen] = useState(true);
-  const [panelsSwapped, setPanelsSwapped] = useState(false);
   const [revisionFilter, setRevisionFilter] = useState({ mode: 'all', hiddenGens: [] });
 
   /* ── Page View Mode ── */
@@ -1686,13 +1685,10 @@ setActiveTab('editor');
       {/* ── Toolbar (full width, top) ── */}
       <div className="toolbar">
         <div className="toolbar-tabs">
-          <button onClick={() => { setSidebarOpen(v => !v); setStylePanelOpen(v => !v); }} className={`toolbar-tab-btn ${stylePanelOpen || sidebarOpen ? 'active' : ''}`} title="Mostrar/Esconder Painéis">
-            <Columns size={16} />
-          </button>
-          <button onClick={() => setPanelsSwapped(v => !v)} className={`toolbar-tab-btn ${panelsSwapped ? 'active' : ''}`} title="Inverter Lado dos Painéis">
-            <MoveHorizontal size={16} />
-          </button>
-          <button onClick={() => setStylePanelOpen(v => !v)} className={`toolbar-tab-btn ${stylePanelOpen ? 'active' : ''}`} title="Abrir/Fechar Revisão">
+            <button onClick={() => { setSidebarOpen(v => !v); setStylePanelOpen(v => !v); }} className={`toolbar-tab-btn ${stylePanelOpen || sidebarOpen ? 'active' : ''}`} title="Mostrar/Esconder Painéis">
+              <Columns size={16} />
+            </button>
+            <button onClick={() => setStylePanelOpen(v => !v)} className={`toolbar-tab-btn ${stylePanelOpen ? 'active' : ''}`} title="Abrir/Fechar Revisão">
             <Settings2 size={14} />
           </button>
           <button onClick={() => setSidebarOpen(v => !v)} className={`toolbar-tab-btn ${sidebarOpen ? 'active' : ''}`} title="Abrir/Fechar Sidebar">
@@ -1761,7 +1757,7 @@ setActiveTab('editor');
       <div className="main-area" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* ── Revision Panel ── */}
         {stylePanelOpen && (
-          <div className="style-panel-wrapper open" style={{ order: panelsSwapped ? 2 : 0 }}>
+          <div className="style-panel-wrapper open">
             <StylePanel
               open={true}
               onCollapse={() => setStylePanelOpen(false)}
@@ -2261,7 +2257,6 @@ setActiveTab('editor');
         onOutlinerSelect={(item) => focusBlock(item.id, 'start')}
         position={sidebarPosition}
         onPositionToggle={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
-        style={{ order: panelsSwapped ? 0 : 2 }}
       />
 
       {/* ── Autocomplete ── */}

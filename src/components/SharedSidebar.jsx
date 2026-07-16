@@ -93,7 +93,6 @@ export default function SharedSidebar({
   onOutlinerSelect,
   position = 'right',
   onPositionToggle,
-  style: outerStyle,
 }) {
   const [search, setSearch] = useState('');
   const [bsCat, setBsCat] = useState('all');
@@ -366,7 +365,7 @@ export default function SharedSidebar({
   };
 
   return (
-    <div className="reference-sidebar open" style={{ width: '320px', minWidth: '320px', borderLeft: position === 'right' ? '1px solid rgba(255,255,255,0.06)' : 'none', borderRight: position === 'left' ? '1px solid rgba(255,255,255,0.06)' : 'none', backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', ...outerStyle }}>
+    <div className="reference-sidebar open" style={{ width: '320px', minWidth: '320px', borderLeft: position === 'right' ? '1px solid rgba(255,255,255,0.06)' : 'none', borderRight: position === 'left' ? '1px solid rgba(255,255,255,0.06)' : 'none', backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="sidebar-drag-handle" />
       <div className="reference-sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
         <div className="reference-tabs" style={{ display: 'flex', gap: '1px', overflow: 'hidden', flex: 1 }}>
