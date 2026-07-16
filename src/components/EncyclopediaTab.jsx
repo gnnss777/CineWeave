@@ -151,12 +151,9 @@ export default function EncyclopediaTab() {
   return (
     <div className="encyclopedia-container" data-onboarding="encyclopedia-tab">
 
-      <div className="flex justify-between items-center px-2 mb-2">
-        <span className="text-xs text-gray-500">{totalItems} itens no total</span>
-      </div>
-
       <div className="encyclopedia-layout">
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-gray-500 whitespace-nowrap">{totalItems} itens</span>
           <div className="tab-bar flex-1" style={{ display: 'flex', flexWrap: 'wrap' }}>
             <button onClick={() => setActiveTab('characters')} className={`tab-btn text-sm ${activeTab === 'characters' ? 'active' : ''}`}>
               <BookOpen size={16} /> Personagens <span className="chip-count">{getEntityCount('characters')}</span>
