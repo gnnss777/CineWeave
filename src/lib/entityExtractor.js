@@ -178,17 +178,20 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
 
     // Fallback: scan ACTION elements for ALL-CAPS character cues
     if (el.type === 'action') {
-      if (text.length >= 2 && text === text.toUpperCase() && /^[A-ZÀ-ÿ\s.]+$/.test(text)) {
-        const upperName = text;
-        if (!seenCharNames.has(upperName) && !existingCharNames.has(upperName)) {
-          const prev = i > 0 ? screenplay[i - 1] : null;
-          const prevEmpty = !prev || !prev.text || prev.text.trim() === '';
-          const prevIsScene = prev?.type === 'scene-heading' || prev?.type === 'transition' || prev?.type === 'section';
-          if (prevEmpty || prevIsScene) {
+      const cleanAction = text.replace(/\(.*\)/, '').trim();
+      if (cleanAction.length >= 2 && cleanAction === cleanAction.toUpperCase() && /^[A-ZÀ-ÿ\s.]+$/.test(cleanAction)) {
+        const prev = i > 0 ? screenplay[i - 1] : null;
+        const prevEmpty = !prev || !prev.text || prev.text.trim() === '';
+        const prevIsScene = prev?.type === 'scene-heading' || prev?.type === 'transition' || prev?.type === 'section';
+        if (prevEmpty || prevIsScene) {
+          const upperName = cleanAction;
+          // Set currentSpeaker for subsequent dialogue detection
+          currentSpeaker = cleanAction.charAt(0).toUpperCase() + cleanAction.slice(1).toLowerCase();
+          if (!seenCharNames.has(upperName) && !existingCharNames.has(upperName)) {
             seenCharNames.add(upperName);
             const avatar = ['amber', 'green', 'blue', 'purple', 'red', 'pink'][characters.length % 6];
             characters.push(createEntity('characters', {
-              name: text.charAt(0).toUpperCase() + text.slice(1).toLowerCase(),
+              name: currentSpeaker,
               avatar,
             }));
             if (currentScene) {
@@ -196,6 +199,13 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
             }
           }
         }
+      } else if (currentSpeaker && cleanAction.length > 0 && cleanAction !== cleanAction.toUpperCase()) {
+        // Not ALL-CAPS → treat as dialogue line following a character
+        dialogues.push(createEntity('dialogues', {
+          speaker: currentSpeaker,
+          line: cleanAction,
+          context: '',
+        }));
       }
     }
   }
