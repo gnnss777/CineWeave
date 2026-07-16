@@ -376,7 +376,29 @@ export async function syncProjectToSupabase(project) {
     // 6. Sync mind map nodes + links (full replace)
     let savedNodes = [];
     if (project.mindMapNodes?.length) {
-      savedNodes = await db.saveMindMapNodes(user.id, sbProjId, project.mindMapNodes) || [];
+      // Enrich clean nodes with entity data before sync
+      const enrichedNodes = project.mindMapNodes.map(n => {
+        if (n.entityId) {
+          const entities = project.entities || {};
+          // Find entity data to fill label/type/details
+          for (const [type, list] of Object.entries(entities)) {
+            if (!Array.isArray(list)) continue;
+            const entity = list.find(e => e.id === n.entityId);
+            if (entity) {
+              const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'plot_points' ? 'plot_point' : type === 'themes' ? 'theme' : type === 'acts' ? 'act' : type;
+              return {
+                ...n,
+                label: entity.name || entity.title || entity.statement || '?',
+                type: shortType,
+                details: entity.description || entity.synopsis || entity.evidence || '',
+              };
+            }
+          }
+        }
+        // Fallback for legacy nodes without entityId
+        return { ...n, label: n.label || '?', type: n.type || 'unknown', details: n.details || '' };
+      });
+      savedNodes = await db.saveMindMapNodes(user.id, sbProjId, enrichedNodes) || [];
       // Map the generated database UUID back to local nodes' saved_id
       project.mindMapNodes.forEach((node, idx) => {
         if (savedNodes[idx]) {

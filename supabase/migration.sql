@@ -558,9 +558,14 @@ ALTER TABLE public.screenplay_elements
 -- Update project.updated_at on content change
 CREATE OR REPLACE FUNCTION public.touch_project_on_content_change()
 RETURNS TRIGGER AS $$
+DECLARE
+  pid UUID;
 BEGIN
-  UPDATE public.projects SET updated_at = NOW() WHERE id = NEW.project_id;
-  RETURN NEW;
+  pid := COALESCE(NEW.project_id, OLD.project_id);
+  IF pid IS NOT NULL THEN
+    UPDATE public.projects SET updated_at = NOW() WHERE id = pid;
+  END IF;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 
