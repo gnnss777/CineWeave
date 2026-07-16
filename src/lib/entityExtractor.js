@@ -90,17 +90,6 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
   let currentSceneChars = new Set();
   let order = 0;
 
-  const allCharacterNames = new Set();
-
-  for (let i = 0; i < screenplay.length; i++) {
-    const el = screenplay[i];
-    if (!el || !el.text) continue;
-    if (el.type === 'character') {
-      const cleanName = el.text.replace(/\(.*\)/, '').trim().toUpperCase();
-      if (cleanName) allCharacterNames.add(cleanName);
-    }
-  }
-
   for (let i = 0; i < screenplay.length; i++) {
     const el = screenplay[i];
     if (!el || !el.text) continue;
@@ -172,6 +161,29 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
       }
       if (currentScene) {
         currentSceneChars.add(upperName);
+      }
+    }
+
+    // Fallback: scan ACTION elements for ALL-CAPS character cues
+    if (el.type === 'action') {
+      if (text.length >= 2 && text === text.toUpperCase() && /^[A-ZÀ-ÿ\s.]+$/.test(text)) {
+        const upperName = text;
+        if (!seenCharNames.has(upperName) && !existingCharNames.has(upperName)) {
+          const prev = i > 0 ? screenplay[i - 1] : null;
+          const prevEmpty = !prev || !prev.text || prev.text.trim() === '';
+          const prevIsScene = prev?.type === 'scene-heading' || prev?.type === 'transition' || prev?.type === 'section';
+          if (prevEmpty || prevIsScene) {
+            seenCharNames.add(upperName);
+            const avatar = ['amber', 'green', 'blue', 'purple', 'red', 'pink'][characters.length % 6];
+            characters.push(createEntity('characters', {
+              name: text.charAt(0).toUpperCase() + text.slice(1).toLowerCase(),
+              avatar,
+            }));
+            if (currentScene) {
+              currentSceneChars.add(upperName);
+            }
+          }
+        }
       }
     }
   }

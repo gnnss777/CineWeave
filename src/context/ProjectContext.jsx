@@ -1362,6 +1362,17 @@ export const ProjectProvider = ({ children }) => {
       }
     }
 
+    // Debug: verify extracted data
+    console.log('[ImportDebug] extracted:', {
+      chars: extracted.characters.length,
+      locs: extracted.locations.length,
+      scenes: extracted.scenes.length,
+      acts: extracted.acts.length,
+    });
+    console.log('[ImportDebug] proj.entities.characters:', proj.entities.characters?.length);
+    console.log('[ImportDebug] proj.entities.scenes:', proj.entities.scenes?.length);
+    console.log('[ImportDebug] proj.characters (legacy):', proj.characters?.length);
+
     // Build linking map and link entities to screenplay
     const entityMaps = buildEntityLinkingMap(proj.entities, extracted);
     const linkedScreenplay = linkEntitiesToScreenplay(importedElements, entityMaps);

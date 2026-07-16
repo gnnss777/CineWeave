@@ -1177,22 +1177,33 @@
   justify-content: center;
   width: 88px;
   height: 88px;
-  background: linear-gradient(135deg, #ef4444, #dc2626);
   color: #fff;
   border: none;
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
 }
 
-.record-button-circle:hover:not(:disabled) {
+.record-button-circle.idle {
+  background: rgba(204, 238, 0, 0.1);
+  border: 2px solid var(--primary-gold);
+  box-shadow: 0 0 20px var(--glow-gold);
+}
+
+.record-button-circle.idle:hover:not(:disabled) {
+  background: rgba(204, 238, 0, 0.2);
   transform: scale(1.05);
-  box-shadow: 0 12px 32px rgba(239, 68, 68, 0.5);
 }
 
 .record-button-circle.recording {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
   animation: recordPulse 1.5s infinite;
+}
+
+.record-button-circle.recording:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 12px 32px rgba(239, 68, 68, 0.5);
 }
 
 .recording-timer {
@@ -2138,6 +2149,15 @@
   }
 
   .panel-items {
+    display: none;
+  }
+  .drop-zone {
+    display: none;
+  }
+  .recordings-list {
+    display: none;
+  }
+  .divider {
     display: none;
   }
 }

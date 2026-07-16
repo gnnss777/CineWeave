@@ -8,6 +8,7 @@ import { parseFiles } from '../lib/fileParser';
 import { uploadProjectFilesBatch } from '../lib/storage';
 import ConfirmModal from './ConfirmModal';
 import PromptModal from './PromptModal';
+import LottieMic from './LottieMic';
 import {
   Mic,
   MicOff,
@@ -1154,7 +1155,6 @@ export default function BrainstormTab() {
                 <button 
                   onClick={stopRecording}
                   className="record-button-circle recording pulse-record"
-                  style={{ backgroundColor: '#ef4444' }}
                   aria-label="Parar gravação"
                 >
                   <Square size={32} color="#fff" />
@@ -1195,10 +1195,9 @@ export default function BrainstormTab() {
               <>
                 <button 
                   onClick={startRecording}
-                  className="record-button-circle"
-                  style={{ backgroundColor: 'rgba(204, 238, 0, 0.1)', border: '2px solid var(--primary-gold)' }}
+                  className="record-button-circle idle"
                 >
-                  <Mic size={32} color="var(--primary-gold)" />
+                  <LottieMic isRecording={false} size={40} />
                 </button>
                 <span className="text-sm text-gray-400">Clique para iniciar</span>
               </>
@@ -1815,7 +1814,6 @@ function RecordingModal({
                 <button 
                   onClick={onStopRecording}
                   className="record-button-circle recording pulse-record"
-                  style={{ backgroundColor: '#ef4444' }}
                   aria-label="Parar gravação"
                 >
                   <Square size={32} color="#fff" />
@@ -1846,10 +1844,9 @@ function RecordingModal({
               <>
                 <button 
                   onClick={onStartRecording}
-                  className="record-button-circle"
-                  style={{ backgroundColor: 'rgba(204, 238, 0, 0.1)', border: '2px solid var(--primary-gold)' }}
+                  className="record-button-circle idle"
                 >
-                  <Mic size={32} color="var(--primary-gold)" />
+                  <LottieMic isRecording={false} size={40} />
                 </button>
                 <p className="record-hint">Clique para começar a gravar a reunião</p>
               </>
