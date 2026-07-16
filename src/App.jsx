@@ -9,6 +9,7 @@ const BrainstormTab = React.lazy(() => import('./components/BrainstormTab'));
 const MindMapTab = React.lazy(() => import('./components/MindMapTab'));
 const ScreenplayTab = React.lazy(() => import('./components/ScreenplayTab'));
 const EncyclopediaTab = React.lazy(() => import('./components/EncyclopediaTab'));
+const StoryboardTab = React.lazy(() => import('./components/StoryboardTab'));
 import InstallPrompt from './components/InstallPrompt';
 import UserMenu from './components/UserMenu';
 import OnboardingOverlay from './components/OnboardingOverlay';
@@ -16,7 +17,7 @@ import ConfirmModal from './components/ConfirmModal';
 import LoginPage from './components/LoginPage';
 import InviteModal from './components/InviteModal';
 import GuideModal from './components/GuideModal';
-import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Hash, Users, Share2, Sun, Moon, Menu } from 'lucide-react';
+import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Hash, Users, Share2, Sun, Moon, Menu, Image } from 'lucide-react';
 import TagSelector from './components/TagSelector';
 
 function HelpButton() {
@@ -129,6 +130,7 @@ function CineWeaveShell() {
       case 'screenplay': return <ScreenplayTab />;
       case 'encyclopedia': return <EncyclopediaTab />;
       case 'mindmap': return <MindMapTab />;
+      case 'storyboard': return <StoryboardTab />;
       case 'brainstorm': return <BrainstormTab key={currentProject?.id} />;
       default: return <BrainstormTab key={currentProject?.id} />;
     }
@@ -156,10 +158,13 @@ function CineWeaveShell() {
           <button onClick={() => setActiveTab('screenplay')} className={`nav-item ${activeTab === 'screenplay' ? 'active' : ''}`}>
             <FileText size={16} /> Roteiro
           </button>
-          <button onClick={() => setActiveTab('encyclopedia')} className={`nav-item ${activeTab === 'encyclopedia' ? 'active' : ''}`}>
-            <BookOpen size={16} /> Enciclopédia
-          </button>
-          <button onClick={() => setActiveTab('mindmap')} className={`nav-item ${activeTab === 'mindmap' ? 'active' : ''}`}>
+            <button onClick={() => setActiveTab('encyclopedia')} className={`nav-item ${activeTab === 'encyclopedia' ? 'active' : ''}`}>
+              <BookOpen size={16} /> EnciclopAcdia
+            </button>
+            <button onClick={() => setActiveTab('storyboard')} className={`nav-item ${activeTab === 'storyboard' ? 'active' : ''}`}>
+              <Image size={16} /> Storyboard
+            </button>
+            <button onClick={() => setActiveTab('mindmap')} className={`nav-item ${activeTab === 'mindmap' ? 'active' : ''}`}>
             <Compass size={16} /> Mapa Mental
           </button>
           <button onClick={() => setActiveTab('brainstorm')} className={`nav-item ${activeTab === 'brainstorm' ? 'active' : ''}`}>
@@ -368,6 +373,10 @@ function CineWeaveShell() {
         <button className={`mobile-nav-btn ${activeTab === 'encyclopedia' ? 'active' : ''}`} onClick={() => setActiveTab('encyclopedia')}>
           <BookOpen size={18} />
           <span>Enciclopédia</span>
+        </button>
+        <button className={`mobile-nav-btn ${activeTab === 'storyboard' ? 'active' : ''}`} onClick={() => setActiveTab('storyboard')}>
+          <Image size={18} />
+          <span>Storyboard</span>
         </button>
         <button className={`mobile-nav-btn ${activeTab === 'mindmap' ? 'active' : ''}`} onClick={() => setActiveTab('mindmap')}>
           <Compass size={18} />

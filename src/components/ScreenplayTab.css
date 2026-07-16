@@ -145,8 +145,8 @@
 }
 .format-badge {
   font-family: var(--font-ui); font-size: 8px; font-weight: 800; letter-spacing: 0.1em;
-  padding: 2px 5px; border-radius: 4px; cursor: pointer; transition: opacity 0.2s ease, background 0.15s;
-  position: absolute; left: -105px; top: 8px; width: 72px; text-align: right;
+  padding: 2px 4px; border-radius: 4px; cursor: pointer; transition: opacity 0.2s ease, background 0.15s;
+  position: absolute; left: -110px; top: 8px; width: 50px; text-align: right;
   background-color: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.08);
   z-index: 1; opacity: 0.3;
 }
@@ -200,10 +200,10 @@
 /* Scene Number Marker */
 .scene-marker {
   position: absolute;
-  left: -64px;
+  left: -60px;
   top: 6px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 900;
   color: #ccee00;
   letter-spacing: 0.02em;
@@ -218,25 +218,25 @@
   opacity: 1;
 }
 .editor-container.continuous-active .scene-marker {
-  left: -54px;
+  left: -50px;
 }
 
 /* Line Number */
 .line-number {
   position: absolute;
-  left: -42px;
+  left: -40px;
   top: 8px;
   font-family: var(--font-ui);
   font-size: 9px;
   font-weight: 600;
-  color: rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.3);
   user-select: none;
   pointer-events: none;
-  width: 24px;
-  text-align: right;
+  width: 28px;
+  text-align: left;
 }
 .editor-container.continuous-active .line-number {
-  left: -30px;
+  left: -28px;
 }
 
 /* Revision Star Marker */

@@ -511,14 +511,19 @@ export default function ScreenplayTab() {
         console.warn('[FountainImport] File upload failed (non-fatal):', uploadErr);
       }
 
-      let fountainText;
+      let imported;
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         const parsed = await parseFile(file);
-        fountainText = parsed.text;
+        const fountainText = parsed.text;
+        imported = parseFountain(fountainText);
+      } else if (file.name.toLowerCase().endsWith('.fdx')) {
+        const { parseFdx } = await import('../lib/fdxImport');
+        const xmlText = await file.text();
+        imported = parseFdx(xmlText);
       } else {
-        fountainText = await file.text();
+        const fountainText = await file.text();
+        imported = parseFountain(fountainText);
       }
-      const imported = parseFountain(fountainText);
       console.log('[FountainImport] elements:', imported.length, 'types:', imported.filter(e => e.type === 'scene-heading').length, 'scenes,', imported.filter(e => e.type === 'character').length, 'chars');
       const result = importScreenplayWithEntities(imported);
       console.log('[FountainImport] extracted entity counts:', result);
@@ -1096,7 +1101,9 @@ export default function ScreenplayTab() {
 
   const handleGripClick = (e, blockId, index) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
+    const wrapper = e.currentTarget.closest('.script-element-wrapper');
+    if (!wrapper) return;
+    const rect = wrapper.getBoundingClientRect();
     setActiveBlockMenu({ show: true, blockId, index, x: rect.left - 180, y: rect.bottom + window.scrollY });
   };
 
@@ -1794,7 +1801,8 @@ setActiveTab('editor');
           <button onClick={() => setVersionPanelOpen(v => !v)} className={`toolbar-tab-btn ${versionPanelOpen ? 'active' : ''}`} title="Painel de Versões"><Clock size={14} /></button>
           <button onClick={() => setCoverageModal(true)} className="toolbar-tab-btn" title="Análise de Roteiro"><BarChart2 size={14} /></button>
           <button onClick={() => setClassicScriptsModal(true)} className="toolbar-tab-btn" title="Importar Roteiros Clássicos"><BookOpen size={14} /></button>
-          <input ref={fountainInputRef} type="file" accept=".fountain,.txt,.pdf" onChange={handleFountainImport} style={{ display: 'none' }} />
+          <input ref={fountainInputRef} type="file"               accept=".fountain,.txt,.pdf,.fdx"
+              onChange={handleFountainImport} style={{ display: 'none' }} />
           <button onClick={() => fountainInputRef.current.click()} className="toolbar-tab-btn" title="Importar .fountain / .pdf"><Upload size={14} /></button>
           <button onClick={handleFountainExport} className="toolbar-tab-btn" title="Exportar .fountain"><Download size={14} /></button>
           <button onClick={handlePDFExport} className="toolbar-tab-btn" title="Exportar PDF"><Printer size={14} /></button>
@@ -1807,7 +1815,7 @@ setActiveTab('editor');
 
       {/* ── Page Thumbnails (always visible, fixed) ── */}
       {pageViewMode === 'continuous' && paginatedElements.totalPages > 1 && (
-        <div className="page-thumbnails-fixed" style={{ left: stylePanelOpen ? 328 : 8, top: 70 }}>
+        <div className="page-thumbnails-fixed" style={{ left: stylePanelOpen ? 328 : 8, top: 78 }}>
           {Array.from({ length: paginatedElements.totalPages }, (_, i) => i + 1).map(pageNum => (
             <div key={pageNum} className={`page-thumb ${pageNum === currentPage ? 'active' : ''}`}
               onClick={() => { setCurrentPage(pageNum); scrollToPage(pageNum); }} title={`Pagina ${pageNum}`}>

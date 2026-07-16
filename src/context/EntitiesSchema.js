@@ -118,6 +118,8 @@ export const ENTITY_TYPES = {
   },
 };
 
+export const ALL_ENTITY_TYPES = ENTITY_TYPES;
+
 // Funções utilitárias
 export function createEntity(type, overrides = {}) {
   const schema = ENTITY_TYPES[type];
@@ -144,9 +146,26 @@ export function getEntityId(type, id) {
   return schema ? schema.id.replace('{id}', id) : id;
 }
 
+export function findEntityInProject(project, entityId) {
+  if (!project?.entities || !entityId) return null;
+  for (const [type, items] of Object.entries(project.entities)) {
+    if (!Array.isArray(items)) continue;
+    const found = items.find(item => item.id === entityId);
+    if (found) return { ...found, type };
+  }
+  return null;
+}
+
 export function createEntityId(type) {
   const schema = ENTITY_TYPES[type];
   return schema ? schema.id.replace('{id}', `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`) : null;
+}
+
+export function getEntityType(entityId) {
+  if (!entityId) return null;
+  const prefix = entityId.split('-')[0];
+  const typeMap = { char: 'characters', loc: 'locations', obj: 'objects', scene: 'scenes', plot: 'plot_points', act: 'acts', storyboard: 'storyboards', frame: 'storyboard_frames', layer: 'storyboard_layers', drawing: 'drawing_elements' };
+  return typeMap[prefix] || null;
 }
 
 export function getBaseEntityId(entityId) {
