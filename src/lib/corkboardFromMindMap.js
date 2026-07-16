@@ -1,0 +1,47 @@
+import { resolveNodeDisplay } from './mindMapUtils';
+
+export function getCorkboardData(nodes, links, project) {
+  if (!nodes || !project) {
+    return { scenesByAct: [], unlinkedScenes: [], allEntityNodes: [], actNodes: [], sceneNodes: [], linkMap: {} };
+  }
+
+  const resolved = nodes.map(n => ({ node: n, display: resolveNodeDisplay(n, project) }));
+  const actNodes = resolved.filter(r => r.display.type === 'act');
+  const sceneNodes = resolved.filter(r => r.display.type === 'scene');
+  const otherNodes = resolved.filter(r => r.display.type !== 'act' && r.display.type !== 'scene');
+
+  const linkMap = {};
+  (links || []).forEach(l => {
+    if (!linkMap[l.source]) linkMap[l.source] = { out: [], in: [] };
+    if (!linkMap[l.target]) linkMap[l.target] = { out: [], in: [] };
+    linkMap[l.source].out.push(l.target);
+    linkMap[l.target].in.push(l.source);
+  });
+
+  const scenesByAct = actNodes.map(a => {
+    const linkedSceneIds = linkMap[a.node.id]?.out || [];
+    const actScenes = sceneNodes
+      .filter(s => linkedSceneIds.includes(s.node.id))
+      .sort((a, b) => (a.display.entity?.order ?? 0) - (b.display.entity?.order ?? 0));
+    return { act: a.display, scenes: actScenes };
+  });
+
+  const allActLinkedSceneIds = new Set();
+  actNodes.forEach(a => (linkMap[a.node.id]?.out || []).forEach(id => allActLinkedSceneIds.add(id)));
+  const unlinkedScenes = sceneNodes.filter(s => !allActLinkedSceneIds.has(s.node.id));
+
+  return { scenesByAct, unlinkedScenes, allEntityNodes: otherNodes, actNodes, sceneNodes, linkMap };
+}
+
+export function moveSceneToAct(links, sceneNodeId, targetActNodeId) {
+  const updatedLinks = links.filter(l => l.target !== sceneNodeId);
+  const exists = updatedLinks.some(l => l.source === targetActNodeId && l.target === sceneNodeId);
+  if (!exists) {
+    updatedLinks.push({
+      id: `l-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      source: targetActNodeId,
+      target: sceneNodeId,
+    });
+  }
+  return updatedLinks;
+}
