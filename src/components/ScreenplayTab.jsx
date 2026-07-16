@@ -391,6 +391,10 @@ export default function ScreenplayTab() {
 
   const [activeBlockMenu, setActiveBlockMenu] = useState({ show: false, blockId: '', index: 0, x: 0, y: 0 });
 
+  /* ── Drag and Drop ── */
+  const [dragIndex, setDragIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
   /* ── Simulated Plugins ── */
   const [selectedPlugin, setSelectedPlugin] = useState('linter');
   const [pluginLog, setPluginLog] = useState([]);
@@ -1096,6 +1100,48 @@ export default function ScreenplayTab() {
     setActiveBlockMenu({ show: true, blockId, index, x: rect.left - 180, y: rect.bottom + window.scrollY });
   };
 
+  const scrollToPage = (pageNum) => {
+    const item = paginatedElements.items.find(item => !item.isPageBreak && item.pageNum === pageNum);
+    if (item) focusBlock(item.id, 'start');
+  };
+
+  /* ── Drag and Drop Handlers ── */
+  const handleDragStart = (e, index) => {
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const updated = [...elements];
+    const [moved] = updated.splice(dragIndex, 1);
+    updated.splice(targetIndex, 0, moved);
+    saveScreenplay(updated);
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
   const moveBlockUp = (index) => {
     if (index === 0) return;
     const updated = [...elements];
@@ -1759,6 +1805,18 @@ setActiveTab('editor');
         </div>
       </div>
 
+      {/* ── Page Thumbnails (always visible, fixed) ── */}
+      {pageViewMode === 'continuous' && paginatedElements.totalPages > 1 && (
+        <div className="page-thumbnails-fixed" style={{ left: stylePanelOpen ? 328 : 8, top: 70 }}>
+          {Array.from({ length: paginatedElements.totalPages }, (_, i) => i + 1).map(pageNum => (
+            <div key={pageNum} className={`page-thumb ${pageNum === currentPage ? 'active' : ''}`}
+              onClick={() => { setCurrentPage(pageNum); scrollToPage(pageNum); }} title={`Pagina ${pageNum}`}>
+              {pageNum}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Main area (panels + editor) ── */}
       <div className="main-area" style={{ gridTemplateColumns: `${stylePanelOpen ? '320px' : '0px'} 1fr ${sidebarOpen ? '320px' : '0px'}` }}>
         {/* ── Revision Panel ── */}
@@ -1802,20 +1860,8 @@ setActiveTab('editor');
           {/* ── A. TEXT EDITOR ── */}
           {activeTab === 'editor' && (
             pageViewMode === 'continuous' ? (
-              <div className={`screenplay-container continuous-mode dark-paper ${printMode ? 'print-mode' : ''}`} style={{ width: '100%' }}>
-                {/* Minimap — scene navigation strip */}
-                {sceneHeadings.length > 1 && (
-                  <div className="minimap">
-                    {sceneHeadings.map((sh, i) => (
-                      <div
-                        key={sh.id}
-                        onClick={() => focusBlock(sh.id, 'start')}
-                        title={sh.text}
-                        className={`minimap-dot ${i === activeSceneIdx ? 'active' : ''}`}
-                      />
-                    ))}
-                  </div>
-                )}
+              <>
+                <div className={`screenplay-container continuous-mode dark-paper ${printMode ? 'print-mode' : ''}`} style={{ width: '100%' }}>
                 {elements.filter(el => el.type !== 'beat-metadata').length === 0 ? (
                   <div style={{ padding: '60px', textAlign: 'center', color: '#7c7c82' }}>
                     <FileText size={48} style={{ margin: '0 auto 16px auto', opacity: 0.5 }} />
@@ -1846,8 +1892,13 @@ setActiveTab('editor');
                     const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';
                     const isSearchMatch = searchQuery && searchMatches.includes(el.id);
                     return (
-                      <div key={el.id} className={`script-element-wrapper ${isSearchMatch ? 'search-match' : ''} ${isSearchMatch && searchMatches[searchMatchIdx] === el.id ? 'search-match-current' : ''}`}>
-                        <span className="format-badge">{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
+                      <div key={el.id}
+                        className={`script-element-wrapper ${isSearchMatch ? 'search-match' : ''} ${isSearchMatch && searchMatches[searchMatchIdx] === el.id ? 'search-match-current' : ''} ${dragIndex === item.originalIndex ? 'dragging' : ''} ${dragOverIndex === item.originalIndex ? 'drag-over' : ''}`}
+                        onDragOver={(e) => handleDragOver(e, item.originalIndex)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, item.originalIndex)}>
+                        <span className="format-badge" onClick={(e) => handleGripClick(e, el.id, item.originalIndex)}>{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
+                        <span className="line-number">{item.originalIndex + 1}</span>
                         {isSceneHeading && (
                           <span className="scene-marker">#{sceneNumberMap[item.originalIndex] || item.originalIndex + 1}</span>
                         )}
@@ -1884,7 +1935,7 @@ setActiveTab('editor');
                             <option value="acao">Acao</option>
                           </select>
                         </div>
-                        <div onClick={(e) => handleGripClick(e, el.id, item.originalIndex)} style={{ position: 'absolute', left: '-24px', top: '8px', cursor: 'pointer', color: '#444', fontSize: '12px', userSelect: 'none' }} title="Acoes do Bloco">⠿</div>
+                        <div className="drag-handle" draggable onDragStart={(e) => handleDragStart(e, item.originalIndex)} title="Arrastar para mover">⠿</div>
                         {(pendingAutoTypes[el.id] || el.type) === 'character' && findMatchingCharacter(el.text) && (
                           <span onClick={() => openFicha(findMatchingCharacter(el.text), 'character')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(204,238,0,0.12)', color: '#ccee00', border: '1px solid rgba(204,238,0,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
                             Ficha
@@ -1921,6 +1972,7 @@ setActiveTab('editor');
                   Ctrl+1..6 = tipo | Enter = nova linha | Alt+↑/↓ = mover | Ctrl+D = duplicar | Alt+Backspace = apagar
                 </div>
               </div>
+            </>
             ) : (
               <div className="paginated-viewport">
                 {pages.length === 0 ? (
@@ -1947,8 +1999,13 @@ setActiveTab('editor');
                           const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';
                           const isSearchMatch = searchQuery && searchMatches.includes(el.id);
                           return (
-                            <div key={el.id} className={`script-element-wrapper ${isSearchMatch ? 'search-match' : ''} ${isSearchMatch && searchMatches[searchMatchIdx] === el.id ? 'search-match-current' : ''}`}>
-                              <span className="format-badge">{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
+                            <div key={el.id}
+                              className={`script-element-wrapper ${isSearchMatch ? 'search-match' : ''} ${isSearchMatch && searchMatches[searchMatchIdx] === el.id ? 'search-match-current' : ''} ${dragIndex === origIndex ? 'dragging' : ''} ${dragOverIndex === origIndex ? 'drag-over' : ''}`}
+                              onDragOver={(e) => handleDragOver(e, origIndex)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, origIndex)}>
+                        <span className="format-badge" onClick={(e) => handleGripClick(e, el.id, origIndex)}>{getTypeLabel(pendingAutoTypes[el.id] || el.type)}</span>
+                              <span className="line-number">{origIndex + 1}</span>
                               {isSceneHeading && (
                                 <span className="scene-marker">#{sceneNumberMap[origIndex] || origIndex + 1}</span>
                               )}
@@ -1985,7 +2042,7 @@ setActiveTab('editor');
                                   <option value="acao">Acao</option>
                                 </select>
                               </div>
-                              <div onClick={(e) => handleGripClick(e, el.id, origIndex)} style={{ position: 'absolute', left: '-24px', top: '8px', cursor: 'pointer', color: '#444', fontSize: '12px', userSelect: 'none' }} title="Acoes do Bloco">⠿</div>
+                              <div className="drag-handle" draggable onDragStart={(e) => handleDragStart(e, origIndex)} title="Arrastar para mover">⠿</div>
                               {(pendingAutoTypes[el.id] || el.type) === 'character' && findMatchingCharacter(el.text) && (
                                 <span onClick={() => openFicha(findMatchingCharacter(el.text), 'character')} style={{ position: 'absolute', right: '16px', top: '8px', background: 'rgba(204,238,0,0.12)', color: '#ccee00', border: '1px solid rgba(204,238,0,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>Ficha</span>
                               )}
@@ -2259,15 +2316,31 @@ setActiveTab('editor');
 
       {/* ── Block Menu ── */}
       {activeBlockMenu.show && (
-        <div className="block-menu-dropdown" style={{ position: 'absolute', left: `${activeBlockMenu.x}px`, top: `${activeBlockMenu.y}px`, background: '#0a0a0d', border: '1px solid #1d1d24', borderRadius: '6px', padding: '4px', zIndex: 'var(--z-tooltip)', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 8px 16px rgba(0,0,0,0.5)', width: '180px' }} onClick={(e) => e.stopPropagation()}>
-          <div onClick={() => moveBlockUp(activeBlockMenu.index)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><span>Mover para Cima</span></div>
-          <div onClick={() => moveBlockDown(activeBlockMenu.index)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><span>Mover para Baixo</span></div>
-          <div onClick={() => duplicateBlock(activeBlockMenu.index)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><span>Duplicar Bloco</span></div>
-          <div onClick={() => deleteBlock(activeBlockMenu.index)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', color: '#ef4444' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,0,0,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><span>Excluir Bloco</span></div>
-          <div style={{ borderBottom: '1px solid #141419', margin: '4px 0' }} />
-          <div style={{ padding: '2px 12px', fontSize: '8px', color: '#7c7c82', fontWeight: 'bold' }}>CONVERTER PARA...</div>
+        <div className="block-menu-dropdown" style={{ position: 'absolute', left: `${activeBlockMenu.x}px`, top: `${activeBlockMenu.y}px`, zIndex: 'var(--z-tooltip)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="block-menu-section-label">MOVIMENTO</div>
+          <div className="block-menu-item" onClick={() => moveBlockUp(activeBlockMenu.index)}>
+            <span className="block-menu-item-text"><ChevronUp size={12} /> Mover para Cima</span>
+            <span className="block-menu-shortcut">Alt+↑</span>
+          </div>
+          <div className="block-menu-item" onClick={() => moveBlockDown(activeBlockMenu.index)}>
+            <span className="block-menu-item-text"><ChevronDown size={12} /> Mover para Baixo</span>
+            <span className="block-menu-shortcut">Alt+↓</span>
+          </div>
+          <div className="block-menu-divider" />
+          <div className="block-menu-section-label">ACOES</div>
+          <div className="block-menu-item" onClick={() => duplicateBlock(activeBlockMenu.index)}>
+            <span className="block-menu-item-text">Duplicar Bloco</span>
+            <span className="block-menu-shortcut">Ctrl+D</span>
+          </div>
+          <div className="block-menu-item danger" onClick={() => deleteBlock(activeBlockMenu.index)}>
+            <span className="block-menu-item-text"><Trash2 size={12} /> Excluir Bloco</span>
+          </div>
+          <div className="block-menu-divider" />
+          <div className="block-menu-section-label">CONVERTER PARA</div>
           {['scene-heading', 'action', 'character', 'parenthetical', 'dialogue', 'transition'].map(t => (
-            <div key={t} onClick={() => changeBlockType(activeBlockMenu.index, t)} style={{ padding: '6px 12px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', textTransform: 'capitalize' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>{getTypeLabel(t)}</div>
+            <div key={t} className="block-menu-item" onClick={() => changeBlockType(activeBlockMenu.index, t)}>
+              {getTypeLabel(t)}
+            </div>
           ))}
         </div>
       )}

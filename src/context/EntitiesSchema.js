@@ -1,31 +1,23 @@
-/**
- * EntitiesSchema.js — Schema canônico de entidades narrativas
- * FASE 0.1: Estrutura de dados centralizada para CineWeave
- * 
- * Todas as entidades narrativas (personagens, locações, cenas, etc.)
- * vivem em project.entities. O schema abaixo define a forma canônica
- * de cada tipo, usada tanto para validação quanto para criação.
- */
+// Estrutura canônica de cada tipo de entidade
 
-// Valores padrão por tipo de entidade
-export const ENTITY_DEFAULTS = {
+export const ENTITY_TYPES = {
   characters: {
-    id: '',
+    id: 'char-{id}',
     name: '',
-    role: 'Coadjuvante',
+    role: 'Coadjuvante',       // Protagonista, Antagonista, Aliado, Mentor, Coadjuvante
     description: '',
-    traits: [],
+    traits: [],                 // array de strings
     backstory: '',
-    avatar: 'amber',
+    avatar: 'amber',            // cor do avatar
     notes: '',
-    relationships: [],
+    relationships: [],          // [{ targetId: 'char-2', type: 'aliado', intensity: 5 }]
     createdAt: 0,
     updatedAt: 0,
   },
   locations: {
-    id: '',
+    id: 'loc-{id}',
     name: '',
-    type: 'INT.',
+    type: 'INT.',               // INT., EXT., INT./EXT.
     description: '',
     timeOfDay: 'DIA',
     mood: '',
@@ -34,7 +26,7 @@ export const ENTITY_DEFAULTS = {
     updatedAt: 0,
   },
   objects: {
-    id: '',
+    id: 'obj-{id}',
     name: '',
     description: '',
     significance: '',
@@ -43,54 +35,35 @@ export const ENTITY_DEFAULTS = {
     updatedAt: 0,
   },
   scenes: {
-    id: '',
+    id: 'scene-{id}',
     title: '',
     synopsis: '',
-    actId: null,
-    characterIds: [],
-    order: 0,
-    status: 'draft',
+    actId: null,                // ref para entities.acts[].id
+    characterIds: [],           // refs para entities.characters[].id
+    order: 0,                   // posição na timeline
+    status: 'draft',            // draft, written, revised, final
     createdAt: 0,
     updatedAt: 0,
   },
   plot_points: {
-    id: '',
+    id: 'plot-{id}',
     title: '',
     description: '',
     actId: null,
-    tags: [],
-    createdAt: 0,
-    updatedAt: 0,
-  },
-  dialogues: {
-    id: '',
-    speaker: '',
-    line: '',
-    context: '',
-    tags: [],
-    sceneId: null,
-    createdAt: 0,
-    updatedAt: 0,
-  },
-  world_elements: {
-    id: '',
-    name: '',
-    type: 'setting',
-    description: '',
     tags: [],
     createdAt: 0,
     updatedAt: 0,
   },
   themes: {
-    id: '',
+    id: 'theme-{id}',
     statement: '',
     evidence: '',
-    relevance: 'Central',
+    relevance: 'Central',       // Central, Secundário, Menor
     createdAt: 0,
     updatedAt: 0,
   },
   acts: {
-    id: '',
+    id: 'act-{id}',
     name: '',
     order: 0,
     description: '',
@@ -98,93 +71,84 @@ export const ENTITY_DEFAULTS = {
     createdAt: 0,
     updatedAt: 0,
   },
+  storyboards: {
+    id: 'storyboard-{id}',
+    name: '',
+    description: '',
+    project_id: null,
+    created_at: 0,
+    updated_at: 0,
+  },
+  storyboard_frames: {
+    id: 'frame-{id}',
+    storyboard_id: 'storyboard-{storyboard_id}',
+    scene_id: null, // ref para entities.scenes[].id
+    order: 0,
+    width: 1920,
+    height: 1080,
+    preview_url: null,
+    exported_at: 0,
+    created_at: 0,
+    updated_at: 0,
+  },
+  storyboard_layers: {
+    id: 'layer-{id}',
+    storyboard_id: 'storyboard-{storyboard_id}',
+    frame_id: 'frame-{frame_id}',
+    name: '',
+    type: 'drawing', // drawing, text, image, background
+    opacity: 100,
+    visible: true,
+    locked: false,
+    blend_mode: 'source-over',
+    data: {},
+    created_at: 0,
+    updated_at: 0,
+  },
+  drawing_elements: {
+    id: 'drawing-{id}',
+    layer_id: 'layer-{layer_id}',
+    type: 'path', // path, rect, circle, text, image
+    data: {},
+    width: 1920,
+    height: 1080,
+    exported_at: 0,
+    created_at: 0,
+    updated_at: 0,
+  },
 };
 
-// Tipos válidos de entidades
-export const ENTITY_TYPES = Object.keys(ENTITY_DEFAULTS);
-
-// Roles válidos para personagens
-export const VALID_ROLES = [
-  'Protagonista', 'Antagonista', 'Aliado', 'Aliada',
-  'Mentor', 'Mentora', 'Coadjuvante', 'Figurante',
-  'Interest', 'Antagonista Secundário',
-];
-
-// Cores de avatar válidas
-export const AVATAR_COLORS = ['amber', 'green', 'blue', 'purple', 'red', 'pink'];
-
-// Status de cena
-export const SCENE_STATUS = ['draft', 'written', 'revised', 'final'];
-
-/**
- * Cria uma entidade com valores padrão mesclados
- */
+// Funções utilitárias
 export function createEntity(type, overrides = {}) {
-  const defaults = ENTITY_DEFAULTS[type];
-  if (!defaults) throw new Error(`Tipo de entidade inválido: ${type}`);
-  
+  const schema = ENTITY_TYPES[type];
+  if (!schema) {
+    console.error(`Unknown entity type: ${type}`);
+    return null;
+  }
+
   const now = Date.now();
   return {
-    ...defaults,
+    ...schema,
     ...overrides,
-    id: overrides.id || `${type.slice(0, -1)}-${now}`,
     createdAt: overrides.createdAt || now,
-    updatedAt: now,
+    updatedAt: overrides.updatedAt || now,
   };
 }
 
-/**
- * Valida uma entidade contra seu schema
- */
-export function validateEntity(entity, type) {
-  const defaults = ENTITY_DEFAULTS[type];
-  if (!defaults) return ['Tipo inválido'];
-
-  const errors = [];
-  
-  if (!entity.id) errors.push('ID é obrigatório');
-  if (type === 'characters' && !entity.name?.trim()) errors.push('Nome é obrigatório');
-  if (type === 'locations' && !entity.name?.trim()) errors.push('Nome é obrigatório');
-  if (type === 'scenes' && !entity.title?.trim()) errors.push('Título é obrigatório');
-  if (type === 'acts' && !entity.name?.trim()) errors.push('Nome do ato é obrigatório');
-  if (type === 'plot_points' && !entity.title?.trim()) errors.push('Título é obrigatório');
-  if (type === 'themes' && !entity.statement?.trim()) errors.push('Frase-tema é obrigatória');
-  if (type === 'dialogues' && !entity.speaker?.trim()) errors.push('Speaker é obrigatório');
-  if (type === 'world_elements' && !entity.name?.trim()) errors.push('Nome é obrigatório');
-  
-  if (type === 'characters' && entity.role && !VALID_ROLES.includes(entity.role)) {
-    errors.push(`Role inválida: ${entity.role}. Válidas: ${VALID_ROLES.join(', ')}`);
-  }
-
-  return errors;
+export function isValidEntityType(type) {
+  return type in ENTITY_TYPES;
 }
 
-// Alias para compatibilidade
-export const ALL_ENTITY_TYPES = ENTITY_TYPES;
-
-/**
- * Busca uma entidade por ID em todas as listas do projeto
- */
-export function findEntityInProject(project, entityId) {
-  if (!project || !entityId) return null;
-
-  const entities = project.entities || {};
-  for (const type of ENTITY_TYPES) {
-    const list = entities[type];
-    if (Array.isArray(list)) {
-      const found = list.find(e => e.id === entityId);
-      if (found) return { type, data: found };
-    }
-  }
-
-  return null;
+export function getEntityId(type, id) {
+  const schema = ENTITY_TYPES[type];
+  return schema ? schema.id.replace('{id}', id) : id;
 }
 
-/**
- * Retorna o tipo plural de entidade a partir de um identificador
- */
-export function getEntityType(type) {
-  if (!type) return null;
-  const singular = type.endsWith('s') ? type : `${type}s`;
-  return ENTITY_TYPES.includes(singular) ? singular : null;
+export function createEntityId(type) {
+  const schema = ENTITY_TYPES[type];
+  return schema ? schema.id.replace('{id}', `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`) : null;
+}
+
+export function getBaseEntityId(entityId) {
+  return entityId?.replace(/storyboard-|frame-|layer-|drawing-/g, '') || null;
 }

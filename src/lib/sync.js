@@ -374,6 +374,7 @@ export async function syncProjectToSupabase(project) {
     await db.saveScreenplayElements(user.id, sbProjId, project.screenplay || []);
 
     // 6. Sync mind map nodes + links (full replace)
+    const validNodeTypes = ['act', 'scene', 'character', 'location', 'object'];
     let savedNodes = [];
     if (project.mindMapNodes?.length) {
       // Enrich clean nodes with entity data before sync
@@ -385,7 +386,8 @@ export async function syncProjectToSupabase(project) {
             if (!Array.isArray(list)) continue;
             const entity = list.find(e => e.id === n.entityId);
             if (entity) {
-              const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'plot_points' ? 'plot_point' : type === 'dialogues' ? 'dialogue' : type === 'world_elements' ? 'world_element' : type === 'themes' ? 'theme' : type === 'acts' ? 'act' : type;
+              const shortType = type === 'characters' ? 'character' : type === 'locations' ? 'location' : type === 'objects' ? 'object' : type === 'scenes' ? 'scene' : type === 'acts' ? 'act' : null;
+              if (!shortType || !validNodeTypes.includes(shortType)) return null;
               return {
                 ...n,
                 label: entity.name || entity.title || entity.statement || '?',
@@ -395,9 +397,10 @@ export async function syncProjectToSupabase(project) {
             }
           }
         }
-        // Fallback for legacy nodes without entityId
-        return { ...n, label: n.label || '?', type: n.type || 'unknown', details: n.details || '' };
-      });
+        // Fallback for legacy nodes without entityId or not found
+        const fallbackType = n.type && validNodeTypes.includes(n.type) ? n.type : 'scene';
+        return { ...n, label: n.label || '?', type: fallbackType, details: n.details || '' };
+      }).filter(Boolean);
       savedNodes = await db.saveMindMapNodes(user.id, sbProjId, enrichedNodes) || [];
       // Map the generated database UUID back to local nodes' saved_id
       project.mindMapNodes.forEach((node, idx) => {

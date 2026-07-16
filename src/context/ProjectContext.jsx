@@ -1412,6 +1412,7 @@ export const ProjectProvider = ({ children }) => {
       proj.mindMapNodes.push({
         id: nodeId,
         entityId: id,
+        type,
         x: Math.round(nodeX),
         y: Math.round(nodeY),
       });
