@@ -1321,6 +1321,31 @@ export const ProjectProvider = ({ children }) => {
       }
     }
 
+    // 5b. MERGE DIALOGUES
+    for (const item of extracted.dialogues || []) {
+      if (!item.speaker || !item.line) continue;
+      if (!proj.entities.dialogues) proj.entities.dialogues = [];
+      proj.entities.dialogues.push({
+        ...item,
+        id: item.id || genId('dlg'),
+        createdAt: Date.now(), updatedAt: Date.now(),
+      });
+    }
+
+    // 5c. MERGE THEMES
+    for (const item of extracted.themes || []) {
+      if (!item.statement) continue;
+      if (!proj.entities.themes) proj.entities.themes = [];
+      const exists = proj.entities.themes.find(t => t.statement === item.statement);
+      if (!exists) {
+        proj.entities.themes.push({
+          ...item,
+          id: item.id || genId('theme'),
+          createdAt: Date.now(), updatedAt: Date.now(),
+        });
+      }
+    }
+
     // 6. CREATE MIND MAP NODES for new entities
     if (!proj.mindMapNodes) proj.mindMapNodes = [];
     const firstActNode = proj.mindMapNodes.find(n => {
@@ -1368,10 +1393,13 @@ export const ProjectProvider = ({ children }) => {
       locs: extracted.locations.length,
       scenes: extracted.scenes.length,
       acts: extracted.acts.length,
+      objects: extracted.objects.length,
+      dialogues: extracted.dialogues.length,
+      themes: extracted.themes.length,
     });
     console.log('[ImportDebug] proj.entities.characters:', proj.entities.characters?.length);
     console.log('[ImportDebug] proj.entities.scenes:', proj.entities.scenes?.length);
-    console.log('[ImportDebug] proj.characters (legacy):', proj.characters?.length);
+    console.log('[ImportDebug] proj.entities.dialogues:', proj.entities.dialogues?.length);
 
     // Build linking map and link entities to screenplay
     const entityMaps = buildEntityLinkingMap(proj.entities, extracted);
@@ -1387,6 +1415,8 @@ export const ProjectProvider = ({ children }) => {
       locations: extracted.locations.length,
       scenes: extracted.scenes.length,
       acts: extracted.acts.length,
+      dialogues: extracted.dialogues.length,
+      themes: extracted.themes.length,
     };
   };
 

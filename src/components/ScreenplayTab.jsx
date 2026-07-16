@@ -517,6 +517,8 @@ export default function ScreenplayTab() {
       console.log('[FountainImport] element types:', imported.map(el => `${el.type}: "${el.text?.slice(0, 60)}"`));
       const result = importScreenplayWithEntities(imported);
       console.log('[FountainImport] extracted entity counts:', result);
+      // Force editor to show the imported screenplay
+      setElements(imported);
 
       // Save screenplay import record
       try {
@@ -540,6 +542,7 @@ export default function ScreenplayTab() {
       if (result?.locations) lines.push(`• ${result.locations} locação(ões)`);
       if (result?.scenes) lines.push(`• ${result.scenes} cena(s)`);
       if (result?.acts) lines.push(`• ${result.acts} ato(s)`);
+      if (result?.dialogues) lines.push(`• ${result.dialogues} diálogo(s)`);
       const fountainSummary = lines.length > 0
         ? `Foram criadas automaticamente:\n\n${lines.join('\n')}`
         : 'Roteiro importado. Elementos foram parseados e estão prontos para edição.';

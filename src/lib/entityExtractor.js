@@ -67,6 +67,8 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
   const scenes = [];
   const acts = [];
   const objects = [];
+  const dialogues = [];
+  const themes = [];
 
   const existingCharNames = new Set(
     (existingEntities.characters || []).map(c => c.name.toUpperCase())
@@ -89,6 +91,7 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
   let currentScene = null;
   let currentSceneChars = new Set();
   let order = 0;
+  let currentSpeaker = null;
 
   for (let i = 0; i < screenplay.length; i++) {
     const el = screenplay[i];
@@ -151,6 +154,7 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
     if (el.type === 'character') {
       const cleanName = text.replace(/\(.*\)/, '').trim();
       const upperName = cleanName.toUpperCase();
+      currentSpeaker = cleanName;
       if (upperName && !seenCharNames.has(upperName) && !existingCharNames.has(upperName)) {
         seenCharNames.add(upperName);
         const avatar = ['amber', 'green', 'blue', 'purple', 'red', 'pink'][characters.length % 6];
@@ -162,6 +166,14 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
       if (currentScene) {
         currentSceneChars.add(upperName);
       }
+    }
+
+    if (el.type === 'dialogue' && currentSpeaker) {
+      dialogues.push(createEntity('dialogues', {
+        speaker: currentSpeaker,
+        line: text,
+        context: '',
+      }));
     }
 
     // Fallback: scan ACTION elements for ALL-CAPS character cues
@@ -198,7 +210,7 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
     scenes.push(currentScene);
   }
 
-  return { characters, locations, objects, scenes, acts };
+  return { characters, locations, objects, scenes, acts, dialogues, themes };
 }
 
 function removeAccents(str) {
