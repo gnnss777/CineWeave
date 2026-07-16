@@ -3,7 +3,6 @@ import { useProject } from '../context/ProjectContext';
 import { useEntities } from '../context/useEntities';
 import FichaModal from './FichaModal';
 import ConfirmModal from './ConfirmModal';
-import { resolveNodeDisplay } from '../lib/mindMapUtils';
 import { getCorkboardData, moveSceneToAct } from '../lib/corkboardFromMindMap';
 import './CorkboardTab.css';
 import { ExternalLink, FileText, User, MapPin, Target, Heart, Plus, MessageSquare, Globe, Layers, Film } from 'lucide-react';
@@ -18,7 +17,7 @@ export default function CorkboardTab() {
 
   const nodes = currentProject?.mindMapNodes || [];
   const links = currentProject?.mindMapLinks || [];
-  const { scenesByAct, unlinkedScenes, allEntityNodes, linkMap } = getCorkboardData(nodes, links, currentProject);
+  const { scenesByAct, unlinkedScenes } = getCorkboardData(nodes, links, currentProject);
 
   const handleDragStart = (e, sceneId) => {
     e.dataTransfer.setData('text/plain', sceneId);
@@ -169,7 +168,7 @@ export default function CorkboardTab() {
                 {section.items.length === 0 ? (
                   <p style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic', textAlign: 'center', padding: '8px 0' }}>{section.emptyText}</p>
                 ) : (
-                  {section.items.slice(0, 5).map(item => {
+                  section.items.slice(0, 5).map(item => {
                     const hasNode = nodes.some(n => n.entityId === item.id);
                     return (
                       <div key={item.id}
