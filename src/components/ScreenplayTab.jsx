@@ -1760,7 +1760,7 @@ setActiveTab('editor');
       {/* ── Main area (panels + editor) ── */}
       <div className="main-area" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* ── Revision Panel ── */}
-        {activeTab === 'editor' && stylePanelOpen && (
+        {stylePanelOpen && (
           <div className="style-panel-wrapper open" style={{ order: panelsSwapped ? 2 : 0 }}>
             <StylePanel
               open={true}
