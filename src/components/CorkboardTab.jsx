@@ -202,7 +202,7 @@ export default function CorkboardTab() {
                         )}
                       </div>
                     );
-                  })}
+                  })
                 )}
                 {section.items.length > 5 && (
                   <p style={{ fontSize: '10px', color: '#6b7280', textAlign: 'center', marginTop: '4px' }}>+{section.items.length - 5} mais</p>

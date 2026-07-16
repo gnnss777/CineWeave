@@ -482,12 +482,14 @@ export default function ScreenplayTab() {
       const importType = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'fountain';
       try {
         const { getCurrentUser } = await import('../lib/supabase');
+        const { getSupabaseId } = await import('../lib/sync');
         const user = await getCurrentUser();
         if (user && currentProject?.id) {
-          const uploadResult = await uploadProjectFile(currentProject.id, user.id, file, 'screenplay');
+          const sbProjId = getSupabaseId(currentProject.id, 'projects') || currentProject.id;
+          const uploadResult = await uploadProjectFile(sbProjId, user.id, file, 'screenplay');
           if (uploadResult) {
             // Save project_files record in DB
-            const savedFile = await db.saveProjectFile(user.id, currentProject.id, {
+            const savedFile = await db.saveProjectFile(user.id, sbProjId, {
               ...uploadResult,
               source: 'screenplay',
             });
@@ -513,21 +515,20 @@ export default function ScreenplayTab() {
         fountainText = await file.text();
       }
       const imported = parseFountain(fountainText);
-      console.log('[FountainImport] elements:', imported);
-      console.log('[FountainImport] element types:', imported.map(el => `${el.type}: "${el.text?.slice(0, 60)}"`));
-      alert(`DEBUG: ${imported.length} elementos parseados (${imported.filter(e => e.type === 'scene-heading').length} cenas, ${imported.filter(e => e.type === 'character').length} personagens)`);
+      console.log('[FountainImport] elements:', imported.length, 'types:', imported.filter(e => e.type === 'scene-heading').length, 'scenes,', imported.filter(e => e.type === 'character').length, 'chars');
       const result = importScreenplayWithEntities(imported);
       console.log('[FountainImport] extracted entity counts:', result);
-      alert(`DEBUG: Extração concluída: ${JSON.stringify(result)}`);
       // Force editor to show the imported screenplay
       setElements(imported);
 
       // Save screenplay import record
       try {
         const { getCurrentUser } = await import('../lib/supabase');
+        const { getSupabaseId } = await import('../lib/sync');
         const user = await getCurrentUser();
         if (user && currentProject?.id) {
-          await db.saveScreenplayImport(user.id, currentProject.id, {
+          const sbProjId = getSupabaseId(currentProject.id, 'projects') || currentProject.id;
+          await db.saveScreenplayImport(user.id, sbProjId, {
             fileId: fileStorageRecord?.id || null,
             originalFilename: file.name,
             importType,

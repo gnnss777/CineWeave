@@ -463,6 +463,19 @@ export async function syncProjectToSupabase(project) {
       }
     }
 
+    // 12. Sync screenplay imports
+    if (Array.isArray(project.screenplayImports)) {
+      for (const si of project.screenplayImports) {
+        if (si._sbSynced) continue;
+        try {
+          const saved = await db.saveScreenplayImport(user.id, sbProjId, si);
+          if (saved) si._sbSynced = true;
+        } catch (err) {
+          console.warn('[Supabase sync] Failed to sync screenplay import:', err);
+        }
+      }
+    }
+
   } catch (err) {
     console.error('[Supabase sync] Error:', err);
   }
