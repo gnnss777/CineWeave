@@ -692,6 +692,7 @@ export default function MindMapTab() {
       })()}
 
       {/* SVG Drawing Canvas */}
+      {viewMode === 'canvas' && (
       <svg
         ref={svgRef}
         className={`mindmap-canvas canvas-svg ${linkSourceId ? 'linking-active' : ''} ${isPlacingNode ? 'placing-node' : ''}`}
@@ -1025,6 +1026,12 @@ export default function MindMapTab() {
           )}
         </g>
       </svg>
+      )}
+      {viewMode === 'corkboard' && (
+        <div className="mindmap-corkboard-view" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          <CorkboardTab />
+        </div>
+      )}
 
       {/* Floating Canvas Action buttons */}
       <div className="canvas-controls">
@@ -1046,6 +1053,10 @@ export default function MindMapTab() {
         </button>
         <button onClick={() => setShowHistoryModal(true)} className="canvas-btn accent" title="Histórico de Versões">
           <Clock size={18} />
+        </button>
+        <div className="canvas-btn-divider" />
+        <button onClick={() => setViewMode(prev => prev === 'canvas' ? 'corkboard' : 'canvas')} className="canvas-btn accent" title={viewMode === 'canvas' ? 'Visualizar Mural' : 'Visualizar Mapa'}>
+          <Columns size={18} />
         </button>
       </div>
 
@@ -1238,19 +1249,6 @@ export default function MindMapTab() {
 
       {confirmModal && <ConfirmModal {...confirmModal} />}
       {promptModal && <PromptModal {...promptModal} />}
-      <SharedSidebar
-        currentProject={currentProject}
-        activeTab={sharedSidebarTab}
-        onTabChange={setSharedSidebarTab}
-        open={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onEdit={(item, type, mode) => openFicha(item, type, mode)}
-        onNavigateToMindMap={(id) => navigateTo('mindmap', id)}
-        onNavigateToEncyclopedia={(id) => navigateTo('encyclopedia', id)}
-        onSelectItem={(item, type) => openFicha(item, type)}
-        tabContext="mindmap"
-        data-onboarding="mindmap-sidebar"
-      />
     </div>
   );
 }
