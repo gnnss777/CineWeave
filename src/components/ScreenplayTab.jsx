@@ -63,9 +63,11 @@ function StylePanel({
           <Settings2 size={14} />
           <span>Revisão</span>
         </div>
-        <button className="style-panel-collapse" onClick={onCollapse} title="Recolher painel">
-          <ChevronRight size={14} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button className="style-panel-collapse" onClick={onCollapse} title="Fechar painel">
+            <X size={12} />
+          </button>
+        </div>
       </div>
 
       <div className="style-panel-section">
@@ -1682,39 +1684,28 @@ setActiveTab('editor');
       })()}
 
       {/* ── Revision Panel (flex sibling) ── */}
-      {activeTab === 'editor' && (
-        stylePanelOpen ? (
-          <div className="style-panel-wrapper open" style={{ order: panelsSwapped ? 2 : 0 }}>
-            <StylePanel
-              open={true}
-              onCollapse={() => setStylePanelOpen(false)}
-              revisionFilter={revisionFilter}
-              setRevisionFilter={setRevisionFilter}
-              revisionMode={revisionMode}
-              setRevisionMode={setRevisionMode}
-              revisionGeneration={revisionGeneration}
-              setRevisionGeneration={setRevisionGeneration}
-              revisionCount={revisionItems.length}
-              revisionGroups={revisionGroups}
-              visibleCount={visibleRevisionCount}
-              revisions={revisions}
-              focusBlock={focusBlock}
-              toggleRevision={(id) => {
-                setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-              }}
-              clearAllRevisions={() => setRevisions([])}
-            />
-          </div>
-        ) : (
-          <button
-            className="style-panel-toggle-pill"
-            onClick={() => setStylePanelOpen(true)}
-            title="Abrir Revisão"
-            style={{ position: 'relative', order: panelsSwapped ? 2 : 0, flexShrink: 0, alignSelf: 'center' }}
-          >
-            <Settings2 size={16} />
-          </button>
-        )
+      {activeTab === 'editor' && stylePanelOpen && (
+        <div className="style-panel-wrapper open" style={{ order: panelsSwapped ? 2 : 0 }}>
+          <StylePanel
+            open={true}
+            onCollapse={() => setStylePanelOpen(false)}
+            revisionFilter={revisionFilter}
+            setRevisionFilter={setRevisionFilter}
+            revisionMode={revisionMode}
+            setRevisionMode={setRevisionMode}
+            revisionGeneration={revisionGeneration}
+            setRevisionGeneration={setRevisionGeneration}
+            revisionCount={revisionItems.length}
+            revisionGroups={revisionGroups}
+            visibleCount={visibleRevisionCount}
+            revisions={revisions}
+            focusBlock={focusBlock}
+            toggleRevision={(id) => {
+              setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+            }}
+            clearAllRevisions={() => setRevisions([])}
+          />
+        </div>
       )}
 
       {/* ── Main workspace ── */}
@@ -1726,6 +1717,12 @@ setActiveTab('editor');
             </button>
             <button onClick={() => setPanelsSwapped(v => !v)} className={`toolbar-tab-btn ${panelsSwapped ? 'active' : ''}`} title="Inverter Lado dos Painéis">
               <MoveHorizontal size={16} />
+            </button>
+            <button onClick={() => setStylePanelOpen(v => !v)} className={`toolbar-tab-btn ${stylePanelOpen ? 'active' : ''}`} title="Abrir/Fechar Revisão">
+              <Settings2 size={14} />
+            </button>
+            <button onClick={() => setSidebarOpen(v => !v)} className={`toolbar-tab-btn ${sidebarOpen ? 'active' : ''}`} title="Abrir/Fechar Sidebar">
+              <Columns size={14} />
             </button>
             <div className="toolbar-tabs">
               <button onClick={() => setActiveTab('editor')} className={`toolbar-tab-btn ${activeTab === 'editor' ? 'active' : ''}`}><Edit3 size={14} /><span>Editor</span></button>

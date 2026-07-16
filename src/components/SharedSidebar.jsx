@@ -184,13 +184,7 @@ export default function SharedSidebar({
   }, [currentProject?.screenplay, outlinerData]);
 
   if (!open) {
-    return (
-      <div className="reference-sidebar-toggle" style={{ position: 'absolute', [position === 'left' ? 'left' : 'right']: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
-        <button onClick={onToggle} className={`btn-secondary py-2 px-1 text-xs ${position === 'left' ? 'rounded-r-lg rounded-l-none' : 'rounded-l-lg rounded-r-none'}`} title="Abrir painel">
-          <Compass size={16} />
-        </button>
-      </div>
-    );
+    return null;
   }
 
   const listItems = () => {
