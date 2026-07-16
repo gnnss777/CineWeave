@@ -127,20 +127,26 @@ import './BrainstormTab.css';
 const CATEGORIES = [
   { id: 'all', label: 'Todas', icon: Sparkle, color: 'var(--primary-gold)', bg: 'rgba(204, 238, 0, 0.15)' },
   { id: 'characters', label: 'Personagem', icon: User, color: 'var(--color-character)', bg: 'rgba(245, 158, 11, 0.15)' },
+  { id: 'locations', label: 'Locação', icon: MapPin, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
+  { id: 'objects', label: 'Objeto', icon: Gem, color: '#d97706', bg: 'rgba(251, 191, 36, 0.15)' },
+  { id: 'scenes', label: 'Cena', icon: FilmIcon, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' },
   { id: 'plot_points', label: 'Enredo', icon: TargetIcon2, color: 'var(--primary-gold)', bg: 'rgba(204, 238, 0, 0.15)' },
-  { id: 'scenes', label: 'Cena', icon: FilmIcon, color: 'var(--color-act)', bg: 'rgba(59, 130, 246, 0.15)' },
-  { id: 'dialogues', label: 'Diálogo', icon: MessageSquareIcon, color: 'var(--color-object)', bg: 'rgba(239, 68, 68, 0.15)' },
-  { id: 'world_elements', label: 'Mundo', icon: GlobeIcon, color: 'var(--color-location)', bg: 'rgba(16, 185, 129, 0.15)' },
+  { id: 'dialogues', label: 'Diálogo', icon: MessageSquareIcon, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+  { id: 'world_elements', label: 'Mundo', icon: GlobeIcon, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
   { id: 'themes', label: 'Tema', icon: HeartIcon4, color: '#ec4899', bg: 'rgba(236, 72, 153, 0.15)' },
+  { id: 'acts', label: 'Ato', icon: Layers, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)' },
 ];
 
 const CATEGORY_ICONS = {
   characters: User,
+  locations: MapPin,
+  objects: Gem,
   plot_points: TargetIcon2,
   scenes: FilmIcon,
   dialogues: MessageSquareIcon,
   world_elements: GlobeIcon,
   themes: HeartIcon4,
+  acts: Layers,
 };
 
 const FILE_TYPE_ICONS = {
@@ -179,7 +185,7 @@ export default function BrainstormTab() {
     getPendingStagingCount 
   } = useProject();
 
-  const { plotPoints, scenes, dialogues, themes, worldElements } = useEntities();
+  const { plotPoints, scenes, dialogues, themes, worldElements, locations, objects, acts } = useEntities();
   const documents = currentProject?.brainstormDocuments || [];
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -727,6 +733,9 @@ export default function BrainstormTab() {
     dialogues,
     themes,
     world_elements: worldElements,
+    locations,
+    objects,
+    acts,
   };
 
   const filteredItems = useMemo(() => {
@@ -777,7 +786,7 @@ export default function BrainstormTab() {
     });
     
     return result;
-  }, [plotPoints, scenes, dialogues, themes, currentProject?.characters, activeCategory, searchQuery, sortBy]);
+  }, [plotPoints, scenes, dialogues, themes, worldElements, locations, objects, acts, currentProject?.characters, activeCategory, searchQuery, sortBy]);
 
   const allDocuments = useMemo(() => {
     const docIds = new Set(documents.map(d => d.id));
@@ -802,7 +811,7 @@ export default function BrainstormTab() {
   const getCategoryCount = (catId) => {
     if (catId === 'all') {
       const charCount = currentProject?.characters?.length || 0;
-      const entityCount = plotPoints.length + scenes.length + dialogues.length + themes.length;
+      const entityCount = plotPoints.length + scenes.length + dialogues.length + themes.length + worldElements.length + locations.length + objects.length + acts.length;
       return charCount + entityCount;
     }
     if (catId === 'characters') return currentProject?.characters?.length || 0;
@@ -834,6 +843,9 @@ export default function BrainstormTab() {
       dialogues: 'dialogues',
       world_elements: 'world_elements',
       themes: 'themes',
+      locations: 'locations',
+      objects: 'objects',
+      acts: 'acts',
     };
     const entityType = entityTypeMap[effectiveCat] || 'plot_points';
     
@@ -910,6 +922,12 @@ export default function BrainstormTab() {
         scr.push({ id: `${newId}-3`, type: 'transition', text: 'CORTA PARA:' });
         break;
       }
+      case 'locations': {
+        const heading = `${item.type || 'INT.'} ${item.name || 'LOCAL'} - ${item.timeOfDay || 'DIA'}`;
+        scr.push({ id: `${newId}-1`, type: 'scene-heading', text: heading.toUpperCase() });
+        if (item.description) scr.push({ id: `${newId}-2`, type: 'action', text: item.description });
+        break;
+      }
       case 'dialogues': {
         const speaker = item.speaker || 'PERSONAGEM';
         const line = item.line || '';
@@ -917,6 +935,16 @@ export default function BrainstormTab() {
         if (ctx) scr.push({ id: `${newId}-ctx`, type: 'action', text: ctx });
         scr.push({ id: `${newId}-1`, type: 'character', text: speaker.toUpperCase() });
         scr.push({ id: `${newId}-2`, type: 'dialogue', text: line });
+        break;
+      }
+      case 'objects': {
+        const text = `[OBJETO] ${item.name || 'Objeto'}: ${item.description || ''}${item.significance ? ` — ${item.significance}` : ''}`;
+        scr.push({ id: `${newId}`, type: 'action', text });
+        break;
+      }
+      case 'acts': {
+        scr.push({ id: `${newId}`, type: 'section', text: `# ${item.name || `Ato ${item.order + 1}`}` });
+        if (item.description) scr.push({ id: `${newId}-d`, type: 'action', text: item.description });
         break;
       }
       case 'plot_points': {
@@ -964,6 +992,9 @@ export default function BrainstormTab() {
       dialogues: 'scene',
       world_elements: 'world',
       themes: 'theme',
+      locations: 'location',
+      objects: 'object',
+      acts: 'act',
     };
     const nodeType = typeMap[effectiveCat] || 'plot_point';
     const entityTypeMap = {
@@ -971,6 +1002,9 @@ export default function BrainstormTab() {
       scene: 'scenes',
       world: 'world_elements',
       theme: 'themes',
+      location: 'locations',
+      object: 'objects',
+      act: 'acts',
     };
     const entityType = entityTypeMap[nodeType] || 'plot_points';
 

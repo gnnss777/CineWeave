@@ -4,7 +4,7 @@ import FichaModal from './FichaModal';
 import ConfirmModal from './ConfirmModal';
 import CorkboardTab from './CorkboardTab';
 import './EncyclopediaTab.css';
-import { Plus, Edit3, Trash2, BookOpen, Compass, Paperclip, ArrowLeft, FileText, Target, Feather, Layers, Columns } from 'lucide-react';
+import { Plus, Edit3, Trash2, BookOpen, Compass, Paperclip, ArrowLeft, FileText, Target, Feather, Layers, Columns, MessageSquare, Globe } from 'lucide-react';
 
 const ENTITY_TYPE_MAP = {
   characters: 'character',
@@ -14,6 +14,8 @@ const ENTITY_TYPE_MAP = {
   plot_points: 'plot_point',
   themes: 'theme',
   acts: 'act',
+  dialogues: 'dialogue',
+  world_elements: 'world_element',
 };
 
 export default function EncyclopediaTab() {
@@ -54,7 +56,11 @@ export default function EncyclopediaTab() {
     const theme = searchInEntities('themes', 'statement');
     if (theme) { setActiveTab('themes'); setFichaModal({ item: theme, type: 'theme', mode: 'view' }); return; }
     const act = searchInEntities('acts', 'name');
-    if (act) { setActiveTab('acts'); setFichaModal({ item: act, type: 'act', mode: 'view' }); }
+    if (act) { setActiveTab('acts'); setFichaModal({ item: act, type: 'act', mode: 'view' }); return; }
+    const dlg = searchInEntities('dialogues', 'speaker');
+    if (dlg) { setActiveTab('dialogues'); setFichaModal({ item: dlg, type: 'dialogue', mode: 'view' }); return; }
+    const world = searchInEntities('world_elements', 'name');
+    if (world) { setActiveTab('world_elements'); setFichaModal({ item: world, type: 'world_element', mode: 'view' }); }
   }, [tabNavigation]);
 
   const handleFichaSave = (data) => {
@@ -95,6 +101,8 @@ export default function EncyclopediaTab() {
       plot_points: { title: '', description: '', actId: '', tags: [] },
       themes: { statement: '', evidence: '', relevance: 'Central' },
       acts: { name: '', order: 0, description: '', color: '#ccee00' },
+      dialogues: { speaker: '', line: '', context: '', tags: [] },
+      world_elements: { name: '', type: 'setting', description: '', tags: [] },
     }[activeTab] || { name: '' };
     setFichaModal({ item: empty, type: t, mode: 'edit' });
   };
@@ -116,6 +124,8 @@ export default function EncyclopediaTab() {
       case 'plot_points': return e.plot_points || [];
       case 'themes': return e.themes || [];
       case 'acts': return e.acts || [];
+      case 'dialogues': return e.dialogues || [];
+      case 'world_elements': return e.world_elements || [];
       default: return [];
     }
   };
@@ -158,6 +168,12 @@ export default function EncyclopediaTab() {
             </button>
             <button onClick={() => setActiveTab('acts')} className={`tab-btn text-sm ${activeTab === 'acts' ? 'active' : ''}`}>
               <Layers size={16} /> Atos
+            </button>
+            <button onClick={() => setActiveTab('dialogues')} className={`tab-btn text-sm ${activeTab === 'dialogues' ? 'active' : ''}`}>
+              <MessageSquare size={16} /> Diálogos
+            </button>
+            <button onClick={() => setActiveTab('world_elements')} className={`tab-btn text-sm ${activeTab === 'world_elements' ? 'active' : ''}`}>
+              <Globe size={16} /> Mundo
             </button>
           </div>
           <button onClick={openAddForm} className="btn-primary py-2 px-3 text-xs flex items-center gap-1">
@@ -331,6 +347,42 @@ export default function EncyclopediaTab() {
                 <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
                   <button onClick={(e) => { e.stopPropagation(); openEditForm(act, 'acts'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
                   <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(act.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'dialogues' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum diálogo cadastrado.</p>
+          ) : (
+            list.map(dlg => (
+              <div key={dlg.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(dlg, 'dialogues')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-base font-bold text-white leading-tight">{dlg.speaker}</h4>
+                  <p className="text-sm italic text-gray-300 mt-2 line-clamp-3 leading-relaxed">"{dlg.line}"</p>
+                  {dlg.context && <p className="text-xs text-gray-500 mt-2 line-clamp-1">{dlg.context}</p>}
+                </div>
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
+                  <button onClick={(e) => { e.stopPropagation(); openEditForm(dlg, 'dialogues'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(dlg.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))
+          ))}
+
+          {activeTab === 'world_elements' && (list.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-4 col-span-full">Nenhum elemento de mundo cadastrado.</p>
+          ) : (
+            list.map(we => (
+              <div key={we.id} className="ficha-card glass glass-interactive" onClick={() => openEditForm(we, 'world_elements')} style={{ cursor: 'pointer' }}>
+                <div>
+                  <h4 className="text-base font-bold text-white leading-tight">{we.name}</h4>
+                  <span className="text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-800/30 px-1.5 py-0.5 rounded font-mono font-bold mt-1 inline-block">{we.type}</span>
+                  <p className="text-xs text-gray-400 mt-3 font-sans line-clamp-4 leading-relaxed">{we.description}</p>
+                </div>
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-800/60">
+                  <button onClick={(e) => { e.stopPropagation(); openEditForm(we, 'world_elements'); }} className="text-gray-400 hover:text-white p-1" title="Editar"><Edit3 size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleFichaDelete(we.id); }} className="text-gray-400 hover:text-red-400 p-1" title="Excluir"><Trash2 size={14} /></button>
                 </div>
               </div>
             ))

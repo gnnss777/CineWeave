@@ -743,8 +743,11 @@ BEGIN
   ELSE
     pid := NEW.project_id;
   END IF;
-  INSERT INTO public.project_audit_log (project_id, entity_type, entity_id, user_id, action, changed_fields)
-  VALUES (pid, TG_TABLE_NAME, COALESCE(NEW.id::TEXT, OLD.id::TEXT), auth.uid(), TG_OP, changes);
+  -- Only insert if the project still exists (avoids FK violation during cascade delete)
+  IF EXISTS (SELECT 1 FROM public.projects WHERE id = pid) THEN
+    INSERT INTO public.project_audit_log (project_id, entity_type, entity_id, user_id, action, changed_fields)
+    VALUES (pid, TG_TABLE_NAME, COALESCE(NEW.id::TEXT, OLD.id::TEXT), auth.uid(), TG_OP, changes);
+  END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
