@@ -95,6 +95,7 @@ export default function MindMapTab() {
   const [pendingNodeData, setPendingNodeData] = useState(null);
 
 
+  const [viewMode, setViewMode] = useState('canvas');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarPosition, setSidebarPosition] = useState('right');
   const [sharedSidebarTab, setSharedSidebarTab] = useState('characters');
