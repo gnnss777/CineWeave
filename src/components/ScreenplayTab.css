@@ -1,5 +1,3 @@
-.workspace { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; background-color: #030303; position: relative; }
-
 /* ── Minimap ── */
 .minimap {
   position: absolute;
@@ -51,7 +49,7 @@
 }
 .toolbar {
   height: 54px; border-bottom: 1px solid #141419; background-color: #08080a;
-  display: flex; align-items: center; justify-content: flex-start;
+  display: flex; align-items: center;
   padding: 0 16px; flex-shrink: 0;
   overflow-x: auto; overflow-y: hidden; gap: 8px;
   scrollbar-width: none; -ms-overflow-style: none;
@@ -126,6 +124,8 @@
 .stats-card { background-color: #08080a; border: 1px solid #141419; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
 .stats-number { font-size: 2.2rem; font-weight: 800; color: #ccee00; line-height: 1; }
 .zen-active .toolbar { display: none !important; }
+.zen-active .style-panel-wrapper { display: none !important; }
+.zen-active .reference-sidebar { display: none !important; }
 
 /* Novel Mode Styles */
 .novel-container { max-width: 650px; margin: 0 auto; padding: 3rem 2rem; color: #e5e7eb; font-family: 'Georgia', serif; line-height: 1.8; }
@@ -471,7 +471,7 @@
   .toolbar-search:focus { width: 120px; }
 }
 @media (max-width: 768px) {
-  .workspace {
+  .editor-container {
     padding-bottom: 64px;
   }
   .toolbar {

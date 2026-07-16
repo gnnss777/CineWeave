@@ -1650,7 +1650,7 @@ setActiveTab('editor');
   }
 
   return (
-    <div className={`screenplay-layout-container ${zenMode ? 'zen-active' : ''}`} style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#050505', color: '#fff' }}>
+    <div className={`screenplay-layout-container ${zenMode ? 'zen-active' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#050505', color: '#fff' }}>
       {(() => {
         const pendingCount = getPendingStagingCount();
         if (pendingCount === 0) return null;
@@ -1683,114 +1683,109 @@ setActiveTab('editor');
         );
       })()}
 
-      {/* ── Revision Panel (flex sibling) ── */}
-      {activeTab === 'editor' && stylePanelOpen && (
-        <div className="style-panel-wrapper open" style={{ order: panelsSwapped ? 2 : 0 }}>
-          <StylePanel
-            open={true}
-            onCollapse={() => setStylePanelOpen(false)}
-            revisionFilter={revisionFilter}
-            setRevisionFilter={setRevisionFilter}
-            revisionMode={revisionMode}
-            setRevisionMode={setRevisionMode}
-            revisionGeneration={revisionGeneration}
-            setRevisionGeneration={setRevisionGeneration}
-            revisionCount={revisionItems.length}
-            revisionGroups={revisionGroups}
-            visibleCount={visibleRevisionCount}
-            revisions={revisions}
-            focusBlock={focusBlock}
-            toggleRevision={(id) => {
-              setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-            }}
-            clearAllRevisions={() => setRevisions([])}
-          />
+      {/* ── Toolbar (full width, top) ── */}
+      <div className="toolbar">
+        <div className="toolbar-tabs">
+          <button onClick={() => { setSidebarOpen(v => !v); setStylePanelOpen(v => !v); }} className={`toolbar-tab-btn ${stylePanelOpen || sidebarOpen ? 'active' : ''}`} title="Mostrar/Esconder Painéis">
+            <Columns size={16} />
+          </button>
+          <button onClick={() => setPanelsSwapped(v => !v)} className={`toolbar-tab-btn ${panelsSwapped ? 'active' : ''}`} title="Inverter Lado dos Painéis">
+            <MoveHorizontal size={16} />
+          </button>
+          <button onClick={() => setStylePanelOpen(v => !v)} className={`toolbar-tab-btn ${stylePanelOpen ? 'active' : ''}`} title="Abrir/Fechar Revisão">
+            <Settings2 size={14} />
+          </button>
+          <button onClick={() => setSidebarOpen(v => !v)} className={`toolbar-tab-btn ${sidebarOpen ? 'active' : ''}`} title="Abrir/Fechar Sidebar">
+            <Columns size={14} />
+          </button>
+          <div className="toolbar-separator" />
+          <button onClick={() => setActiveTab('editor')} className={`toolbar-tab-btn ${activeTab === 'editor' ? 'active' : ''}`}><Edit3 size={14} /><span>Editor</span></button>
+          <button onClick={() => setActiveTab('cards')} className={`toolbar-tab-btn ${activeTab === 'cards' ? 'active' : ''}`}><Grid size={14} /><span>Fichas</span></button>
+          <button onClick={() => setActiveTab('timeline')} className={`toolbar-tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}><Layers size={14} /><span>Linha do Tempo</span></button>
+          <button onClick={() => setActiveTab('stats')} className={`toolbar-tab-btn ${activeTab === 'stats' ? 'active' : ''}`}><BarChart2 size={14} /><span>Estatisticas</span></button>
+          <button onClick={() => setActiveTab('plugins')} className={`toolbar-tab-btn ${activeTab === 'plugins' ? 'active' : ''}`}><Cpu size={14} /><span>Plugins</span></button>
+          {sceneHeadings.length > 0 && (
+            <select
+              value={activeSceneIdx >= 0 ? activeSceneIdx : ''}
+              onChange={(e) => { const idx = parseInt(e.target.value); if (idx >= 0) focusBlock(sceneHeadings[idx].id, 'start'); }}
+              className="toolbar-tab-btn"
+              style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#ccc', cursor: 'pointer', maxWidth: '140px' }}
+              title="Ir para Cena"
+            >
+              {sceneHeadings.map((sh, i) => (
+                <option key={sh.id} value={i}>
+                  #{i + 1} {sh.text?.slice(0, 40)}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="toolbar-separator" />
+          <button onClick={() => { setPageViewMode('continuous'); setCurrentPage(1); }} className={`toolbar-tab-btn ${pageViewMode === 'continuous' ? 'active' : ''}`} title="Pagina continua">
+            <FileText size={14} /><span>Continuo</span>
+          </button>
+          <button onClick={() => { setPageViewMode('paginated'); setCurrentPage(1); }} className={`toolbar-tab-btn ${pageViewMode === 'paginated' ? 'active' : ''}`} title="Pagina por pagina">
+            <Layers size={14} /><span>Paginas</span>
+          </button>
         </div>
-      )}
-
-      {/* ── Main workspace ── */}
-      <div className="workspace" style={{ order: 1 }}>
-        <div className="toolbar">
-          <div className="toolbar-tabs">
-            <button onClick={() => { setSidebarOpen(v => !v); setStylePanelOpen(v => !v); }} className={`toolbar-tab-btn ${stylePanelOpen || sidebarOpen ? 'active' : ''}`} title="Mostrar/Esconder Painéis">
-              <Columns size={16} />
-            </button>
-            <button onClick={() => setPanelsSwapped(v => !v)} className={`toolbar-tab-btn ${panelsSwapped ? 'active' : ''}`} title="Inverter Lado dos Painéis">
-              <MoveHorizontal size={16} />
-            </button>
-            <button onClick={() => setStylePanelOpen(v => !v)} className={`toolbar-tab-btn ${stylePanelOpen ? 'active' : ''}`} title="Abrir/Fechar Revisão">
-              <Settings2 size={14} />
-            </button>
-            <button onClick={() => setSidebarOpen(v => !v)} className={`toolbar-tab-btn ${sidebarOpen ? 'active' : ''}`} title="Abrir/Fechar Sidebar">
-              <Columns size={14} />
-            </button>
-            <div className="toolbar-separator" />
-            <button onClick={() => setActiveTab('editor')} className={`toolbar-tab-btn ${activeTab === 'editor' ? 'active' : ''}`}><Edit3 size={14} /><span>Editor</span></button>
-            <button onClick={() => setActiveTab('cards')} className={`toolbar-tab-btn ${activeTab === 'cards' ? 'active' : ''}`}><Grid size={14} /><span>Fichas</span></button>
-            <button onClick={() => setActiveTab('timeline')} className={`toolbar-tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}><Layers size={14} /><span>Linha do Tempo</span></button>
-            <button onClick={() => setActiveTab('stats')} className={`toolbar-tab-btn ${activeTab === 'stats' ? 'active' : ''}`}><BarChart2 size={14} /><span>Estatisticas</span></button>
-            <button onClick={() => setActiveTab('plugins')} className={`toolbar-tab-btn ${activeTab === 'plugins' ? 'active' : ''}`}><Cpu size={14} /><span>Plugins</span></button>
-            {sceneHeadings.length > 0 && (
-              <select
-                value={activeSceneIdx >= 0 ? activeSceneIdx : ''}
-                onChange={(e) => { const idx = parseInt(e.target.value); if (idx >= 0) focusBlock(sceneHeadings[idx].id, 'start'); }}
-                className="toolbar-tab-btn"
-                style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#ccc', cursor: 'pointer', maxWidth: '140px' }}
-                title="Ir para Cena"
-              >
-                {sceneHeadings.map((sh, i) => (
-                  <option key={sh.id} value={i}>
-                    #{i + 1} {sh.text?.slice(0, 40)}
-                  </option>
-                ))}
-              </select>
-            )}
-            <div className="toolbar-separator" />
-            <button onClick={() => { setPageViewMode('continuous'); setCurrentPage(1); }} className={`toolbar-tab-btn ${pageViewMode === 'continuous' ? 'active' : ''}`} title="Pagina continua">
-              <FileText size={14} /><span>Continuo</span>
-            </button>
-            <button onClick={() => { setPageViewMode('paginated'); setCurrentPage(1); }} className={`toolbar-tab-btn ${pageViewMode === 'paginated' ? 'active' : ''}`} title="Pagina por pagina">
-              <Layers size={14} /><span>Paginas</span>
-            </button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
-            {/* Search bar */}
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setSearchMatchIdx(0); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) performSearch(-1); else performSearch(1); } if (e.key === 'Escape') setSearchQuery(''); }}
-                placeholder="🔍 Buscar..."
-                className="toolbar-search"
-              />
-              {searchQuery && (
-                <span style={{ position: 'absolute', right: 4, fontSize: '10px', color: '#888', pointerEvents: 'none' }}>
-                  {searchMatches.length > 0 ? `${searchMatchIdx + 1}/${searchMatches.length}` : '0'}
-                </span>
-              )}
-            </div>
-            <button onClick={() => setVersionPanelOpen(v => !v)} className={`toolbar-tab-btn ${versionPanelOpen ? 'active' : ''}`} title="Painel de Versões"><Clock size={14} /></button>
-            <button onClick={() => setCoverageModal(true)} className="toolbar-tab-btn" title="Análise de Roteiro"><BarChart2 size={14} /></button>
-            <button onClick={() => setClassicScriptsModal(true)} className="toolbar-tab-btn" title="Importar Roteiros Clássicos"><BookOpen size={14} /></button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
-              ref={fountainInputRef}
-              type="file"
-              accept=".fountain,.txt,.pdf"
-              onChange={handleFountainImport}
-              style={{ display: 'none' }}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setSearchMatchIdx(0); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) performSearch(-1); else performSearch(1); } if (e.key === 'Escape') setSearchQuery(''); }}
+              placeholder="🔍 Buscar..."
+              className="toolbar-search"
             />
-            <button onClick={() => fountainInputRef.current.click()} className="toolbar-tab-btn" title="Importar .fountain / .pdf"><Upload size={14} /></button>
-            <button onClick={handleFountainExport} className="toolbar-tab-btn" title="Exportar .fountain"><Download size={14} /></button>
-            <button onClick={handlePDFExport} className="toolbar-tab-btn" title="Exportar PDF"><Printer size={14} /></button>
-            <button onClick={handleAIFeedback} disabled={aiLoading} className="toolbar-tab-btn" title="Feedback da IA"><Award size={14} /></button>
-            <button onClick={() => setShowCompileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(204,238,0,0.1)', border: '1px solid rgba(204,238,0,0.3)', color: '#ccee00', padding: '6px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}><Sparkles size={12} /></button>
-            <button onClick={() => setTypewriterMode(!typewriterMode)} className={`toolbar-tab-btn ${typewriterMode ? 'active' : ''}`} title="Modo Typewriter"><Edit3 size={14} /></button>
-            <button onClick={() => setZenMode(!zenMode)} className={`toolbar-tab-btn ${zenMode ? 'active' : ''}`} title="Modo Zen"><Minimize2 size={14} /></button>
+            {searchQuery && (
+              <span style={{ position: 'absolute', right: 4, fontSize: '10px', color: '#888', pointerEvents: 'none' }}>
+                {searchMatches.length > 0 ? `${searchMatchIdx + 1}/${searchMatches.length}` : '0'}
+              </span>
+            )}
           </div>
+          <button onClick={() => setVersionPanelOpen(v => !v)} className={`toolbar-tab-btn ${versionPanelOpen ? 'active' : ''}`} title="Painel de Versões"><Clock size={14} /></button>
+          <button onClick={() => setCoverageModal(true)} className="toolbar-tab-btn" title="Análise de Roteiro"><BarChart2 size={14} /></button>
+          <button onClick={() => setClassicScriptsModal(true)} className="toolbar-tab-btn" title="Importar Roteiros Clássicos"><BookOpen size={14} /></button>
+          <input ref={fountainInputRef} type="file" accept=".fountain,.txt,.pdf" onChange={handleFountainImport} style={{ display: 'none' }} />
+          <button onClick={() => fountainInputRef.current.click()} className="toolbar-tab-btn" title="Importar .fountain / .pdf"><Upload size={14} /></button>
+          <button onClick={handleFountainExport} className="toolbar-tab-btn" title="Exportar .fountain"><Download size={14} /></button>
+          <button onClick={handlePDFExport} className="toolbar-tab-btn" title="Exportar PDF"><Printer size={14} /></button>
+          <button onClick={handleAIFeedback} disabled={aiLoading} className="toolbar-tab-btn" title="Feedback da IA"><Award size={14} /></button>
+          <button onClick={() => setShowCompileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(204,238,0,0.1)', border: '1px solid rgba(204,238,0,0.3)', color: '#ccee00', padding: '6px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}><Sparkles size={12} /></button>
+          <button onClick={() => setTypewriterMode(!typewriterMode)} className={`toolbar-tab-btn ${typewriterMode ? 'active' : ''}`} title="Modo Typewriter"><Edit3 size={14} /></button>
+          <button onClick={() => setZenMode(!zenMode)} className={`toolbar-tab-btn ${zenMode ? 'active' : ''}`} title="Modo Zen"><Minimize2 size={14} /></button>
         </div>
+      </div>
 
-        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`}>
+      {/* ── Main area (panels + editor) ── */}
+      <div className="main-area" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* ── Revision Panel ── */}
+        {activeTab === 'editor' && stylePanelOpen && (
+          <div className="style-panel-wrapper open" style={{ order: panelsSwapped ? 2 : 0 }}>
+            <StylePanel
+              open={true}
+              onCollapse={() => setStylePanelOpen(false)}
+              revisionFilter={revisionFilter}
+              setRevisionFilter={setRevisionFilter}
+              revisionMode={revisionMode}
+              setRevisionMode={setRevisionMode}
+              revisionGeneration={revisionGeneration}
+              setRevisionGeneration={setRevisionGeneration}
+              revisionCount={revisionItems.length}
+              revisionGroups={revisionGroups}
+              visibleCount={visibleRevisionCount}
+              revisions={revisions}
+              focusBlock={focusBlock}
+              toggleRevision={(id) => {
+                setRevisions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+              }}
+              clearAllRevisions={() => setRevisions([])}
+            />
+          </div>
+        )}
+
+        {/* ── Editor Container ── */}
+        <div className={`editor-container ${activeTab === 'editor' && !printMode && pageViewMode === 'continuous' ? 'continuous-active' : ''} ${printMode ? 'print-active' : ''} ${typewriterMode ? 'typewriter-active' : ''}`} style={{ flex: 1, overflow: 'auto' }}>
           
           {/* ── Print Mode Toggle (canto superior direito) ── */}
           {activeTab === 'editor' && (
