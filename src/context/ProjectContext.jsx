@@ -581,17 +581,61 @@ export const ProjectProvider = ({ children }) => {
 
   // ── ENTITIES CRUD (centralized) ──────────────────────────────
   const saveEntity = (type, entity) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id !== currentProjectId) return p;
-      return updateEntity(p, type, entity);
-    }));
+      const proj = { ...currentProject };
+      autoSaveVersionIfNeeded(proj, 'Ficha');
+      const now = Date.now();
+      const list = proj.entities[type] || [];
+      const existingIdx = entity.id ? list.findIndex(e => e.id === entity.id) : -1;
+
+      if (existingIdx >= 0) {
+        proj.entities[type] = list.map(e => e.id === entity.id ? { ...e, ...entity, updatedAt: now } : e);
+        proj.mindMapNodes = (proj.mindMapNodes || []).map(node => {
+          if (node.entityId === entity.id || node.id === `n-${entity.id}`) {
+            const label = entity.name || entity.title || entity.statement || '';
+            const details = entity.description || entity.synopsis || entity.evidence || '';
+            return { ...node, entityId: entity.id, ...(label ? { label } : {}), ...(details ? { details } : {}) };
+          }
+          return node;
+        });
+      } else {
+        const newEntity = { ...entity, id: entity.id || `${type.slice(0, -1)}-${now}`, createdAt: now, updatedAt: now };
+        if (!proj.entities[type]) proj.entities[type] = [];
+        proj.entities[type] = [...list, newEntity];
+        const nodeId = `n-${newEntity.id}`;
+        if (!(proj.mindMapNodes || []).some(n => n.id === nodeId || n.entityId === newEntity.id)) {
+          if (!proj.mindMapNodes) proj.mindMapNodes = [];
+          proj.mindMapNodes.push({ id: nodeId, entityId: newEntity.id, x: Math.round(300 + Math.random() * 400), y: Math.round(300 + Math.random() * 200) });
+          linkNodeToFirstAct(proj, nodeId);
+        }
+      }
+      // Sync legacy arrays
+      ['characters','locations','objects'].forEach(legacyType => {
+        if (type !== legacyType) return;
+        const legacyArr = legacyType === 'characters' ? proj.characters : legacyType === 'locations' ? proj.locations : proj.objects;
+        const updatedEntity = (proj.entities[type] || []).find(e => e.id === entity.id);
+        if (!updatedEntity) return;
+        if (legacyArr?.some(e => e.id === entity.id)) {
+          if (legacyType === 'characters') proj.characters = legacyArr.map(e => e.id === entity.id ? updatedEntity : e);
+          else if (legacyType === 'locations') proj.locations = legacyArr.map(e => e.id === entity.id ? updatedEntity : e);
+          else proj.objects = legacyArr.map(e => e.id === entity.id ? updatedEntity : e);
+        } else {
+          if (!proj[legacyType]) proj[legacyType] = [];
+          proj[legacyType].push(updatedEntity);
+        }
+      });
+      updateProject(proj);
   };
 
   const deleteEntityById = (type, entityId) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id !== currentProjectId) return p;
-      return deleteEntityFromProject(p, type, entityId);
-    }));
+      const proj = { ...currentProject };
+      autoSaveVersionIfNeeded(proj, 'Ficha');
+      proj.entities[type] = (proj.entities[type] || []).filter(e => e.id !== entityId);
+      proj.mindMapNodes = (proj.mindMapNodes || []).filter(n => n.entityId !== entityId && n.id !== `n-${entityId}`);
+      proj.mindMapLinks = (proj.mindMapLinks || []).filter(l => l.source !== `n-${entityId}` && l.target !== `n-${entityId}`);
+      if (type === 'characters' && proj.characters) proj.characters = proj.characters.filter(c => c.id !== entityId);
+      if (type === 'locations' && proj.locations) proj.locations = proj.locations.filter(l => l.id !== entityId);
+      if (type === 'objects' && proj.objects) proj.objects = proj.objects.filter(o => o.id !== entityId);
+      updateProject(proj);
   };
 
   // ── IDEAS ─────────────────────────────────────────────────────

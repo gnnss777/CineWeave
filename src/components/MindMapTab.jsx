@@ -1252,6 +1252,5 @@ export default function MindMapTab() {
         data-onboarding="mindmap-sidebar"
       />
     </div>
-    <div className="mindmap-tab-container" data-onboarding="mindmap-tab">
   );
 }
