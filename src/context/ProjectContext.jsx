@@ -1656,11 +1656,40 @@ export const ProjectProvider = ({ children }) => {
     updateProject(proj);
   };
 
+  const syncActIdsFromMindMap = (proj) => {
+    if (!proj.entities?.scenes || !proj.mindMapNodes || !proj.mindMapLinks) return;
+    const sceneToActMap = {};
+    proj.mindMapLinks.forEach(l => {
+      const sourceNode = proj.mindMapNodes.find(n => n.id === l.source);
+      if (!sourceNode) return;
+      const sourceDisplayType = (() => {
+        if (sourceNode.type === 'act') return 'act';
+        if (sourceNode.entityId && proj.entities?.acts?.some(a => a.id === sourceNode.entityId)) return 'act';
+        return null;
+      })();
+      if (sourceDisplayType === 'act') {
+        sceneToActMap[l.target] = sourceNode.entityId || sourceNode.id;
+      }
+    });
+    proj.entities.scenes = proj.entities.scenes.map(scene => {
+      const sceneNode = proj.mindMapNodes.find(n => n.entityId === scene.id);
+      if (sceneNode && sceneToActMap[sceneNode.id]) {
+        const actEntityId = sceneToActMap[sceneNode.id];
+        const actEntity = proj.entities.acts?.find(a => a.id === actEntityId);
+        if (actEntity) {
+          return { ...scene, actId: actEntity.id };
+        }
+      }
+      return scene;
+    });
+  };
+
   const updateMindMap = (nodes, links) => {
     const proj = { ...currentProject };
     autoSaveVersionIfNeeded(proj, 'Mapa');
     proj.mindMapNodes = nodes;
     proj.mindMapLinks = links;
+    syncActIdsFromMindMap(proj);
     updateProject(proj);
   };
 
