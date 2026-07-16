@@ -380,8 +380,9 @@ export default function SharedSidebar({
             const isActive = activeTab === key;
             return (
               <button key={key} onClick={() => onTabChange(key)} title={label} className={`reference-tab ${isActive ? 'active' : ''}`}
-                style={{ padding: '5px 7px', fontSize: '10px', fontWeight: isActive ? 700 : 500, borderRadius: '6px', border: 'none', background: isActive ? 'rgba(204, 238, 0, 0.15)' : 'transparent', color: isActive ? '#ccee00' : '#666', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}>
-                <Icon size={14} />
+                style={{ padding: '4px 6px', fontSize: '10px', fontWeight: isActive ? 700 : 500, borderRadius: '6px', border: 'none', background: isActive ? 'rgba(204, 238, 0, 0.15)' : 'transparent', color: isActive ? '#ccee00' : '#666', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', transition: 'all 0.15s' }}>
+                <Icon size={13} />
+                <span style={{ fontSize: '8px', opacity: 0.85 }}>{label}</span>
               </button>
             );
           })}

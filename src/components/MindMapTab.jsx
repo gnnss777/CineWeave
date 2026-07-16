@@ -692,9 +692,10 @@ export default function MindMapTab() {
       })()}
 
       {/* SVG Drawing Canvas */}
-      <svg className="mindmap-canvas" data-onboarding="mindmap-canvas">
+      <svg
         ref={svgRef}
-        className={`canvas-svg ${linkSourceId ? 'linking-active' : ''} ${isPlacingNode ? 'placing-node' : ''}`}
+        className={`mindmap-canvas canvas-svg ${linkSourceId ? 'linking-active' : ''} ${isPlacingNode ? 'placing-node' : ''}`}
+        data-onboarding="mindmap-canvas"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
