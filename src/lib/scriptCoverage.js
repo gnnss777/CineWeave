@@ -1,4 +1,4 @@
-import benchmarkData from '../../ROTEIROS/benchmark_data.json';
+import benchmarkData from './benchmark_data.json';
 
 export const CRITERIA = [
   { key: 'plot', label: 'Plot', weight: 5, desc: 'Estrutura, originalidade, lógica' },
