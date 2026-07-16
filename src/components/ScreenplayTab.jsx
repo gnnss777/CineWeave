@@ -1709,7 +1709,7 @@ setActiveTab('editor');
       )}
 
       {/* ── Main workspace ── */}
-      <div className="workspace">
+      <div className="workspace" style={{ order: 1 }}>
         <div className="toolbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button onClick={() => { setSidebarOpen(v => !v); setStylePanelOpen(v => !v); }} className={`toolbar-tab-btn ${stylePanelOpen || sidebarOpen ? 'active' : ''}`} title="Mostrar/Esconder Painéis">
