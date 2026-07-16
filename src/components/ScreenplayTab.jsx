@@ -515,8 +515,10 @@ export default function ScreenplayTab() {
       const imported = parseFountain(fountainText);
       console.log('[FountainImport] elements:', imported);
       console.log('[FountainImport] element types:', imported.map(el => `${el.type}: "${el.text?.slice(0, 60)}"`));
+      alert(`DEBUG: ${imported.length} elementos parseados (${imported.filter(e => e.type === 'scene-heading').length} cenas, ${imported.filter(e => e.type === 'character').length} personagens)`);
       const result = importScreenplayWithEntities(imported);
       console.log('[FountainImport] extracted entity counts:', result);
+      alert(`DEBUG: Extração concluída: ${JSON.stringify(result)}`);
       // Force editor to show the imported screenplay
       setElements(imported);
 

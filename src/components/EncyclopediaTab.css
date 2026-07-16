@@ -31,3 +31,9 @@
 .avatar-purple { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; border: 1px solid #8b5cf6; }
 .avatar-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
 .avatar-green { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
+.chip-count {
+  background: rgba(204, 238, 0, 0.1); color: var(--primary-gold); font-size: 10px;
+  font-weight: bold; padding: 0 6px; border-radius: 8px; line-height: 16px;
+  margin-left: 4px; min-width: 18px; text-align: center;
+}
+.tab-btn.active .chip-count { background: rgba(204, 238, 0, 0.2); }

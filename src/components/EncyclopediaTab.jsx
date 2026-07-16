@@ -130,6 +130,11 @@ export default function EncyclopediaTab() {
     }
   };
 
+  const getEntityCount = (type) => {
+    const e = currentProject?.entities || {};
+    return (e[type] || []).length;
+  };
+
   const list = getList();
 
   if (!currentProject) {
@@ -141,39 +146,44 @@ export default function EncyclopediaTab() {
     );
   }
 
+  const totalItems = getEntityCount('characters') + getEntityCount('locations') + getEntityCount('objects') + getEntityCount('scenes') + getEntityCount('plot_points') + getEntityCount('dialogues') + getEntityCount('world_elements') + getEntityCount('themes') + getEntityCount('acts');
+
   return (
     <div className="encyclopedia-container" data-onboarding="encyclopedia-tab">
 
+      <div className="flex justify-between items-center px-2 mb-2">
+        <span className="text-xs text-gray-500">{totalItems} itens no total</span>
+      </div>
 
       <div className="encyclopedia-layout">
         <div className="flex justify-between items-center mb-2">
           <div className="tab-bar flex-1" style={{ display: 'flex', flexWrap: 'wrap' }}>
             <button onClick={() => setActiveTab('characters')} className={`tab-btn text-sm ${activeTab === 'characters' ? 'active' : ''}`}>
-              <BookOpen size={16} /> Personagens
+              <BookOpen size={16} /> Personagens <span className="chip-count">{getEntityCount('characters')}</span>
             </button>
             <button onClick={() => setActiveTab('locations')} className={`tab-btn text-sm ${activeTab === 'locations' ? 'active' : ''}`}>
-              <Compass size={16} /> Locações
+              <Compass size={16} /> Locações <span className="chip-count">{getEntityCount('locations')}</span>
             </button>
             <button onClick={() => setActiveTab('objects')} className={`tab-btn text-sm ${activeTab === 'objects' ? 'active' : ''}`}>
-              <Paperclip size={16} /> Objetos
+              <Paperclip size={16} /> Objetos <span className="chip-count">{getEntityCount('objects')}</span>
             </button>
             <button onClick={() => setActiveTab('scenes')} className={`tab-btn text-sm ${activeTab === 'scenes' ? 'active' : ''}`}>
-              <FileText size={16} /> Cenas
+              <FileText size={16} /> Cenas <span className="chip-count">{getEntityCount('scenes')}</span>
             </button>
             <button onClick={() => setActiveTab('plot_points')} className={`tab-btn text-sm ${activeTab === 'plot_points' ? 'active' : ''}`}>
-              <Target size={16} /> Plot Points
+              <Target size={16} /> Plot Points <span className="chip-count">{getEntityCount('plot_points')}</span>
             </button>
             <button onClick={() => setActiveTab('dialogues')} className={`tab-btn text-sm ${activeTab === 'dialogues' ? 'active' : ''}`}>
-              <MessageSquare size={16} /> Diálogos
+              <MessageSquare size={16} /> Diálogos <span className="chip-count">{getEntityCount('dialogues')}</span>
             </button>
             <button onClick={() => setActiveTab('world_elements')} className={`tab-btn text-sm ${activeTab === 'world_elements' ? 'active' : ''}`}>
-              <Globe size={16} /> Mundo
+              <Globe size={16} /> Mundo <span className="chip-count">{getEntityCount('world_elements')}</span>
             </button>
             <button onClick={() => setActiveTab('themes')} className={`tab-btn text-sm ${activeTab === 'themes' ? 'active' : ''}`}>
-              <Feather size={16} /> Temas
+              <Feather size={16} /> Temas <span className="chip-count">{getEntityCount('themes')}</span>
             </button>
             <button onClick={() => setActiveTab('acts')} className={`tab-btn text-sm ${activeTab === 'acts' ? 'active' : ''}`}>
-              <Layers size={16} /> Atos
+              <Layers size={16} /> Atos <span className="chip-count">{getEntityCount('acts')}</span>
             </button>
           </div>
           <button onClick={openAddForm} className="btn-primary py-2 px-3 text-xs flex items-center gap-1" data-onboarding="encyclopedia-create">

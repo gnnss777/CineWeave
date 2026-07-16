@@ -53,7 +53,7 @@ function CineWeaveShell() {
     setProjectTags,
     tabNavigation,
   } = useProject();
-  const { startTour } = useOnboarding();
+   const { startTour } = useOnboarding();
 
   const [activeTab, setActiveTab] = useState('brainstorm');
   const [showProjectDrawer, setShowProjectDrawer] = useState(false);
@@ -382,6 +382,7 @@ function CineWeaveShell() {
       <InstallPrompt />
       {confirmModal && <ConfirmModal {...confirmModal} />}
       {inviteModalProjectId && <InviteModal projectId={inviteModalProjectId} onClose={() => setInviteModalProjectId(null)} />}
+      <GuideModal isOpen={showGuideModal} onClose={() => setShowGuideModal(false)} />
     </div>
   );
 }
@@ -437,10 +438,9 @@ function AuthenticatedApp() {
         <SyncProvider>
           <ProjectProvider>
              <OnboardingProvider>
-               <CineWeaveShell />
-               <OnboardingOverlay />
-               <GuideModal isOpen={showGuideModal} onClose={() => setShowGuideModal(false)} />
-             </OnboardingProvider>
+                <CineWeaveShell />
+                <OnboardingOverlay />
+              </OnboardingProvider>
           </ProjectProvider>
         </SyncProvider>
       </ThemeProvider>
