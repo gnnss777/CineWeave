@@ -9,6 +9,7 @@ import { uploadProjectFilesBatch } from '../lib/storage';
 import ConfirmModal from './ConfirmModal';
 import PromptModal from './PromptModal';
 import LottieMic from './LottieMic';
+import DocViewerModal from './DocViewerModal';
 import {
   Mic,
   MicOff,
@@ -196,6 +197,7 @@ export default function BrainstormTab() {
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [processingQueue, setProcessingQueue] = useState([]);
   const [expandedDoc, setExpandedDoc] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
   const [manualNotes, setManualNotes] = useState('');
   const [manualNotesDocId, setManualNotesDocId] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -1301,7 +1303,13 @@ export default function BrainstormTab() {
                       viewMode={viewMode}
                       onDelete={() => handleDeleteDocument(doc.id)}
                       onRetry={() => handleRetryDocument(doc)}
-                      onExpand={() => setExpandedDoc(doc.id === expandedDoc ? null : doc.id)}
+                      onExpand={() => {
+                        if (window.innerWidth < 768) {
+                          setViewingDoc(doc.id);
+                        } else {
+                          setExpandedDoc(doc.id === expandedDoc ? null : doc.id);
+                        }
+                      }}
                       isExpanded={expandedDoc === doc.id}
                       onEditContent={handleEditRecordingContent}
                       STATUS_CONFIG={STATUS_CONFIG}
@@ -1479,6 +1487,15 @@ export default function BrainstormTab() {
 
       {confirmModal && <ConfirmModal {...confirmModal} />}
       {promptModal && <PromptModal {...promptModal} />}
+      {viewingDoc && (
+        <DocViewerModal
+          doc={allDocuments.find(d => d.id === viewingDoc)}
+          onClose={() => setViewingDoc(null)}
+          onDelete={handleDeleteDocument}
+          onRetry={handleRetryDocument}
+          onEditContent={handleEditRecordingContent}
+        />
+      )}
       <input
         ref={fileInputRef}
         type="file"

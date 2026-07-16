@@ -2154,6 +2154,46 @@
   .drop-zone {
     display: none;
   }
+  .documents-container.grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .doc-card.grid {
+    min-height: 0;
+    max-height: none;
+  }
+  .doc-card.grid .doc-card-expanded,
+  .doc-card.grid .doc-content-preview {
+    display: none;
+  }
+  .doc-card.grid .doc-card-header {
+    padding: 0.5rem;
+  }
+  .doc-card.grid .doc-card-actions {
+    display: flex;
+    gap: 2px;
+  }
+  .doc-card.grid .doc-card-actions .action-btn {
+    padding: 4px;
+  }
+  .doc-card.grid .doc-icon-wrapper svg {
+    width: 20px;
+    height: 20px;
+  }
+  .doc-card.grid .doc-card-name {
+    font-size: 0.8125rem;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .doc-card.grid .doc-card-meta {
+    font-size: 0.625rem;
+  }
+  .doc-card.grid .doc-card-status {
+    display: none;
+  }
   .recordings-list {
     display: none;
   }
