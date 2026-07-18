@@ -21,6 +21,9 @@ export default function StoryboardTab() {
   const handleAddFrame = (sceneId) => {
     const scene = entities.scenes.find((s) => s.id === sceneId);
 
+    console.log('[StoryboardTab] handleAddFrame - sceneId:', sceneId);
+    console.log('[StoryboardTab] handleAddFrame - scene:', scene);
+
     if (!scene) return;
 
     // Determinar próximo order

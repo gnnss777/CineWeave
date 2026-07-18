@@ -173,6 +173,9 @@ export function ensureEntities(proj) {
       acts,
       dialogues,
       world_elements: worldElementsToWorld,
+      storyboards: proj.entities?.storyboards || [],
+      storyboard_frames: proj.entities?.storyboard_frames || [],
+      storyboard_layers: proj.entities?.storyboard_layers || [],
     },
   };
 }

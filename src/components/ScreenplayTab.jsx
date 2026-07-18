@@ -1106,7 +1106,7 @@ export default function ScreenplayTab() {
     const wrapper = e.currentTarget.closest('.script-element-wrapper');
     if (!wrapper) return;
     const rect = wrapper.getBoundingClientRect();
-    setActiveBlockMenu({ show: true, blockId, index, x: rect.left - 180, y: rect.bottom + window.scrollY });
+    setActiveBlockMenu({ show: true, blockId, index, x: rect.left - 180, y: rect.top + window.scrollY - 8 });
   };
 
   const scrollToPage = (pageNum) => {
@@ -1817,7 +1817,7 @@ setActiveTab('editor');
 
       {/* ── Page Thumbnails (always visible, fixed) ── */}
       {pageViewMode === 'continuous' && paginatedElements.totalPages > 1 && (
-        <div className="page-thumbnails-fixed" style={{ left: stylePanelOpen ? 328 : 8, top: 78 }}>
+        <div className="page-thumbnails-fixed" style={{ left: stylePanelOpen ? 328 : 8, top: 96 }}>
           {Array.from({ length: paginatedElements.totalPages }, (_, i) => i + 1).map(pageNum => (
             <div key={pageNum} className={`page-thumb ${pageNum === currentPage ? 'active' : ''}`}
               onClick={() => { setCurrentPage(pageNum); scrollToPage(pageNum); }} title={`Pagina ${pageNum}`}>
