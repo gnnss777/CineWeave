@@ -13,6 +13,7 @@ export default function StoryboardTab() {
 
   // Estado da storyboard
   const [activeFrameId, setActiveFrameId] = useState(null);
+  const [activeLayerId, setActiveLayerId] = useState(null);
   const [frames, setFrames] = useState(entities.storyboard_frames || []);
   const [layers, setLayers] = useState(entities.storyboard_layers || []);
   const [selectedStoryboard, setSelectedStoryboard] = useState('main');
@@ -174,7 +175,7 @@ export default function StoryboardTab() {
                   layers={layers.filter((l) => l.frame_id === activeFrameId)}
                   activeLayerId={activeLayerId}
                   onToggleLayer={() => {}}
-                  onSelectLayer={() => {}}
+                  onSelectLayer={setActiveLayerId}
                   onAddLayer={() => {}}
                 />
               </div>
