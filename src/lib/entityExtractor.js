@@ -1,18 +1,18 @@
 ﻿import { createEntity } from '../context/EntitiesSchema';
 
-const SCENE_HEADING_RE = /^(INT\.|EXT\.|INT\.\/EXT\.|I\/E\.|INT\/EXT\.|EST\.)\s+(.+?)(?:\s*[ΓÇôΓÇö-]\s*(.+))?$/i;
+const SCENE_HEADING_RE = /^(INT\.|EXT\.|INT\.\/EXT\.|I\/E\.|INT\/EXT\.|EST\.)\s+(.+?)(?:\s*[-–—]\s*(.+))?$/i;
 
 const TIME_OF_DAY_OPTIONS = [
   ['DIA', 'DAY'], ['NOITE', 'NIGHT'], ['TARDE', 'AFTERNOON'],
   ['MADRUGADA', 'DAWN'], ['ENTARDECER', 'DUSK'], ['AMANHECER', 'SUNRISE'],
-  ['MANH├â', 'MORNING'], ['SUNSET'], ['LATE AFTERNOON'],
+  ['MANHÃ', 'MORNING'], ['SUNSET'], ['LATE AFTERNOON'],
   ['CONTINUOUS'], ['MOMENTS LATER'],
 ];
 
 const ACT_RE = /^(ATO|ACT)\s+(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/i;
 
 function cleanSceneNumber(text) {
-  let cleaned = text.replace(/\s*[-ΓÇôΓÇö]\s*(?:DIA|DAY|NOITE|NIGHT)?\s*\d+\s*$/i, '').trim();
+  let cleaned = text.replace(/\s*[-–—]\s*(?:DIA|DAY|NOITE|NIGHT)?\s*\d+\s*$/i, '').trim();
   // Safety net: strip trailing standalone digits (scene number without dash prefix)
   cleaned = cleaned.replace(/\s+\d+\s*$/, '').trim();
   return cleaned;
@@ -173,12 +173,13 @@ export function extractEntitiesFromScreenplay(screenplay, existingEntities = {})
         speaker: currentSpeaker,
         line: text,
         context: '',
+        sceneId: currentScene ? currentScene.id : null,
       }));
     }
 
     // Fallback: scan ACTION elements for ALL-CAPS character cues
     if (el.type === 'action') {
-      if (text.length >= 2 && text === text.toUpperCase() && /^[A-Z├Ç-├┐\s.]+$/.test(text)) {
+      if (text.length >= 2 && text === text.toUpperCase() && /^[A-ZÀ-Ú\s.]+$/.test(text)) {
         const upperName = text;
         if (!seenCharNames.has(upperName) && !existingCharNames.has(upperName)) {
           const prev = i > 0 ? screenplay[i - 1] : null;
