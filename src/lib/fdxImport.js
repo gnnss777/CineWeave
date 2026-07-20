@@ -5,6 +5,10 @@ const TYPE_MAP = {
   'Parenthetical': 'parenthetical',
   'Dialogue': 'dialogue',
   'Transition': 'transition',
+  'Shot': 'transition',
+  'General': 'action',
+  'Cast List': 'action',
+  'Note': 'action',
 };
 
 function decodeXmlEntities(text) {
@@ -42,6 +46,18 @@ export function parseFdx(xmlText) {
       id: `fdx-${i}`,
       type: internalType,
       text: decodeXmlEntities(text),
+    });
+  });
+
+  // Extract script notes
+  const scriptNotes = doc.querySelectorAll('ScriptNote');
+  scriptNotes.forEach((note, i) => {
+    const text = note.textContent?.trim();
+    if (!text) return;
+    elements.push({
+      id: `fdx-note-${i}`,
+      type: 'action',
+      text: `[[NOTE]] ${text}`,
     });
   });
 
