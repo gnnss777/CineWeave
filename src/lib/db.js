@@ -756,3 +756,243 @@ export async function declineInvitation(invitationId) {
   if (error) throw error;
   return data;
 }
+
+// ── SCENES ──────────────────────────────────────────────────
+export async function fetchScenes(projectId) {
+  if (!isConfigured()) return [];
+  const { data, error } = await supabase
+    .from('scenes')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('order', { ascending: true });
+  if (error) { console.error('[db] fetchScenes error:', error); return []; }
+  return data || [];
+}
+
+export async function saveScene(userId, projectId, scene) {
+  if (!isConfigured()) return scene;
+  if (scene.id) {
+    const { data, error } = await supabase
+      .from('scenes')
+      .update({
+        title: scene.title, synopsis: scene.synopsis,
+        act_id: scene.actId, character_ids: scene.characterIds || [],
+        order: scene.order || 0, status: scene.status || 'draft',
+      })
+      .eq('id', scene.id)
+      .select()
+      .single();
+    if (error) { console.error('[db] saveScene error:', error); return scene; }
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('scenes')
+    .insert({
+      project_id: projectId, user_id: userId,
+      title: scene.title || '', synopsis: scene.synopsis || '',
+      act_id: scene.actId || null, character_ids: scene.characterIds || [],
+      order: scene.order || 0, status: scene.status || 'draft',
+    })
+    .select()
+    .single();
+  if (error) { console.error('[db] saveScene error:', error); return scene; }
+  return data;
+}
+
+// ── ACTS ────────────────────────────────────────────────────
+export async function fetchActs(projectId) {
+  if (!isConfigured()) return [];
+  const { data, error } = await supabase
+    .from('acts')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('order', { ascending: true });
+  if (error) { console.error('[db] fetchActs error:', error); return []; }
+  return data || [];
+}
+
+export async function saveAct(userId, projectId, act) {
+  if (!isConfigured()) return act;
+  if (act.id) {
+    const { data, error } = await supabase
+      .from('acts')
+      .update({
+        name: act.name, order: act.order || 0,
+        description: act.description || '', color: act.color || '#ccee00',
+      })
+      .eq('id', act.id)
+      .select()
+      .single();
+    if (error) { console.error('[db] saveAct error:', error); return act; }
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('acts')
+    .insert({
+      project_id: projectId, user_id: userId,
+      name: act.name || '', order: act.order || 0,
+      description: act.description || '', color: act.color || '#ccee00',
+    })
+    .select()
+    .single();
+  if (error) { console.error('[db] saveAct error:', error); return act; }
+  return data;
+}
+
+// ── DIALOGUES ──────────────────────────────────────────────
+export async function fetchDialogues(projectId) {
+  if (!isConfigured()) return [];
+  const { data, error } = await supabase
+    .from('dialogues')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) { console.error('[db] fetchDialogues error:', error); return []; }
+  return data || [];
+}
+
+export async function saveDialogue(userId, projectId, dialogue) {
+  if (!isConfigured()) return dialogue;
+  if (dialogue.id) {
+    const { data, error } = await supabase
+      .from('dialogues')
+      .update({
+        speaker: dialogue.speaker, line: dialogue.line,
+        context: dialogue.context || '', scene_id: dialogue.sceneId || null,
+        tags: dialogue.tags || [],
+      })
+      .eq('id', dialogue.id)
+      .select()
+      .single();
+    if (error) { console.error('[db] saveDialogue error:', error); return dialogue; }
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('dialogues')
+    .insert({
+      project_id: projectId, user_id: userId,
+      speaker: dialogue.speaker || '', line: dialogue.line || '',
+      context: dialogue.context || '', scene_id: dialogue.sceneId || null,
+      tags: dialogue.tags || [],
+    })
+    .select()
+    .single();
+  if (error) { console.error('[db] saveDialogue error:', error); return dialogue; }
+  return data;
+}
+
+// ── THEMES ─────────────────────────────────────────────────
+export async function fetchThemes(projectId) {
+  if (!isConfigured()) return [];
+  const { data, error } = await supabase
+    .from('themes')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) { console.error('[db] fetchThemes error:', error); return []; }
+  return data || [];
+}
+
+export async function saveTheme(userId, projectId, theme) {
+  if (!isConfigured()) return theme;
+  if (theme.id) {
+    const { data, error } = await supabase
+      .from('themes')
+      .update({
+        statement: theme.statement, evidence: theme.evidence || '',
+        relevance: theme.relevance || 'Central',
+      })
+      .eq('id', theme.id)
+      .select()
+      .single();
+    if (error) { console.error('[db] saveTheme error:', error); return theme; }
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('themes')
+    .insert({
+      project_id: projectId, user_id: userId,
+      statement: theme.statement || '', evidence: theme.evidence || '',
+      relevance: theme.relevance || 'Central',
+    })
+    .select()
+    .single();
+  if (error) { console.error('[db] saveTheme error:', error); return theme; }
+  return data;
+}
+
+// ── PLOT POINTS ────────────────────────────────────────────
+export async function fetchPlotPoints(projectId) {
+  if (!isConfigured()) return [];
+  const { data, error } = await supabase
+    .from('plot_points')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) { console.error('[db] fetchPlotPoints error:', error); return []; }
+  return data || [];
+}
+
+export async function savePlotPoint(userId, projectId, pp) {
+  if (!isConfigured()) return pp;
+  if (pp.id) {
+    const { data, error } = await supabase
+      .from('plot_points')
+      .update({
+        title: pp.title, description: pp.description || '',
+        act_id: pp.actId || null, tags: pp.tags || [],
+      })
+      .eq('id', pp.id)
+      .select()
+      .single();
+    if (error) { console.error('[db] savePlotPoint error:', error); return pp; }
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('plot_points')
+    .insert({
+      project_id: projectId, user_id: userId,
+      title: pp.title || '', description: pp.description || '',
+      act_id: pp.actId || null, tags: pp.tags || [],
+    })
+    .select()
+    .single();
+  if (error) { console.error('[db] savePlotPoint error:', error); return pp; }
+  return data;
+}
+
+// ── WORLD ELEMENTS ──────────────────────────────────────────
+export async function fetchWorldElements(projectId) {
+  if (!isConfigured()) return [];
+  const { data, error } = await supabase
+    .from('world_elements')
+    .select('*')
+    .eq('project_id', projectId);
+  if (error) { console.error('[db] fetchWorldElements error:', error); return []; }
+  return data || [];
+}
+
+export async function saveWorldElement(userId, projectId, we) {
+  if (!isConfigured()) return we;
+  if (we.id) {
+    const { data, error } = await supabase
+      .from('world_elements')
+      .update({
+        name: we.name, type: we.type || 'setting',
+        description: we.description || '', tags: we.tags || [],
+      })
+      .eq('id', we.id)
+      .select()
+      .single();
+    if (error) { console.error('[db] saveWorldElement error:', error); return we; }
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('world_elements')
+    .insert({
+      project_id: projectId, user_id: userId,
+      name: we.name || '', type: we.type || 'setting',
+      description: we.description || '', tags: we.tags || [],
+    })
+    .select()
+    .single();
+  if (error) { console.error('[db] saveWorldElement error:', error); return we; }
+  return data;
+}
