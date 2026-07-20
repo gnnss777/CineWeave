@@ -91,7 +91,7 @@ export async function loadProjectsFromSupabase() {
       map.projects[localId] = sbProj.id;
     }
 
-    const [sbChars, sbLocs, sbObjs, sbScreenplay, sbNodes, sbLinks, sbRecs, sbMedia, sbBsd, sbTags, sbIdeas, sbProjectFiles, sbScreenplayImports] = await Promise.all([
+    const [sbChars, sbLocs, sbObjs, sbScreenplay, sbNodes, sbLinks, sbRecs, sbMedia, sbBsd, sbTags, sbIdeas, sbProjectFiles, sbScreenplayImports, sbScenes, sbActs, sbDialogues, sbThemes, sbPlotPoints, sbWorldElements] = await Promise.all([
       db.fetchCharacters(sbProj.id),
       db.fetchLocations(sbProj.id),
       db.fetchObjects(sbProj.id),
@@ -105,6 +105,12 @@ export async function loadProjectsFromSupabase() {
       db.fetchIdeas(sbProj.id).catch(() => []),
       db.fetchProjectFiles(sbProj.id).catch(() => []),
       db.fetchScreenplayImports(sbProj.id).catch(() => []),
+      db.fetchScenes(sbProj.id).catch(() => []),
+      db.fetchActs(sbProj.id).catch(() => []),
+      db.fetchDialogues(sbProj.id).catch(() => []),
+      db.fetchThemes(sbProj.id).catch(() => []),
+      db.fetchPlotPoints(sbProj.id).catch(() => []),
+      db.fetchWorldElements(sbProj.id).catch(() => []),
     ]);
 
     const characters = (sbChars || []).map(c => {
@@ -262,6 +268,62 @@ export async function loadProjectsFromSupabase() {
         metadata: si.metadata,
         createdAt: new Date(si.created_at).getTime(),
       })),
+      scenes: (sbScenes || []).map(s => ({
+        id: s.id,
+        title: s.title || '',
+        synopsis: s.synopsis || '',
+        actId: s.act_id || null,
+        characterIds: s.character_ids || [],
+        order: s.order || 0,
+        status: s.status || 'draft',
+        createdAt: s.created_at ? new Date(s.created_at).getTime() : 0,
+        updatedAt: s.updated_at ? new Date(s.updated_at).getTime() : 0,
+      })),
+      acts: (sbActs || []).map(a => ({
+        id: a.id,
+        name: a.name || '',
+        order: a.order || 0,
+        description: a.description || '',
+        color: a.color || '#ccee00',
+        createdAt: a.created_at ? new Date(a.created_at).getTime() : 0,
+        updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : 0,
+      })),
+      dialogues: (sbDialogues || []).map(d => ({
+        id: d.id,
+        speaker: d.speaker || '',
+        line: d.line || '',
+        context: d.context || '',
+        sceneId: d.scene_id || null,
+        tags: d.tags || [],
+        createdAt: d.created_at ? new Date(d.created_at).getTime() : 0,
+        updatedAt: d.updated_at ? new Date(d.updated_at).getTime() : 0,
+      })),
+      themes: (sbThemes || []).map(t => ({
+        id: t.id,
+        statement: t.statement || '',
+        evidence: t.evidence || '',
+        relevance: t.relevance || 'Central',
+        createdAt: t.created_at ? new Date(t.created_at).getTime() : 0,
+        updatedAt: t.updated_at ? new Date(t.updated_at).getTime() : 0,
+      })),
+      plot_points: (sbPlotPoints || []).map(pp => ({
+        id: pp.id,
+        title: pp.title || '',
+        description: pp.description || '',
+        actId: pp.act_id || null,
+        tags: pp.tags || [],
+        createdAt: pp.created_at ? new Date(pp.created_at).getTime() : 0,
+        updatedAt: pp.updated_at ? new Date(pp.updated_at).getTime() : 0,
+      })),
+      world_elements: (sbWorldElements || []).map(we => ({
+        id: we.id,
+        name: we.name || '',
+        type: we.type || 'setting',
+        description: we.description || '',
+        tags: we.tags || [],
+        createdAt: we.created_at ? new Date(we.created_at).getTime() : 0,
+        updatedAt: we.updated_at ? new Date(we.updated_at).getTime() : 0,
+      })),
       needsAutoLayout: false,
     });
   }
@@ -372,6 +434,46 @@ export async function syncProjectToSupabase(project) {
 
     // 5. Sync screenplay (full replace)
     await db.saveScreenplayElements(user.id, sbProjId, project.screenplay || []);
+
+    // 5b. Sync scenes
+    for (const scene of (project.entities?.scenes || [])) {
+      await db.saveScene(user.id, sbProjId, {
+        ...scene,
+        actId: scene.actId,
+        characterIds: scene.characterIds || [],
+      });
+    }
+
+    // 5c. Sync acts
+    for (const act of (project.entities?.acts || [])) {
+      await db.saveAct(user.id, sbProjId, act);
+    }
+
+    // 5d. Sync dialogues
+    for (const d of (project.entities?.dialogues || [])) {
+      await db.saveDialogue(user.id, sbProjId, {
+        ...d,
+        sceneId: d.sceneId,
+      });
+    }
+
+    // 5e. Sync themes
+    for (const t of (project.entities?.themes || [])) {
+      await db.saveTheme(user.id, sbProjId, t);
+    }
+
+    // 5f. Sync plot_points
+    for (const pp of (project.entities?.plot_points || [])) {
+      await db.savePlotPoint(user.id, sbProjId, {
+        ...pp,
+        actId: pp.actId,
+      });
+    }
+
+    // 5g. Sync world_elements
+    for (const we of (project.entities?.world_elements || [])) {
+      await db.saveWorldElement(user.id, sbProjId, we);
+    }
 
     // 6. Sync mind map nodes + links (full replace)
     const validNodeTypes = ['act', 'scene', 'character', 'location', 'object'];
