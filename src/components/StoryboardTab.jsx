@@ -8,7 +8,7 @@ import FrameTimeline from './FrameTimeline';
 import LayerPanel from './LayerPanel';
 
 export default function StoryboardTab() {
-  const { currentProject, navigateTo } = useProject();
+  const { currentProject, updateProject, navigateTo } = useProject();
   const entities = currentProject.entities;
 
   // Estado da storyboard
@@ -20,15 +20,12 @@ export default function StoryboardTab() {
 
   // Adicionar novo frame
   const handleAddFrame = (sceneId) => {
-    const scene = entities.scenes.find((s) => s.id === sceneId);
-
-    console.log('[StoryboardTab] handleAddFrame - sceneId:', sceneId);
-    console.log('[StoryboardTab] handleAddFrame - scene:', scene);
-
+    const proj = { ...currentProject };
+    const scene = proj.entities.scenes.find((s) => s.id === sceneId);
     if (!scene) return;
 
-    // Determinar próximo order
-    const nextOrder = frames.length > 0 ? Math.max(...frames.map((f) => f.order)) + 1 : 0;
+    const existingFrames = proj.entities.storyboard_frames || [];
+    const nextOrder = existingFrames.length > 0 ? Math.max(...existingFrames.map((f) => f.order)) + 1 : 0;
 
     const newFrame = createEntity('storyboard_frames', {
       id: `frame-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -37,11 +34,8 @@ export default function StoryboardTab() {
       order: nextOrder,
       width: 1920,
       height: 1080,
-      created_at: Date.now(),
-      updated_at: Date.now(),
     });
 
-    // Criar layer de background
     const newLayer = createEntity('storyboard_layers', {
       id: `layer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       storyboard_id: selectedStoryboard,
@@ -53,29 +47,15 @@ export default function StoryboardTab() {
       locked: false,
       blend_mode: 'source-over',
       data: { color: '#ffffff' },
-      created_at: Date.now(),
-      updated_at: Date.now(),
     });
 
-    // Atualizar entities
-    const updatedFrames = [...frames, newFrame];
-    const updatedLayers = [...layers, newLayer];
+    if (!proj.entities.storyboard_frames) proj.entities.storyboard_frames = [];
+    if (!proj.entities.storyboard_layers) proj.entities.storyboard_layers = [];
+    proj.entities.storyboard_frames = [...existingFrames, newFrame];
+    proj.entities.storyboard_layers = [...(proj.entities.storyboard_layers || []), newLayer];
 
-    setFrames(updatedFrames);
-    setLayers(updatedLayers);
-
-    // Atualizar currentProject
-    currentProject.entities.storyboard_frames = updatedFrames;
-    currentProject.entities.storyboard_layers = updatedLayers;
-
-    // Salvar no localStorage
-    saveToStorage();
-
-    // Ativar o novo frame
+    updateProject(proj);
     setActiveFrameId(newFrame.id);
-
-    // Navegar para o novo frame
-    navigateTo('storyboard', newFrame.id);
   };
 
   // Ativar frame
@@ -87,27 +67,10 @@ export default function StoryboardTab() {
   const handleDeleteFrame = (frameId) => {
     if (!confirm('Are you sure you want to delete this frame?')) return;
 
-    const updatedFrames = frames.filter((f) => f.id !== frameId);
-    setFrames(updatedFrames);
-
-    // Atualizar currentProject
-    currentProject.entities.storyboard_frames = updatedFrames;
-    saveToStorage();
+    const proj = { ...currentProject };
+    proj.entities.storyboard_frames = (proj.entities.storyboard_frames || []).filter((f) => f.id !== frameId);
+    updateProject(proj);
   };
-
-  // Salvar no localStorage
-  function saveToStorage() {
-    try {
-      const projects = JSON.parse(localStorage.getItem('cineweave_projects') || '[]');
-      const projectIndex = projects.findIndex((p) => p.id === currentProject.id);
-      if (projectIndex !== -1) {
-        projects[projectIndex] = currentProject;
-        localStorage.setItem('cineweave_projects', JSON.stringify(projects));
-      }
-    } catch (error) {
-      console.error('Error saving to storage:', error);
-    }
-  }
 
   // Frame atual
   const activeFrame = frames.find((f) => f.id === activeFrameId);
