@@ -21,15 +21,15 @@ export default function LayerPanel({ layers, activeLayerId, onToggleLayer, onSel
   const getLayerTypeColor = (type) => {
     switch (type) {
       case 'drawing':
-        return '#3b82f6';
+        return 'var(--color-act)';
       case 'text':
-        return '#8b5cf6';
+        return 'var(--color-scene)';
       case 'image':
-        return '#ec4899';
+        return 'var(--color-theme)';
       case 'background':
-        return '#10b981';
+        return 'var(--color-location)';
       default:
-        return '#6b7280';
+        return 'var(--text-muted)';
     }
   };
 

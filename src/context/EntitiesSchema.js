@@ -183,7 +183,7 @@ export function createEntityId(type) {
 export function getEntityType(entityId) {
   if (!entityId) return null;
   const prefix = entityId.split('-')[0];
-  const typeMap = { char: 'characters', loc: 'locations', obj: 'objects', scene: 'scenes', plot: 'plot_points', act: 'acts', storyboard: 'storyboards', frame: 'storyboard_frames', layer: 'storyboard_layers', drawing: 'drawing_elements' };
+  const typeMap = { char: 'characters', loc: 'locations', obj: 'objects', scene: 'scenes', plot: 'plot_points', theme: 'themes', act: 'acts', dlg: 'dialogues', we: 'world_elements', storyboard: 'storyboards', frame: 'storyboard_frames', layer: 'storyboard_layers', drawing: 'drawing_elements' };
   return typeMap[prefix] || null;
 }
 

@@ -158,13 +158,13 @@ function CineWeaveShell() {
           <button onClick={() => setActiveTab('screenplay')} className={`nav-item ${activeTab === 'screenplay' ? 'active' : ''}`}>
             <FileText size={16} /> Roteiro
           </button>
-            <button onClick={() => setActiveTab('encyclopedia')} className={`nav-item ${activeTab === 'encyclopedia' ? 'active' : ''}`}>
-              <BookOpen size={16} /> EnciclopAcdia
-            </button>
-            <button onClick={() => setActiveTab('storyboard')} className={`nav-item ${activeTab === 'storyboard' ? 'active' : ''}`}>
-              <Image size={16} /> Storyboard
-            </button>
-            <button onClick={() => setActiveTab('mindmap')} className={`nav-item ${activeTab === 'mindmap' ? 'active' : ''}`}>
+          <button onClick={() => setActiveTab('encyclopedia')} className={`nav-item ${activeTab === 'encyclopedia' ? 'active' : ''}`}>
+            <BookOpen size={16} /> Enciclopédia
+          </button>
+          <button onClick={() => setActiveTab('storyboard')} className={`nav-item ${activeTab === 'storyboard' ? 'active' : ''}`}>
+            <Image size={16} /> Storyboard
+          </button>
+          <button onClick={() => setActiveTab('mindmap')} className={`nav-item ${activeTab === 'mindmap' ? 'active' : ''}`}>
             <Compass size={16} /> Mapa Mental
           </button>
           <button onClick={() => setActiveTab('brainstorm')} className={`nav-item ${activeTab === 'brainstorm' ? 'active' : ''}`}>
