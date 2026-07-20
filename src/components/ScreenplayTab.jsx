@@ -480,7 +480,7 @@ export default function ScreenplayTab() {
     e.target.value = '';
     
     let fileStorageRecord = null;
-    let fountainText = '';
+    let rawText = '';
     
     try {
       // Upload file to Storage
@@ -515,16 +515,21 @@ export default function ScreenplayTab() {
       let imported;
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         const parsed = await parseFile(file);
-        fountainText = parsed.text;
-        imported = parseFountain(fountainText);
+        rawText = parsed.text;
+        imported = parseFountain(rawText);
       } else if (file.name.toLowerCase().endsWith('.fdx')) {
         const { parseFdx } = await import('../lib/fdxImport');
         const xmlText = await file.text();
         imported = parseFdx(xmlText);
-        fountainText = imported.map(e => e.text).join('\n');
+        rawText = imported.map(e => e.text).join('\n');
       } else {
-        fountainText = await file.text();
-        imported = parseFountain(fountainText);
+        rawText = await file.text();
+        imported = parseFountain(rawText);
+      }
+
+      if (!imported || imported.length === 0) {
+        alert('Não foi possível extrair elementos do arquivo.');
+        return;
       }
       console.log('[FountainImport] elements:', imported.length, 'types:', imported.filter(e => e.type === 'scene-heading').length, 'scenes,', imported.filter(e => e.type === 'character').length, 'chars');
       const result = importScreenplayWithEntities(imported);
@@ -584,7 +589,7 @@ export default function ScreenplayTab() {
       });
 
       try {
-        const llmResult = await extractEnrichmentFromScreenplay(fountainText, (status) => {
+        const llmResult = await extractEnrichmentFromScreenplay(rawText, (status) => {
           setConfirmModal(prev => prev ? { ...prev, message: `Roteiro importado. Status: ${status}` } : prev);
         });
         const enrichResult = enrichWithLLM(llmResult);
@@ -1803,8 +1808,7 @@ setActiveTab('editor');
           <button onClick={() => setVersionPanelOpen(v => !v)} className={`toolbar-tab-btn ${versionPanelOpen ? 'active' : ''}`} title="Painel de Versões"><Clock size={14} /></button>
           <button onClick={() => setCoverageModal(true)} className="toolbar-tab-btn" title="Análise de Roteiro"><BarChart2 size={14} /></button>
           <button onClick={() => setClassicScriptsModal(true)} className="toolbar-tab-btn" title="Importar Roteiros Clássicos"><BookOpen size={14} /></button>
-          <input ref={fountainInputRef} type="file"               accept=".fountain,.txt,.pdf,.fdx"
-              onChange={handleFountainImport} style={{ display: 'none' }} />
+          <input ref={fountainInputRef} type="file" accept=".fountain,.txt,.pdf,.fdx" onChange={handleFountainImport} style={{ display: 'none' }} />
           <button onClick={() => fountainInputRef.current.click()} className="toolbar-tab-btn" title="Importar .fountain / .pdf"><Upload size={14} /></button>
           <button onClick={handleFountainExport} className="toolbar-tab-btn" title="Exportar .fountain"><Download size={14} /></button>
           <button onClick={handlePDFExport} className="toolbar-tab-btn" title="Exportar PDF"><Printer size={14} /></button>
