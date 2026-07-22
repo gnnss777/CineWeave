@@ -31,3 +31,13 @@ dev-dist
 ROTEIROS/
 *.pdf
 server.err
+
+# Test artifacts
+e2e/screenshots/
+e2e/test-import.fdx
+
+# Agent/zcode workspace
+.zcode/
+.superpowers/
+docs/
+tests/

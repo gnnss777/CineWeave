@@ -148,9 +148,16 @@ export function createEntity(type, overrides = {}) {
   }
 
   const now = Date.now();
+  // Create entity ID if not provided in overrides
+  const entityId = overrides.id || createEntityId(type);
+
+  // Remove id from overrides to avoid conflict with schema id
+  const { id: _providedId, ...cleanOverrides } = overrides;
+
   return {
     ...schema,
-    ...overrides,
+    id: entityId,
+    ...cleanOverrides,
     createdAt: overrides.createdAt || now,
     updatedAt: overrides.updatedAt || now,
   };

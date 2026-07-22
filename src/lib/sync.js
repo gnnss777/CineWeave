@@ -342,6 +342,12 @@ export async function syncProjectToSupabase(project) {
   if (!map.characters) map.characters = {};
   if (!map.locations) map.locations = {};
   if (!map.objects) map.objects = {};
+  if (!map.scenes) map.scenes = {};
+  if (!map.acts) map.acts = {};
+  if (!map.dialogues) map.dialogues = {};
+  if (!map.themes) map.themes = {};
+  if (!map.plot_points) map.plot_points = {};
+  if (!map.world_elements) map.world_elements = {};
 
   try {
     // 1. Ensure project exists in Supabase
@@ -437,42 +443,78 @@ export async function syncProjectToSupabase(project) {
 
     // 5b. Sync scenes
     for (const scene of (project.entities?.scenes || [])) {
-      await db.saveScene(user.id, sbProjId, {
-        ...scene,
-        actId: scene.actId,
-        characterIds: scene.characterIds || [],
+      const existingSbId = map.scenes[scene.id] || (scene.id?.startsWith('sb-') ? scene.id : null);
+      const record = existingSbId ? { ...scene, id: existingSbId } : scene;
+      const saved = await db.saveScene(user.id, sbProjId, {
+        ...record,
+        actId: record.actId,
+        characterIds: record.characterIds || [],
       });
+      if (saved?.id && saved.id !== scene.id) {
+        map.scenes[scene.id] = saved.id;
+        saveIdMap(map);
+      }
     }
 
     // 5c. Sync acts
     for (const act of (project.entities?.acts || [])) {
-      await db.saveAct(user.id, sbProjId, act);
+      const existingSbId = map.acts[act.id] || (act.id?.startsWith('sb-') ? act.id : null);
+      const record = existingSbId ? { ...act, id: existingSbId } : act;
+      const saved = await db.saveAct(user.id, sbProjId, record);
+      if (saved?.id && saved.id !== act.id) {
+        map.acts[act.id] = saved.id;
+        saveIdMap(map);
+      }
     }
 
     // 5d. Sync dialogues
     for (const d of (project.entities?.dialogues || [])) {
-      await db.saveDialogue(user.id, sbProjId, {
-        ...d,
-        sceneId: d.sceneId,
+      const existingSbId = map.dialogues[d.id] || (d.id?.startsWith('sb-') ? d.id : null);
+      const record = existingSbId ? { ...d, id: existingSbId } : d;
+      const saved = await db.saveDialogue(user.id, sbProjId, {
+        ...record,
+        sceneId: record.sceneId,
       });
+      if (saved?.id && saved.id !== d.id) {
+        map.dialogues[d.id] = saved.id;
+        saveIdMap(map);
+      }
     }
 
     // 5e. Sync themes
     for (const t of (project.entities?.themes || [])) {
-      await db.saveTheme(user.id, sbProjId, t);
+      const existingSbId = map.themes[t.id] || (t.id?.startsWith('sb-') ? t.id : null);
+      const record = existingSbId ? { ...t, id: existingSbId } : t;
+      const saved = await db.saveTheme(user.id, sbProjId, record);
+      if (saved?.id && saved.id !== t.id) {
+        map.themes[t.id] = saved.id;
+        saveIdMap(map);
+      }
     }
 
     // 5f. Sync plot_points
     for (const pp of (project.entities?.plot_points || [])) {
-      await db.savePlotPoint(user.id, sbProjId, {
-        ...pp,
-        actId: pp.actId,
+      const existingSbId = map.plot_points[pp.id] || (pp.id?.startsWith('sb-') ? pp.id : null);
+      const record = existingSbId ? { ...pp, id: existingSbId } : pp;
+      const saved = await db.savePlotPoint(user.id, sbProjId, {
+        ...record,
+        actId: record.actId,
       });
+      if (saved?.id && saved.id !== pp.id) {
+        map.plot_points[pp.id] = saved.id;
+        saveIdMap(map);
+      }
     }
 
     // 5g. Sync world_elements
     for (const we of (project.entities?.world_elements || [])) {
-      await db.saveWorldElement(user.id, sbProjId, we);
+      const existingSbId = map.world_elements[we.id] || (we.id?.startsWith('sb-') ? we.id : null);
+      const record = existingSbId ? { ...we, id: existingSbId } : we;
+      const saved = await db.saveWorldElement(user.id, sbProjId, record);
+      if (saved?.id && saved.id !== we.id) {
+        map.world_elements[we.id] = saved.id;
+        saveIdMap(map);
+      }
     }
 
     // 6. Sync mind map nodes + links (full replace)

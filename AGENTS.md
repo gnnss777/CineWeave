@@ -52,3 +52,38 @@ Sempre sugerir a skill certa no momento certo. Perguntar antes de ativar ("Quer 
 feature → writing-plans → implement → code-review → qa → finishing-a-development-branch
 ```
 <!-- END:skills -->
+
+<!-- BEGIN:memory -->
+## GNNSS Memory System
+
+This workspace is part of the GNNSS project ecosystem.
+An Obsidian vault stores all project context across sessions.
+**Always read context before, write after.**
+
+### Pre-Session (read in order)
+1. `C:\Users\gnnss\OneDrive\Documents\GNNSS_VAULT\hot.md`
+2. `C:\Users\gnnss\OneDrive\Documents\GNNSS_VAULT\Diário de Sessão.md` (last 15 lines)
+3. `C:\Users\gnnss\OneDrive\Documents\GNNSS_VAULT\GNNSS Vault.md`
+
+### Post-Session (write these)
+1. Append to `Diário de Sessão.md`:
+   ```
+   ## YYYY-MM-DD — Title
+   
+   ### ✅ Feito
+   - item
+   
+   ### 🧠 Aprendizados
+   - lesson
+   
+   ### 🔧 Pendentes
+   - [ ] pending
+   ```
+2. Overwrite `hot.md` with latest context
+3. Update `CineWeave.md` note if project state changed
+
+### Mid-Session Triggers
+- Decision → append to `Decisões Técnicas.md`
+- Solution → append to `Dicas & Truques.md`
+- Idea → append to `Ideias Criativas.md`
+<!-- END:memory -->

@@ -5,6 +5,11 @@ function isConfigured() {
   return url && url !== 'https://placeholder.supabase.co';
 }
 
+/** Check if string is a valid UUID (Supabase uses uuid PK columns) */
+function isUUID(id) {
+  return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 // ── PROJECTS ──────────────────────────────────────────────
 
 export async function fetchProjects(userId) {
@@ -771,7 +776,7 @@ export async function fetchScenes(projectId) {
 
 export async function saveScene(userId, projectId, scene) {
   if (!isConfigured()) return scene;
-  if (scene.id) {
+  if (scene.id && isUUID(scene.id)) {
     const { data, error } = await supabase
       .from('scenes')
       .update({
@@ -813,7 +818,7 @@ export async function fetchActs(projectId) {
 
 export async function saveAct(userId, projectId, act) {
   if (!isConfigured()) return act;
-  if (act.id) {
+  if (act.id && isUUID(act.id)) {
     const { data, error } = await supabase
       .from('acts')
       .update({
@@ -852,7 +857,15 @@ export async function fetchDialogues(projectId) {
 
 export async function saveDialogue(userId, projectId, dialogue) {
   if (!isConfigured()) return dialogue;
-  if (dialogue.id) {
+  if (!dialogue.id || !isUUID(dialogue.id)) {
+    console.warn('[db] saveDialogue skipping: invalid id', dialogue.id);
+    return dialogue;
+  }
+  if (dialogue.sceneId && !isUUID(dialogue.sceneId)) {
+    console.warn('[db] saveDialogue skipping: sceneId is not a UUID', dialogue.sceneId);
+    return dialogue;
+  }
+  if (dialogue.id && isUUID(dialogue.id)) {
     const { data, error } = await supabase
       .from('dialogues')
       .update({
@@ -893,7 +906,7 @@ export async function fetchThemes(projectId) {
 
 export async function saveTheme(userId, projectId, theme) {
   if (!isConfigured()) return theme;
-  if (theme.id) {
+  if (theme.id && isUUID(theme.id)) {
     const { data, error } = await supabase
       .from('themes')
       .update({
@@ -932,7 +945,7 @@ export async function fetchPlotPoints(projectId) {
 
 export async function savePlotPoint(userId, projectId, pp) {
   if (!isConfigured()) return pp;
-  if (pp.id) {
+  if (pp.id && isUUID(pp.id)) {
     const { data, error } = await supabase
       .from('plot_points')
       .update({
@@ -971,7 +984,7 @@ export async function fetchWorldElements(projectId) {
 
 export async function saveWorldElement(userId, projectId, we) {
   if (!isConfigured()) return we;
-  if (we.id) {
+  if (we.id && isUUID(we.id)) {
     const { data, error } = await supabase
       .from('world_elements')
       .update({
