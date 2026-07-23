@@ -1,0 +1,210 @@
+diff --git a/src/components/BrainstormTab.jsx b/src/components/BrainstormTab.jsx
+index f8c9380..5aa308f 100644
+--- a/src/components/BrainstormTab.jsx
++++ b/src/components/BrainstormTab.jsx
+@@ -217,6 +217,15 @@ export default function BrainstormTab() {
+   const speechActiveRef = useRef(false);
+   const accumulatedRef = useRef('');
+   const processingRef = useRef(false);
++  // BUGFIX: extractFromParsedDocs faz uma chamada assíncrona (IA) e só no
++  // final decide o que salvar de volta usando `currentProject` — mas
++  // `currentProject` aqui é a "foto" do estado de quando a função foi
++  // criada (closure do React), então se algo mudar o projeto enquanto a IA
++  // está processando (ex.: uma gravação sendo adicionada), esse `updateProject`
++  // final sobrescreveria e apagaria essa mudança. Esta ref sempre aponta
++  // para o valor mais recente de currentProject, mesmo em callbacks async.
++  const currentProjectRef = useRef(currentProject);
++  useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
+ 
+   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+   const containerRef = useRef(null);
+@@ -371,11 +380,43 @@ export default function BrainstormTab() {
+     const title = `Reunião #${(currentProject?.recordings?.length || 0) + 1}`;
+     const duration = formatTime(recordingTime || 45);
+     const savedRec = addRecording(title, duration, customTranscript);
+-    
++
++    // BUGFIX: antes, a gravação só ficava salva em `currentProject.recordings`
++    // e NUNCA era enviada para a extração por IA — `isProcessingDoc` excluía
++    // explicitamente ids que começam com "recording-", e a única função que
++    // "processava" gravações (`processBrainstorm`, em ProjectContext.jsx) era
++    // código de demonstração morto (nem estava ligado a nenhum botão) que
++    // inseria sempre os mesmos personagem/local/cena fictícios, ignorando o
++    // conteúdo real da transcrição. Agora registramos a gravação como um
++    // documento "já parseado" (o texto já existe, não precisa reler arquivo),
++    // usando o mesmo id/formato que o restante do código já esperava
++    // (metadata.source === 'recording'), para que ela passe pelo mesmo
++    // pipeline real de IA (extractStructureFromDocuments) que os uploads.
++    addBrainstormDocument({
++      id: `recording-${savedRec.id}`,
++      name: title,
++      type: 'transcrição',
++      content: customTranscript,
++      size: customTranscript.length,
++      status: 'parsed',
++      metadata: {
++        source: 'recording',
++        recordingId: savedRec.id,
++        duration,
++        date: savedRec.date,
++        wordCount: customTranscript.split(/\s+/).filter(Boolean).length,
++      },
++    });
++
+     setAudioUrl(null);
+     setCustomTranscript('');
+     setRecordingTime(0);
+     setShowRecordModal(false);
++
++    // Dispara a extração por IA já em seguida, igual acontece com upload de
++    // documentos — sem isso o usuário teria que descobrir sozinho que precisa
++    // clicar em "Processar Tudo" depois de gravar.
++    extractFromParsedDocs();
+   };
+ 
+   // ── File Handling ──────────────────────────────────────
+@@ -534,9 +575,13 @@ export default function BrainstormTab() {
+     }
+   };
+ 
+-  const extractFromParsedDocs = async () => {
+-    // Documents now come from currentProject.brainstormDocuments, already scoped to project
+-    const unprocessed = documents.filter(d => d.status === 'parsed');
++  const extractFromParsedDocs = async (explicitDocs = null) => {
++    // BUGFIX: quando chamado logo em seguida de um addBrainstormDocument()
++    // (ex.: ao salvar uma gravação), o `documents` deste closure ainda é o
++    // snapshot ANTERIOR ao re-render — o documento novo ainda não apareceria
++    // aqui. Por isso aceitamos uma lista explícita opcional em vez de
++    // depender só do estado `documents`.
++    const unprocessed = explicitDocs || documents.filter(d => d.status === 'parsed');
+     if (unprocessed.length === 0) return;
+ 
+     setIsProcessing(true);
+@@ -544,9 +589,10 @@ export default function BrainstormTab() {
+     setExtractionError(null);
+ 
+     const markDoc = (docId, updates) => {
+-      const docs = currentProject?.brainstormDocuments || [];
++      const proj = currentProjectRef.current;
++      const docs = proj?.brainstormDocuments || [];
+       const updated = docs.map(d => d.id === docId ? { ...d, ...updates } : d);
+-      updateProject({ ...currentProject, brainstormDocuments: updated });
++      updateProject({ ...proj, brainstormDocuments: updated });
+     };
+ 
+     try {
+@@ -558,7 +604,7 @@ export default function BrainstormTab() {
+           content: d.content 
+         })),
+         (status) => setProcessingStatus(status),
+-        currentProject
++        currentProjectRef.current
+       );
+ 
+       // Save extracted entities directly to the unified entities store
+@@ -580,12 +626,18 @@ export default function BrainstormTab() {
+ 
+       const result = processLLMToProject(extracted, 'Documentos importados', '');
+ 
+-      // Mark each unprocessed document as processed
+-      // We use the snapshot of brainstormDocuments from the start of this function
+-      const updatedDocs = documents.map(d => 
++      // BUGFIX: usar currentProjectRef.current (sempre atual) em vez do
++      // `documents`/`currentProject` deste closure — que pode estar
++      // desatualizado depois de um `await` (ex.: extractStructureFromDocuments
++      // leva alguns segundos, e nesse meio-tempo outras mudanças, como uma
++      // gravação recém-salva, já podem ter sido commitadas no estado real).
++      // Usar o snapshot antigo aqui apagaria essas mudanças.
++      const latestProj = currentProjectRef.current;
++      const latestDocs = latestProj?.brainstormDocuments || [];
++      const updatedDocs = latestDocs.map(d => 
+         unprocessed.some(u => u.id === d.id) ? { ...d, status: 'processed', extractedData: extracted } : d
+       );
+-      updateProject({ ...currentProject, brainstormDocuments: updatedDocs });
++      updateProject({ ...latestProj, brainstormDocuments: updatedDocs });
+ 
+       if (result) {
+         const parts = [];
+@@ -614,11 +666,13 @@ export default function BrainstormTab() {
+       setProcessingStatus(`Erro: ${error.message}`);
+       setExtractionError(error.message);
+       
+-      // Mark each unprocessed document as error (using the snapshot)
+-      const updatedDocs = documents.map(d => 
++      // Mark each unprocessed document as error (using the latest state, not a stale snapshot)
++      const latestProj = currentProjectRef.current;
++      const latestDocs = latestProj?.brainstormDocuments || [];
++      const updatedDocs = latestDocs.map(d => 
+         unprocessed.some(u => u.id === d.id) ? { ...d, status: 'error', error: error.message } : d
+       );
+-      updateProject({ ...currentProject, brainstormDocuments: updatedDocs });
++      updateProject({ ...latestProj, brainstormDocuments: updatedDocs });
+       
+       // Show error modal
+       setConfirmModal({
+@@ -675,9 +729,15 @@ export default function BrainstormTab() {
+   const isProcessingDoc = (d) => !d.id.startsWith('recording-');
+ 
+   const handleProcessAll = async () => {
++    // isProcessingDoc aqui só filtra o que precisa de (re)parse de ARQUIVO
++    // (gravação não tem arquivo, já chega com o texto pronto).
+     const pending = documents.filter(d => isProcessingDoc(d) && (d.status === 'pending' || d.status === 'error'));
+     if (pending.length > 0) await processDocuments(pending);
+-    const parsed = documents.filter(d => isProcessingDoc(d) && d.status === 'parsed');
++    // BUGFIX: aqui NÃO filtramos por isProcessingDoc — gravações (status
++    // 'parsed') precisam ser enviadas para a extração por IA como qualquer
++    // outro documento. Antes esse filtro excluía as gravações também deste
++    // passo, então elas nunca eram analisadas.
++    const parsed = documents.filter(d => d.status === 'parsed');
+     if (parsed.length > 0) await extractFromParsedDocs();
+   };
+ 
+diff --git a/src/lib/entityExtractor.js b/src/lib/entityExtractor.js
+index bd4270d..d6b27a7 100644
+--- a/src/lib/entityExtractor.js
++++ b/src/lib/entityExtractor.js
+@@ -12,8 +12,16 @@ const TIME_OF_DAY_OPTIONS = [
+ const ACT_RE = /^(ATO|ACT)\s+(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/i;
+ 
+ function cleanSceneNumber(text) {
+-  let cleaned = text.replace(/\s*[-–—]\s*(?:DIA|DAY|NOITE|NIGHT)?\s*\d+\s*$/i, '').trim();
+-  // Safety net: strip trailing standalone digits (scene number without dash prefix)
++  // BUGFIX: a versão antiga tinha "(?:DIA|DAY|NOITE|NIGHT)?" dentro do
++  // próprio trecho removido, então em headings como "SALA - NOITE 45"
++  // (número de cena após a palavra de horário, comum em PDFs impressos)
++  // a palavra NOITE era apagada junto com o número, e a cena sempre
++  // caía no horário padrão (DIA). Agora só removemos número de cena
++  // "solto" logo após um traço (ex.: "SALA - 45"), sem tocar em
++  // palavras de horário.
++  let cleaned = text.replace(/\s*[-–—]\s*\d+\s*$/i, '').trim();
++  // Safety net: strip trailing standalone digits (scene number without dash prefix,
++  // ou após a palavra de horário, ex.: "NOITE 45" -> "NOITE")
+   cleaned = cleaned.replace(/\s+\d+\s*$/, '').trim();
+   return cleaned;
+ }
+@@ -40,15 +48,20 @@ export function parseSceneHeading(text) {
+   const match = stripped.trim().toUpperCase().match(SCENE_HEADING_RE);
+   if (!match) return null;
+   const type = match[1].toUpperCase();
+-  const locationAndRest = match[2].trim();
++  // BUGFIX: a regex separa o nome do local (match[2]) do trecho após o
++  // traço (match[3], ex.: "NOITE", "COZINHA - NOITE"). O código antigo
++  // usava só match[2] e descartava match[3], então o horário do dia
++  // (DIA/NOITE/TARDE...) nunca era detectado e toda cena virava "DIA".
++  // Reconstituímos a string completa para a lógica de detecção abaixo.
++  const locationAndRest = (match[3] ? `${match[2]} - ${match[3]}` : match[2]).trim();
+ 
+   const { timeOfDay, trimmed: locationPart } = findTimeOfDay(locationAndRest);
+ 
+-  let locationName = locationPart;
+-  const hyphenIdx = locationPart.lastIndexOf(' - ');
++  let locationName = locationPart.replace(/[-–—]\s*$/, '').trim();
++  const hyphenIdx = locationName.lastIndexOf(' - ');
+   if (hyphenIdx > 0) {
+-    const before = locationPart.slice(0, hyphenIdx).trim();
+-    const after = locationPart.slice(hyphenIdx + 3).trim();
++    const before = locationName.slice(0, hyphenIdx).trim();
++    const after = locationName.slice(hyphenIdx + 3).trim();
+     const afterUpper = after.toUpperCase();
+     const isTimeOfDay = TIME_OF_DAY_OPTIONS.some(opts =>
+       opts.some(opt => afterUpper === opt.toUpperCase())
