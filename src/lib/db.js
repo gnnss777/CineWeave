@@ -857,14 +857,7 @@ export async function fetchDialogues(projectId) {
 
 export async function saveDialogue(userId, projectId, dialogue) {
   if (!isConfigured()) return dialogue;
-  if (!dialogue.id || !isUUID(dialogue.id)) {
-    console.warn('[db] saveDialogue skipping: invalid id', dialogue.id);
-    return dialogue;
-  }
-  if (dialogue.sceneId && !isUUID(dialogue.sceneId)) {
-    console.warn('[db] saveDialogue skipping: sceneId is not a UUID', dialogue.sceneId);
-    return dialogue;
-  }
+  // UPDATE if ID is a Supabase UUID, INSERT otherwise
   if (dialogue.id && isUUID(dialogue.id)) {
     const { data, error } = await supabase
       .from('dialogues')
@@ -879,6 +872,7 @@ export async function saveDialogue(userId, projectId, dialogue) {
     if (error) { console.error('[db] saveDialogue error:', error); return dialogue; }
     return data;
   }
+  // INSERT — omits local non-UUID id, lets Supabase generate UUID PK
   const { data, error } = await supabase
     .from('dialogues')
     .insert({

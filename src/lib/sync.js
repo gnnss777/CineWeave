@@ -6,6 +6,9 @@ const ID_MAP_KEY = 'cineweave_sb_ids';
 // Track brainstorm document sync status
 const BSB_SYNCED_FLAG = '__bsb_synced';
 
+const _uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUUID(id) { return typeof id === 'string' && _uuidRe.test(id); }
+
 function isConfigured() {
   const url = import.meta.env.VITE_SUPABASE_URL;
   return url && url !== 'https://placeholder.supabase.co';
@@ -471,9 +474,11 @@ export async function syncProjectToSupabase(project) {
     for (const d of (project.entities?.dialogues || [])) {
       const existingSbId = map.dialogues[d.id] || (d.id?.startsWith('sb-') ? d.id : null);
       const record = existingSbId ? { ...d, id: existingSbId } : d;
+      // Map local sceneId to Supabase UUID (scenes are synced before dialogues)
+      const mappedSceneId = (d.sceneId && map.scenes[d.sceneId]) ? map.scenes[d.sceneId] : null;
       const saved = await db.saveDialogue(user.id, sbProjId, {
         ...record,
-        sceneId: record.sceneId,
+        sceneId: mappedSceneId || (isUUID(d.sceneId) ? d.sceneId : null),
       });
       if (saved?.id && saved.id !== d.id) {
         map.dialogues[d.id] = saved.id;
