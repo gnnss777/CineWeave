@@ -35,7 +35,7 @@ index f8c9380..5aa308f 100644
 +    // usando o mesmo id/formato que o restante do código já esperava
 +    // (metadata.source === 'recording'), para que ela passe pelo mesmo
 +    // pipeline real de IA (extractStructureFromDocuments) que os uploads.
-+    addBrainstormDocument({
++    const recordingDocument = {
 +      id: `recording-${savedRec.id}`,
 +      name: title,
 +      type: 'transcrição',
@@ -49,7 +49,8 @@ index f8c9380..5aa308f 100644
 +        date: savedRec.date,
 +        wordCount: customTranscript.split(/\s+/).filter(Boolean).length,
 +      },
-+    });
++    };
++    addBrainstormDocument(recordingDocument);
 +
      setAudioUrl(null);
      setCustomTranscript('');
@@ -59,7 +60,7 @@ index f8c9380..5aa308f 100644
 +    // Dispara a extração por IA já em seguida, igual acontece com upload de
 +    // documentos — sem isso o usuário teria que descobrir sozinho que precisa
 +    // clicar em "Processar Tudo" depois de gravar.
-+    extractFromParsedDocs();
++    extractFromParsedDocs([recordingDocument]);
    };
  
    // ── File Handling ──────────────────────────────────────

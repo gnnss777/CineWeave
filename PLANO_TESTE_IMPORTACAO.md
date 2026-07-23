@@ -33,7 +33,7 @@ a regex removia "NOITE 45" inteiro em vez de só o "45", perdendo a
 informação de horário de novo.
 
 Os dois estão corrigidos em:
-`/mnt/user-data/outputs/import-tests/fix-timeofday.patch`
+`fix-completo.patch` (na raiz do repositório)
 
 Também montei um harness de teste (roda em Node, sem browser) em
 `/mnt/user-data/outputs/import-tests/`:
@@ -54,7 +54,7 @@ duplica personagem/locação/cena/ato).
 
 ```bash
 cd CineWeave
-git apply fix-timeofday.patch   # ou copie o patch pra dentro do repo primeiro
+git apply fix-completo.patch
 npm install
 ```
 
