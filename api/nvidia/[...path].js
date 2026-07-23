@@ -4,51 +4,60 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-export default async function handler(req, res) {
-  // Apply CORS headers once at the start — res.json()/res.end() ignore { headers }
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
-
-  // CORS preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST, OPTIONS');
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const nvidiaKey = process.env.NVIDIA_API_KEY;
-  if (!nvidiaKey) {
-    return res.status(500).json({ error: 'NVIDIA_API_KEY not configured on server.' });
-  }
-
-  try {
-    const { model, messages, temperature, max_tokens, top_p } = req.body;
-
-    const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${nvidiaKey}`,
-      },
-      body: JSON.stringify({
-        model: model || 'meta/llama-3.1-70b-instruct',
-        messages,
-        temperature: temperature ?? 0.3,
-        max_tokens: max_tokens ?? 4096,
-        top_p: top_p ?? 0.95,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json(data);
+export default {
+  async fetch(request) {
+    // CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: CORS_HEADERS,
+      });
     }
 
-    return res.status(200).json(data);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-}
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { ...CORS_HEADERS, 'Allow': 'POST, OPTIONS', 'Content-Type': 'application/json' },
+      });
+    }
+
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    if (!nvidiaKey) {
+      return new Response(JSON.stringify({ error: 'NVIDIA_API_KEY not configured on server.' }), {
+        status: 500,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    try {
+      const { model, messages, temperature, max_tokens, top_p } = await request.json();
+
+      const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${nvidiaKey}`,
+        },
+        body: JSON.stringify({
+          model: model || 'meta/llama-3.1-70b-instruct',
+          messages,
+          temperature: temperature ?? 0.3,
+          max_tokens: max_tokens ?? 4096,
+          top_p: top_p ?? 0.95,
+        }),
+      });
+
+      const data = await response.json();
+
+      return new Response(JSON.stringify(data), {
+        status: response.status,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+  },
+};
