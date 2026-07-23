@@ -4,6 +4,11 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+async function readBody(request) {
+  const text = await request.text();
+  return JSON.parse(text);
+}
+
 export default {
   async fetch(request) {
     // CORS preflight
@@ -30,7 +35,7 @@ export default {
     }
 
     try {
-      const { model, messages, temperature, max_tokens, top_p } = await request.json();
+      const { model, messages, temperature, max_tokens, top_p } = await readBody(request);
 
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
         method: 'POST',
@@ -47,7 +52,13 @@ export default {
         }),
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = { raw: responseText };
+      }
 
       return new Response(JSON.stringify(data), {
         status: response.status,
