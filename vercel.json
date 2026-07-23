@@ -5,6 +5,7 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "rewrites": [
+    { "source": "/api/nvidia/(.*)", "destination": "/api/nvidia/[...path].js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
