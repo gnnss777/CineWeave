@@ -475,12 +475,15 @@ export async function syncProjectToSupabase(project) {
       const existingSbId = map.dialogues[d.id] || (d.id?.startsWith('sb-') ? d.id : null);
       const record = existingSbId ? { ...d, id: existingSbId } : d;
       // Map local sceneId to Supabase UUID (scenes are synced before dialogues)
-      const mappedSceneId = (d.sceneId && map.scenes[d.sceneId]) ? map.scenes[d.sceneId] : null;
+      const mappedSceneId = (d.sceneId && map.scenes[d.sceneId] && isUUID(map.scenes[d.sceneId]))
+        ? map.scenes[d.sceneId]
+        : null;
       const saved = await db.saveDialogue(user.id, sbProjId, {
         ...record,
         sceneId: mappedSceneId || (isUUID(d.sceneId) ? d.sceneId : null),
       });
-      if (saved?.id && saved.id !== d.id) {
+      // Only update idMap when d.id is stable — avoid storing under "undefined"
+      if (d.id != null && d.id !== '' && saved?.id && saved.id !== d.id) {
         map.dialogues[d.id] = saved.id;
         saveIdMap(map);
       }
