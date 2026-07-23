@@ -867,6 +867,7 @@ export async function saveDialogue(userId, projectId, dialogue) {
         tags: dialogue.tags || [],
       })
       .eq('id', dialogue.id)
+      .eq('project_id', projectId)
       .select()
       .single();
     if (error) { console.error('[db] saveDialogue error:', error); return dialogue; }

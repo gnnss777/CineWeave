@@ -5,19 +5,22 @@ const CORS_HEADERS = {
 };
 
 export default async function handler(req, res) {
+  // Apply CORS headers once at the start — res.json()/res.end() ignore { headers }
+  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
+
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    return res.status(204).end(undefined, { headers: CORS_HEADERS });
+    return res.status(204).end();
   }
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS');
-    return res.status(405).json({ error: 'Method not allowed' }, { headers: CORS_HEADERS });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const nvidiaKey = process.env.NVIDIA_API_KEY;
   if (!nvidiaKey) {
-    return res.status(500).json({ error: 'NVIDIA_API_KEY not configured on server.' }, { headers: CORS_HEADERS });
+    return res.status(500).json({ error: 'NVIDIA_API_KEY not configured on server.' });
   }
 
   try {
@@ -41,11 +44,11 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json(data, { headers: CORS_HEADERS });
+      return res.status(response.status).json(data);
     }
 
-    return res.status(200).json(data, { headers: CORS_HEADERS });
+    return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: err.message }, { headers: CORS_HEADERS });
+    return res.status(500).json({ error: err.message });
   }
 }
