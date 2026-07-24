@@ -87,47 +87,55 @@ function StylePanel({
           </button>
         </div>
 
-        <div className="style-panel-sublabel">Geração ativa para novas edições</div>
-        <div className="style-panel-gen-grid">
+        <div className="style-panel-sublabel" style={{ marginTop: '10px' }}>Versão ativa:</div>
+        <select
+          value={revisionGeneration}
+          onChange={(e) => setRevisionGeneration(parseInt(e.target.value))}
+          className="style-panel-select"
+          style={{
+            width: '100%',
+            padding: '6px 8px',
+            fontSize: '11px',
+            background: 'var(--bg-input)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '6px',
+            color: 'white',
+            cursor: 'pointer',
+          }}
+        >
           {REVISION_GENERATIONS.map(gen => (
-            <button
-              key={gen.level}
-              className={`style-panel-gen-chip ${revisionGeneration === gen.level ? 'active' : ''}`}
-              style={{
-                '--gen-color': gen.hex,
-                background: revisionGeneration === gen.level ? `rgba(${parseInt(gen.hex.slice(1,3),16)},${parseInt(gen.hex.slice(3,5),16)},${parseInt(gen.hex.slice(5,7),16)},0.18)` : 'transparent',
-                borderColor: revisionGeneration === gen.level ? gen.hex : 'rgba(255,255,255,0.08)'
-              }}
-              onClick={() => setRevisionGeneration(gen.level)}
-              title={`${gen.name} (${gen.label})`}
-            >
-              <span className="style-panel-gen-marker" style={{ color: gen.hex }}>{gen.marker}</span>
-              <span className="style-panel-gen-label">{gen.name.replace('Roteiro ', '')}</span>
-            </button>
+            <option key={gen.level} value={gen.level} style={{ background: '#1a1a2e', color: 'white' }}>
+              {gen.marker} {gen.name.replace('Roteiro ', '')} ({gen.label})
+            </option>
           ))}
-        </div>
+        </select>
 
-        <div className="style-panel-sublabel" style={{ marginTop: '10px' }}>Filtro de visualização</div>
-        <div className="style-panel-radio-group">
-          <button
-            className={`style-panel-radio ${revisionFilter.mode === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterMode('all')}
-          >
-            <Eye size={11} /><span>Todas</span>
-          </button>
-          <button
-            className={`style-panel-radio ${revisionFilter.mode === 'only' ? 'active' : ''}`}
-            onClick={() => setFilterMode('only')}
-          >
-            <Filter size={11} /><span>Só revisões</span>
-          </button>
-          <button
-            className={`style-panel-radio ${revisionFilter.mode === 'hide' ? 'active' : ''}`}
-            onClick={() => setFilterMode('hide')}
-          >
-            <EyeOff size={11} /><span>Ocultar</span>
-          </button>
-        </div>
+        <div className="style-panel-sublabel" style={{ marginTop: '10px' }}>Filtrar revisões:</div>
+        <select
+          value={revisionFilter.mode}
+          onChange={(e) => setFilterMode(e.target.value)}
+          className="style-panel-select"
+          style={{
+            width: '100%',
+            padding: '6px 8px',
+            fontSize: '11px',
+            background: 'var(--bg-input)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '6px',
+            color: 'white',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="all" style={{ background: '#1a1a2e', color: 'white' }}>
+            Todas
+          </option>
+          <option value="only" style={{ background: '#1a1a2e', color: 'white' }}>
+            Só revisões
+          </option>
+          <option value="hide" style={{ background: '#1a1a2e', color: 'white' }}>
+            Ocultar
+          </option>
+        </select>
 
         <div className="style-panel-sublabel" style={{ marginTop: '10px' }}>Ocultar gerações</div>
         <div className="style-panel-gen-grid">
@@ -375,6 +383,7 @@ export default function ScreenplayTab() {
   const [revisionMode, setRevisionMode] = useState(false);
   const [revisionGeneration, setRevisionGeneration] = useState(0);
   const [revisions, setRevisions] = useState([]);
+  const [revisionMeta, setRevisionMeta] = useState({});
 
   /* ── Print / Style panel state ── */
   const [printMode, setPrintMode] = useState(false);
@@ -407,6 +416,9 @@ export default function ScreenplayTab() {
   const fountainInputRef = useRef(null);
   const [pendingAutoTypes, setPendingAutoTypes] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  /* ── Track which revision gen was selected when editing each block ── */
+  const blockRevisionGen = useRef(new Map());
   const [searchMatchIdx, setSearchMatchIdx] = useState(0);
   const [activeSceneIdx, setActiveSceneIdx] = useState(-1);
 
@@ -637,10 +649,20 @@ export default function ScreenplayTab() {
       const els = currentProject.screenplay || [];
       setElements(els);
       const meta = parseBeatMetadata(els);
+      console.log('[Revision System] Loading BEAT metadata:', meta);
       if (meta['Revision Mode'] !== undefined) setRevisionMode(meta['Revision Mode']);
       if (meta['Revision Level'] !== undefined) setRevisionGeneration(meta['Revision Level']);
       if (meta['PrintMode'] !== undefined) setPrintMode(meta['PrintMode']);
       else if (meta['NovelMode'] !== undefined) setPrintMode(meta['NovelMode']);
+    }
+  }, [currentProject]);
+
+  /* Load revision metadata on init */
+  useEffect(() => {
+    if (currentProject) {
+      const meta = parseBeatMetadata(currentProject.screenplay || []);
+      console.log('[Revision System] BlockRevisions loaded:', meta['BlockRevisions']);
+      setRevisionMeta(meta['BlockRevisions'] || {});
     }
   }, [currentProject]);
 
@@ -697,17 +719,33 @@ export default function ScreenplayTab() {
     });
 
     // Apply entity updates if any
-    if (hasEntityChanges) {
-      setProjects(prev => prev.map(p => p.id === currentProjectId ? { ...p, entities: updatedEntities } : p));
+    if (hasEntityChanges && currentProject) {
+      updateProject({
+        ...currentProject,
+        entities: updatedEntities
+      });
     }
 
     const meta = {
       'Revision Level': revisionGeneration,
       'Revision Mode': revisionMode,
       'PrintMode': printMode,
-      'BlockRevisions': revisions.reduce((acc, id) => { acc[id] = revisionGeneration; return acc; }, {}),
+      'BlockRevisions': revisions.reduce((acc, id) => {
+        const existingGen = revisionMeta[id];
+        if (existingGen !== undefined) {
+          acc[id] = existingGen;
+        } else {
+          /* ── Usar a geração que estava selecionada quando o bloco foi editado ── */
+          const genWhenEdited = blockRevisionGen.current.get(id);
+          acc[id] = genWhenEdited !== undefined ? genWhenEdited : revisionGeneration;
+        }
+        return acc;
+      }, {}),
       'DocumentStyle': printMode ? 'print' : 'screenplay'
     };
+    console.log('[DEBUG] Guardando metadata do screenplay:', meta);
+    console.log('[DEBUG] revisionMeta atual:', revisionMeta);
+    console.log('[DEBUG] blockRevisionGen:', blockRevisionGen.current);
     const metaBlock = { id: 'beat-metadata', type: 'beat-metadata', text: generateBeatBlock(meta) };
     setElements([...linked, metaBlock]);
     updateScreenplay([...linked, metaBlock]);
@@ -883,6 +921,11 @@ export default function ScreenplayTab() {
     const next = getNextEl(id);
     const nextEmpty = !next || !next.el.text || next.el.text.trim() === '';
 
+    /* ── Guardar qual geração estava selecionada quando o bloco ganha foco ── */
+    if (!blockRevisionGen.current.has(id)) {
+      blockRevisionGen.current.set(id, revisionGeneration);
+    }
+
     /* ── @ forced character cue ── */
     if (text.startsWith('@') && currentEl.type !== 'character') {
       const clean = text.slice(1);
@@ -961,6 +1004,10 @@ export default function ScreenplayTab() {
       );
       saveScreenplay(updated);
     }
+
+    /* ✅ Garantir que a geração selecionada seja registrada quando editing termina */
+    blockRevisionGen.current.set(id, revisionGeneration);
+
     setPendingAutoTypes(prev => {
       const next = { ...prev };
       delete next[id];
@@ -1272,11 +1319,13 @@ export default function ScreenplayTab() {
     finally { setAiLoading(false); }
   };
 
-  /* ── Derive revision metadata for the panel ── */
-  const revisionMeta = useMemo(() => {
-    const meta = parseBeatMetadata(elements);
-    return meta['BlockRevisions'] || {};
-  }, [elements]);
+  /* Load revision metadata on init */
+  useEffect(() => {
+    if (currentProject) {
+      const meta = parseBeatMetadata(currentProject.screenplay || []);
+      setRevisionMeta(meta['BlockRevisions'] || {});
+    }
+  }, [currentProject]);
 
   const revisionItems = useMemo(() => {
     if (!revisions || revisions.length === 0) return [];
@@ -1300,12 +1349,15 @@ export default function ScreenplayTab() {
           type,
           scene: currentScene,
           elIndex: idx,
-          gen: typeof revisionMeta[el.id] === 'number' ? revisionMeta[el.id] : revisionGeneration
+          gen: revisionMeta[el.id] !== undefined ? revisionMeta[el.id] : revisionGeneration
         });
       }
     });
+    console.log('[Revision Panel] Current revisions:', revisions);
+    console.log('[Revision Panel] revisionMeta:', revisionMeta);
+    console.log('[Revision Panel] revisionGeneration:', revisionGeneration);
     return items;
-  }, [revisions, elements, pendingAutoTypes, revisionMeta, revisionGeneration]);
+  }, [revisions, elements, pendingAutoTypes, revisionMeta]);
 
   const revisionGroups = useMemo(() => {
     const groups = [];
@@ -1901,7 +1953,7 @@ setActiveTab('editor');
                       </div>;
                     }
                     const isRevised = revisions.includes(el.id);
-                    const gen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
+                    const gen = REVISION_GENERATIONS.find(g => g.level === revisionMeta[el.id]) || REVISION_GENERATIONS[0];
                     const cleanText = cleanSceneText(el.text);
                     const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';
                     const isSearchMatch = searchQuery && searchMatches.includes(el.id);
@@ -2007,7 +2059,7 @@ setActiveTab('editor');
                             </div>;
                           }
                           const isRevised = revisions.includes(el.id);
-                          const gen = REVISION_GENERATIONS.find(g => g.level === revisionGeneration) || REVISION_GENERATIONS[0];
+                          const gen = REVISION_GENERATIONS.find(g => g.level === revisionMeta[el.id]) || REVISION_GENERATIONS[0];
                           const origIndex = elements.indexOf(el);
                           const cleanText = cleanSceneText(el.text);
                           const isSceneHeading = (pendingAutoTypes[el.id] || el.type) === 'scene-heading';

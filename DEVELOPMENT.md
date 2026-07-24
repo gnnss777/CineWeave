@@ -11,8 +11,10 @@ src/
 │   ├── ProjectContext.jsx   # Global project state + updateProject()
 │   └── EntitiesSchema.js    # Canonical entity type definitions
 ├── components/
-│   ├── ScreenplayTab.jsx    # Fountain/FDX import + screenplay editor
-│   ├── MindMapTab.jsx       # Interactive mind map (Konva-free)
+│   ├── ScreenplayTab.jsx    # Fountain/FDX import + screenplay editor + revision system
+│   ├── AnalysisTab.jsx      # 🆕 Technical analysis tab
+│   ├── VisualizationsTab.jsx # 🆕 Data visualizations
+│   ├── ConfigTab.jsx        # 🆕 Project configuration
 │   ├── StoryboardTab.jsx    # Frame management + CRUD
 │   ├── StoryboardCanvas.jsx # Drawing canvas (Konva)
 │   ├── CorkboardTab.jsx     # Card-based view
@@ -30,6 +32,141 @@ src/
 │   └── backgrounds.js       # Background presets for canvas
 supabase/
 └── migrations/              # SQL migration files
+```
+
+## 🆕 Revision System
+
+### Data Model
+
+Revisions are stored in the BEAT metadata block:
+
+```javascript
+const meta = {
+  'Revision Level': 0,        // Current active generation
+  'Revision Mode': false,     // Whether revision mode is on
+  'PrintMode': false,         // Whether print mode is on
+  'BlockRevisions': {         // Map of blockId → generation level
+    'block-123': 1,           // This block is revision level 1 (Rosa)
+    'block-456': 3,           // This block is revision level 3 (Verde)
+    'block-789': 0,           // This block is revision level 0 (Branco)
+  },
+  'DocumentStyle': 'screenplay'
+};
+```
+
+### Key Components
+
+#### 1. `blockRevisionGen` Ref
+Tracks which generation was selected when each block was edited:
+
+```javascript
+const blockRevisionGen = useRef(new Map());
+
+// Set when block gains focus (handleInput)
+if (!blockRevisionGen.current.has(id)) {
+  blockRevisionGen.current.set(id, revisionGeneration);
+}
+
+// Set when block loses focus (handleBlur) - CRITICAL
+blockRevisionGen.current.set(id, revisionGeneration);
+```
+
+#### 2. `revisionMeta` State
+Stores the loaded revision metadata from BEAT block:
+
+```javascript
+const [revisionMeta, setRevisionMeta] = useState({});
+
+useEffect(() => {
+  if (currentProject) {
+    const meta = parseBeatMetadata(currentProject.screenplay || []);
+    setRevisionMeta(meta['BlockRevisions'] || {});
+  }
+}, [currentProject]);
+```
+
+#### 3. Rendering Logic
+When rendering a block, use `revisionMeta[block.id]` instead of `revisionGeneration`:
+
+```javascript
+const isRevised = revisions.includes(el.id);
+// Get the generation from metadata, NOT from current dropdown
+const gen = REVISION_GENERATIONS.find(
+  g => g.level === revisionMeta[el.id]
+) || REVISION_GENERATIONS[0];
+```
+
+### Fixing Common Issues
+
+#### Issue: Revisions disappear after page refresh
+**Symptoms**:
+- Console shows `Loading BEAT metadata: {}`
+- `revisionMeta: {}` is always empty
+- `blockRevisionGen.current.get(id)` returns undefined
+
+**Root Cause**: The ref is never populated when creating revisions outside of typing
+
+**Fix**: Ensure `handleBlur` always calls `blockRevisionGen.current.set(id, revisionGeneration)`:
+
+```javascript
+const handleBlur = (id) => {
+  const text = blockTexts.current[id];
+  const pendingType = pendingAutoTypes[id];
+  if (text !== undefined || pendingType) {
+    const updated = elements.map(el =>
+      el.id === id
+        ? { ...el, text: text !== undefined ? text : el.text, ...(pendingType ? { type: pendingType } : {}) }
+        : el
+    );
+    saveScreenplay(updated);
+  }
+
+  // ✅ CRITICAL: Register the generation when editing ends
+  blockRevisionGen.current.set(id, revisionGeneration);
+
+  setPendingAutoTypes(prev => {
+    const next = { ...prev };
+    delete next[id];
+    return next;
+  });
+};
+```
+
+#### Issue: Hydration error with SVG in option elements
+**Error**: `In HTML, <svg> cannot be a child of <option>. This will cause a hydration error.`
+
+**Fix**: Remove SVG icons from option elements:
+
+```javascript
+// ❌ WRONG - causes hydration error
+<option value="all">
+  <Eye size={11} /> Todas
+</option>
+
+// ✅ CORRECT - plain text only
+<option value="all" style={{ background: '#1a1a2e', color: 'white' }}>
+  Todas
+</option>
+```
+
+### Debugging
+
+Enable debug logs in `ScreenplayTab.jsx`:
+
+```javascript
+// In saveScreenplay, before creating metaBlock
+console.log('[DEBUG] Guardando metadata do screenplay:', meta);
+console.log('[DEBUG] revisionMeta atual:', revisionMeta);
+console.log('[DEBUG] blockRevisionGen:', blockRevisionGen.current);
+
+// In useEffect that loads metadata
+console.log('[Revision System] Loading BEAT metadata:', meta);
+console.log('[Revision System] BlockRevisions loaded:', meta['BlockRevisions']);
+
+// In render logic
+console.log('[Revision Panel] Current revisions:', revisions);
+console.log('[Revision Panel] revisionMeta:', revisionMeta);
+console.log('[Revision Panel] revisionGeneration:', revisionGeneration);
 ```
 
 ## Key Patterns

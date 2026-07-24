@@ -1,6 +1,41 @@
 # CineWeave
 
-Aplicação de roteirismo colaborativo com unificação de dados entre Brainstorm, Enciclopédia, Roteiro e Mapa Mental.
+Aplicação de roteirismo colaborativo com unificação de dados entre Brainstorm, Enciclopédia, Roteiro, Análise Técnica, Visualizações, Storyboard e Configuração.
+
+## 🆕 Sistema de Revisões
+
+Sistema completo de revisão de roteiro com **8 níveis de revisão** e persistência de cores:
+
+- **Nível 0**: Branco (Azul)
+- **Nível 1**: Rosa
+- **Nível 2**: Amarelo
+- **Nível 3**: Verde
+- **Nível 4**: Dourado
+- **Nível 5**: Creme
+- **Nível 6**: Salmão
+- **Nível 7**: Cereja
+
+### Como Funciona
+
+1. **Versão Ativa**: Dropdown para selecionar qual cor será usada em NOVAS edições
+2. **Persistência**: Cada revisão mantém sua cor original, independente da versão ativa
+3. **Filtro de Revisões**: Mostrar apenas revisões, ocultar revisões ou ver tudo
+4. **Painel de Revisões**: Visualização de todas as revisões com filtros por cena
+5. **Storage**: Cores são salvas no BEAT metadata no formato `BlockRevisions: { "blocoId": "nivel" }`
+
+### Exemplo de Uso
+
+```javascript
+// Criar revisão Rosa
+1. Selecione "Rosa" no dropdown "Versão ativa"
+2. Edite um bloco (ou use o painel de revisões)
+3. A revisão fica Rosa e NUNCA muda de cor
+
+// Mudar versão ativa
+1. Mude "Versão ativa" para "Dourado"
+2. Edite novos blocos → ficam Dourados
+3. Revisões antigas (Rosa, Verde etc) continuam com suas cores originais
+```
 
 ## Arquitetura de Dados Unificada
 
@@ -18,7 +53,7 @@ project.entities  ← ÚNICA FONTE DA VERDADE
 ├── dialogues     ← 🆕 (speaker, line, context, tags, sceneId)
 └── world_elements ← 🆕 (name, type, description, tags)
 
-project.screenplay[]   ← blocos SEMPRE com entityId
+project.screenplay[]   ← blocos SEMPRE com entityId + metadata de revisão
 project.mindMapNodes[] ← só layout (entityId + x,y)
 project.ideas[]        ← notas soltas criativas
 project.recordings[]   ← áudio gravado
@@ -29,10 +64,12 @@ project.mediaUploads[] ← concept art, referências
 
 - ✅ **Fase 1**: Eliminação de `brainstormData`, unificação em `entities`
 - ✅ **Fase 2**: Linkagem bidirecional `screenplay ↔ entities`
-- ⏳ **Fase 3**: Mind Map como view pura de `entities`
-- ⏳ **Fase 4**: Limpeza de arrays legados
-- ⏳ **Fase 5**: Navegação cruzada entre abas
-- ⏳ **Fase 6**: Consolidar 8 abas em 4
+- ✅ **Fase 3**: Mind Map como view pura de `entities`
+- ✅ **Fase 4**: Limpeza de arrays legados
+- ✅ **Fase 5**: Navegação cruzada entre abas
+- ✅ **Fase 6**: Sistema de Revisões com persistência de cores
+- ✅ **Fase 7**: Tabs adicionais (Análise, Visualizações, Configuração)
+- ⏳ **Fase 8**: Navegação cruzada entre abas
 
 ## Navegação Cruzada
 

@@ -6,10 +6,12 @@ import { ProjectProvider, useProject } from './context/ProjectContext';
 import { OnboardingProvider, useOnboarding } from './context/OnboardingContext';
 
 const BrainstormTab = React.lazy(() => import('./components/BrainstormTab'));
-const MindMapTab = React.lazy(() => import('./components/MindMapTab'));
 const ScreenplayTab = React.lazy(() => import('./components/ScreenplayTab'));
 const EncyclopediaTab = React.lazy(() => import('./components/EncyclopediaTab'));
 const StoryboardTab = React.lazy(() => import('./components/StoryboardTab'));
+const AnalysisTab = React.lazy(() => import('./components/AnalysisTab'));
+const ConfigTab = React.lazy(() => import('./components/ConfigTab'));
+const VisualizationsTab = React.lazy(() => import('./components/VisualizationsTab'));
 import InstallPrompt from './components/InstallPrompt';
 import UserMenu from './components/UserMenu';
 import OnboardingOverlay from './components/OnboardingOverlay';
@@ -17,7 +19,7 @@ import ConfirmModal from './components/ConfirmModal';
 import LoginPage from './components/LoginPage';
 import InviteModal from './components/InviteModal';
 import GuideModal from './components/GuideModal';
-import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Hash, Users, Share2, Sun, Moon, Menu, Image } from 'lucide-react';
+import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Hash, Users, Share2, Sun, Moon, Menu, Image, ClipboardList, LayoutGrid, Clock, Settings } from 'lucide-react';
 import TagSelector from './components/TagSelector';
 
 function HelpButton() {
@@ -56,8 +58,17 @@ function CineWeaveShell() {
   } = useProject();
    const { startTour } = useOnboarding();
 
-  const [activeTab, setActiveTab] = useState('brainstorm');
-  const [showProjectDrawer, setShowProjectDrawer] = useState(false);
+const [activeTab, setActiveTab] = useState('brainstorm');
+const [showProjectDrawer, setShowProjectDrawer] = useState(false);
+
+const TABS = [
+  { key: 'screenplay', label: 'Roteiro', icon: FileText },
+  { key: 'analysis', label: 'Análise Técnica', icon: ClipboardList },
+  { key: 'visualizations', label: 'Visualizações', icon: Compass },
+  { key: 'storyboard', label: 'Storyboard', icon: Image },
+  { key: 'config', label: 'Configuração', icon: Settings },
+  { key: 'brainstorm', label: 'Ideias', icon: Sparkles },
+];
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [newProjTitle, setNewProjTitle] = useState('');
   const [newProjTagline, setNewProjTagline] = useState('');
@@ -129,8 +140,10 @@ function CineWeaveShell() {
     switch (activeTab) {
       case 'screenplay': return <ScreenplayTab />;
       case 'encyclopedia': return <EncyclopediaTab />;
-      case 'mindmap': return <MindMapTab />;
       case 'storyboard': return <StoryboardTab />;
+      case 'analysis': return <AnalysisTab />;
+      case 'visualizations': return <VisualizationsTab />;
+      case 'config': return <ConfigTab />;
       case 'brainstorm': return <BrainstormTab key={currentProject?.id} />;
       default: return <BrainstormTab key={currentProject?.id} />;
     }
@@ -155,21 +168,15 @@ function CineWeaveShell() {
         </div>
 
         <div className="header-desktop-nav" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          <button onClick={() => setActiveTab('screenplay')} className={`nav-item ${activeTab === 'screenplay' ? 'active' : ''}`}>
-            <FileText size={16} /> Roteiro
-          </button>
-          <button onClick={() => setActiveTab('encyclopedia')} className={`nav-item ${activeTab === 'encyclopedia' ? 'active' : ''}`}>
-            <BookOpen size={16} /> Enciclopédia
-          </button>
-          <button onClick={() => setActiveTab('storyboard')} className={`nav-item ${activeTab === 'storyboard' ? 'active' : ''}`}>
-            <Image size={16} /> Storyboard
-          </button>
-          <button onClick={() => setActiveTab('mindmap')} className={`nav-item ${activeTab === 'mindmap' ? 'active' : ''}`}>
-            <Compass size={16} /> Mapa Mental
-          </button>
-          <button onClick={() => setActiveTab('brainstorm')} className={`nav-item ${activeTab === 'brainstorm' ? 'active' : ''}`}>
-            <Sparkles size={16} /> Ideias
-          </button>
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`nav-item ${activeTab === tab.key ? 'active' : ''}`}
+            >
+              <tab.icon size={16} /> {tab.label}
+            </button>
+          ))}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
