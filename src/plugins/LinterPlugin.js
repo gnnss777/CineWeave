@@ -1,10 +1,12 @@
 /**
- * Linter Plugin
- * Normaliza sluglines (cabeçalhos de cena) para CAIXA ALTA
- * Não modifica nada sem confirmação
+ * Linter Plugin - Slugline Normalizer
+ * Normaliza todos os cabeçalhos de cena para CAIXA ALTA (sluglines)
+ * Não modifica nada sem confirmação do usuário
+ *
+ * @module plugins/LinterPlugin
+ * @author CodeRabbit
  */
 
-import { useCineWeaveAPI } from '../lib/pluginAPI'
 import LinterTemplate from './templates/LinterTemplate'
 
 export default {
@@ -15,20 +17,40 @@ export default {
   type: 'tool',
   template: LinterTemplate,
 
-  execute: async (params) => {
-    const { screenplay, log, notify } = useCineWeaveAPI()
+  /**
+   * Analisa o screenplay e identifica sluglines para normalizar
+   * Retorna um preview das mudanças sem aplicar nada
+   *
+   * @param {Object} params - Parâmetros do plugin
+   * @param {Object} params.api - API context
+   * @param {Array} params.api.screenplay - Lista de elementos do screenplay
+   * @param {Function} params.api.log - Função para logs
+   * @param {Function} params.api.notify - Função para notificações
+   * @returns {Object} Resultado da análise
+   * @returns {number} result.originalCount - número original de cabeçalhos
+   * @returns {number} result.modifiedCount - número de cabeçalhos modificados
+   * @returns {Array<Object>} result.modified - lista de cabeçalhos modificados
+   *   - {id: string} - ID do bloco
+   *   - {originalText: string} - texto original
+   *   - {text: string} - texto em CAIXA ALTA
+   * @returns {string} result.suggestions - sugestão resumida
+   *
+   * @example
+   * const results = await executePlugin('linter', { screenplay, log, notify })
+   * console.log(results.modifiedCount) // 5
+   */
+  execute: async (params, api) => {
+    const { screenplay, log, notify } = api
 
     log('Linter iniciado')
 
     // Analisar screenplay
     const sceneHeadings = screenplay.filter(el => el.type === 'scene-heading')
     const modified = []
-    const originalTexts = []
 
     sceneHeadings.forEach(el => {
       if (el.text !== el.text.toUpperCase()) {
         modified.push(el)
-        originalTexts.push(el.text)
       }
     })
 
