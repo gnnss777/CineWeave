@@ -48,20 +48,43 @@ export default {
           femaleSpeakers.add(name)
         }
 
-        // Se for o segundo personagem feminino, par
-        if (dialoguePairs.length >= 2 &&
-            dialoguePairs[0].char1 === name &&
-            dialoguePairs[0].char2 !== name) {
-          // Primeira condição (duas personagens femininas com nomes diferentes)
-        }
+        // Coletar pares de diálogo (todas as ocorrências)
+        dialoguePairs.push({
+          char1: dialoguePairs.length > 0 ? dialoguePairs[0].char2 : name,
+          char2: name
+        })
       }
     })
 
-    // Simulação (implementação real seria mais complexa)
-    const femaleSpeakersCount = femaleSpeakers.size || Math.floor(Math.random() * 3)
-    const maleSpeakersCount = Math.floor(Math.random() * 2)
+    // Lógica determinística baseada em personagens femininos reais
+    const uniqueFemaleSpeakers = Array.from(femaleSpeakers).filter(name => name.length > 0)
+    const femaleSpeakersCount = uniqueFemaleSpeakers.length
+    const maleSpeakersCount = dialogues.length - femaleSpeakersCount
     const dialoguesAnalyzed = dialogues.length
-    const bechdelPassed = femaleSpeakersCount >= 2 && maleSpeakersCount >= 2
+
+    // Verificar se pelo menos duas mulheres diferentes têm diálogo
+    let bechdelPassed = false
+    if (femaleSpeakersCount >= 2) {
+      bechdelPassed = true
+    }
+
+    // Verificar se há diálogo entre duas mulheres diferentes
+    if (dialoguePairs.length > 0) {
+      const dialogueCounts = {}
+      dialoguePairs.forEach(pair => {
+        const key = [pair.char1, pair.char2].sort().join('|')
+        dialogueCounts[key] = (dialogueCounts[key] || 0) + 1
+      })
+
+      // Encontrar pares de mulheres
+      for (const [key, count] of Object.entries(dialogueCounts)) {
+        const [name1, name2] = key.split('|')
+        if ((name1 && name2) && uniqueFemaleSpeakers.includes(name1) && uniqueFemaleSpeakers.includes(name2)) {
+          bechdelPassed = true
+          break
+        }
+      }
+    }
 
     const issues = []
     const suggestions = []

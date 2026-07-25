@@ -3,7 +3,6 @@
  * Remove markup indesejado do roteiro
  */
 
-import { useCineWeaveAPI } from '../lib/pluginAPI'
 import CleanerTemplate from './templates/CleanerTemplate'
 
 export default {
@@ -14,8 +13,8 @@ export default {
   type: 'tool',
   template: CleanerTemplate,
 
-  execute: async (params) => {
-    const { screenplay, log, notify } = useCineWeaveAPI()
+  execute: async (params, api) => {
+    const { screenplay, log, notify } = api
 
     log('Markup Cleaner iniciado')
 
@@ -35,9 +34,13 @@ export default {
         shouldRemove = true
       }
 
-      // Tags #[...]#
-      if (el.text && el.text.includes('#') && el.text.includes('#')) {
-        shouldRemove = true
+      // Tags #[...]# - apenas se tiver início E fim (#...#)
+      if (el.text && el.text.includes('#')) {
+        const openHash = el.text.split('#').length % 2 === 1
+        const closeHash = el.text.split('#').length >= 3 && el.text.includes('##')
+        if (openHash && closeHash) {
+          shouldRemove = true
+        }
       }
 
       if (shouldRemove) {
@@ -67,18 +70,16 @@ export default {
       message
     }
 
-    notify('info', 'Markup Cleaner',
-      `${removedBlocks.length} blocos removidos`)
-
     return results
-  }
-}
+  },
 
-  applyChanges: async (results) => {
-    const { screenplay, notify } = useCineWeaveAPI()
+  applyChanges: async (results, api) => {
+    const { screenplay, log, notify } = api
 
     // TODO: Implementar aplicação real
     // Em produção, isso chamaria updateScreenplay() do ProjectContext
+
+    log(`${results.removedCount} blocos removidos`)
 
     notify('success', 'Markup Cleaner',
       `${results.removedCount} blocos removidos com sucesso`)

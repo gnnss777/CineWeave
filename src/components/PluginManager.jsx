@@ -21,11 +21,8 @@ export default function PluginManager({ projectId, onClose }) {
     const loadedPlugins = listPlugins()
     setPlugins(loadedPlugins)
     log('Plugins carregados')
-  }, [log])
-    const loadedPlugins = listPlugins()
-    setPlugins(loadedPlugins)
-    log('Plugins carregados')
-  }
+  }, [])
+
 
   const handleRunPlugin = async (plugin) => {
     setSelectedPlugin(plugin)
@@ -35,7 +32,8 @@ export default function PluginManager({ projectId, onClose }) {
 
     const logs = []
     const logMessage = (msg) => {
-      logs.push({ id: Date.now(), message: msg, timestamp: Date.now() })
+      const logEntry = { id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, message: msg, timestamp: Date.now() }
+      logs.push(logEntry)
       setPluginLogs([...logs])
     }
 
@@ -45,7 +43,8 @@ export default function PluginManager({ projectId, onClose }) {
 
       const results = await executePlugin(plugin.id, {
         screenplay,
-        projectId
+        projectId,
+        api: { screenplay, log }
       })
 
       logMessage(`[Plugin] Plugin executado com sucesso`)
@@ -156,9 +155,15 @@ export default function PluginManager({ projectId, onClose }) {
 
               <div className="plugin-result-section">
                 <h4>Resultado</h4>
-                <pre className="results-pre">
-                  {JSON.stringify(pluginResults, null, 2)}
-                </pre>
+                {selectedPlugin.template ? (
+                  <div className="plugin-result-template">
+                    {selectedPlugin.template({ results: pluginResults, onClose: handleClose })}
+                  </div>
+                ) : (
+                  <pre className="results-pre">
+                    {JSON.stringify(pluginResults, null, 2)}
+                  </pre>
+                )}
               </div>
             </div>
           </div>

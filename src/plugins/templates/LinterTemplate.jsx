@@ -4,9 +4,18 @@
  */
 
 export default function LinterTemplate({ results, onApply, onReject }) {
-  const totalModified = results.modifiedCount
-
   if (!results) return <div>Carregando...</div>
+  if (results.error) {
+    return (
+      <div style={{ padding: '16px', color: '#ef4444' }}>
+        <h3>Erro no Linter</h3>
+        <p>{results.error}</p>
+        <button onClick={onReject} className="btn-secondary">Fechar</button>
+      </div>
+    )
+  }
+
+  const totalModified = results.modifiedCount || 0
 
   return (
     <div className="plugin-linter">

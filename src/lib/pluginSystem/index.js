@@ -5,15 +5,24 @@
 
 const pluginRegistry = new Map()
 
+// Plugins já foram carregados
+let hydrated = false
+
 export function registerPlugin(plugin) {
   pluginRegistry.set(plugin.id, plugin)
-  localStorage.setItem('cineweave_plugins', JSON.stringify([...pluginRegistry]))
+  if (!hydrated) {
+    localStorage.setItem('cineweave_plugins', JSON.stringify([...pluginRegistry]))
+  }
 }
 
 export function executePlugin(pluginId, params) {
   const plugin = pluginRegistry.get(pluginId)
   if (plugin?.execute) {
     try {
+      // Se o plugin receber params e api, chama execute(params, api)
+      if (params.api) {
+        return plugin.execute(params, params.api)
+      }
       return plugin.execute(params)
     } catch (error) {
       console.error(`[Plugin] Erro ao executar ${pluginId}:`, error)
@@ -44,4 +53,24 @@ export function getPluginMetadata(pluginId) {
 export function unregisterPlugin(pluginId) {
   pluginRegistry.delete(pluginId)
   localStorage.setItem('cineweave_plugins', JSON.stringify([...pluginRegistry]))
+}
+
+export function hydratePlugins() {
+  const stored = localStorage.getItem('cineweave_plugins')
+  if (stored) {
+    try {
+      const plugins = JSON.parse(stored)
+      pluginRegistry.clear()
+      plugins.forEach(p => {
+        pluginRegistry.set(p.id, p)
+      })
+      hydrated = true
+    } catch (error) {
+      console.error('[Plugin System] Erro ao hydrate plugins:', error)
+    }
+  }
+}
+
+export function isHydrated() {
+  return hydrated
 }

@@ -35,7 +35,12 @@ export default {
     if (modified.length === 0) {
       log('Nenhum cabeçalho encontrado para normalizar')
       notify('info', 'Linter', 'Nenhum cabeçalho encontrado para normalizar')
-      return { message: 'Nenhum cabeçalho encontrado para normalizar' }
+      return {
+        originalCount: sceneHeadings.length,
+        modifiedCount: 0,
+        modified: [],
+        suggestions: 'Nenhum cabeçalho encontrado'
+      }
     }
 
     // Preparar resultados

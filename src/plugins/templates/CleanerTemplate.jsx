@@ -7,6 +7,15 @@ import { useCineWeaveAPI } from '../../lib/pluginAPI'
 
 export default function CleanerTemplate({ results, onApply, onReject }) {
   if (!results) return <div>Carregando...</div>
+  if (results.error) {
+    return (
+      <div style={{ padding: '16px', color: '#ef4444' }}>
+        <h3>Erro na Limpeza</h3>
+        <p>{results.error}</p>
+        <button onClick={onReject} className="btn-secondary">Fechar</button>
+      </div>
+    )
+  }
 
   const {
     removedCount,

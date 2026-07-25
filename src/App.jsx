@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SyncProvider, useSync } from './context/SyncContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { ProjectProvider } from './context/ProjectContext';
-import { OnboardingProvider } from './context/OnboardingContext';
 
 const BrainstormTab = React.lazy(() => import('./components/BrainstormTab'));
 const ScreenplayTab = React.lazy(() => import('./components/ScreenplayTab'));
@@ -15,7 +14,6 @@ const VisualizationsTab = React.lazy(() => import('./components/VisualizationsTa
 import PluginManager from './components/PluginManager';
 import InstallPrompt from './components/InstallPrompt';
 import UserMenu from './components/UserMenu';
-import OnboardingOverlay from './components/OnboardingOverlay';
 import ConfirmModal from './components/ConfirmModal';
 import LoginPage from './components/LoginPage';
 import InviteModal from './components/InviteModal';
@@ -384,13 +382,13 @@ const TABS = [
           <Image size={18} />
           <span>Storyboard</span>
         </button>
-        <button className={`mobile-nav-btn ${activeTab === 'mindmap' ? 'active' : ''}`} onClick={() => setActiveTab('mindmap')}>
-          <Compass size={18} />
-          <span>Mapa Mental</span>
+        <button className={`mobile-nav-btn ${activeTab === 'analysis' ? 'active' : ''}`} onClick={() => setActiveTab('analysis')}>
+          <ClipboardList size={18} />
+          <span>Análise</span>
         </button>
-        <button className={`mobile-nav-btn ${activeTab === 'brainstorm' ? 'active' : ''}`} onClick={() => setActiveTab('brainstorm')}>
-          <Sparkles size={18} />
-          <span>Ideias</span>
+        <button className={`mobile-nav-btn ${activeTab === 'plugins' ? 'active' : ''}`} onClick={() => setActiveTab('plugins')}>
+          <Cpu size={18} />
+          <span>Plugins</span>
         </button>
       </nav>
 
