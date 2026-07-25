@@ -1,6 +1,14 @@
 /**
  * Markup Cleaner Plugin
- * Remove markup indesejado do roteiro
+ * Remove markup indesejado do roteiro:
+ * - Blocos vazios
+ * - Notas ocultas [[...]]
+ * - Tags marcadas #[...#
+ *
+ * Este plugin não modifica nada sem confirmação do usuário.
+ *
+ * @module plugins/CleanerPlugin
+ * @author CodeRabbit
  */
 
 import CleanerTemplate from './templates/CleanerTemplate'
@@ -13,6 +21,29 @@ export default {
   type: 'tool',
   template: CleanerTemplate,
 
+  /**
+   * Analisa o screenplay e identifica blocos para remoção
+   * Retorna um preview das mudanças sem aplicar nada
+   *
+   * @param {Object} params - Parâmetros do plugin
+   * @param {Object} params.api - API context
+   * @param {Array} params.api.screenplay - Lista de elementos do screenplay
+   * @param {Function} params.api.log - Função para logs
+   * @param {Function} params.api.notify - Função para notificações
+   * @returns {Object} Resultado da análise
+   * @returns {number} result.removedCount - número de blocos identificados
+   * @returns {number} result.currentLength - comprimento atual do screenplay
+   * @returns {number} result.finalLength - comprimento após remoção
+   * @returns {Array<Object>} result.removedBlocks - lista de blocos identificados
+   *   - {id: string} - ID do bloco
+   *   - {text: string} - texto do bloco
+   *   - {type: string} - tipo do bloco
+   * @returns {string} result.message - mensagem resumida
+   *
+   * @example
+   * const results = await executePlugin('cleaner', { screenplay, log, notify })
+   * console.log(results.removedCount) // 5
+   */
   execute: async (params, api) => {
     const { screenplay, log, notify } = api
 
@@ -73,6 +104,23 @@ export default {
     return results
   },
 
+  /**
+   * Aplica as mudanças identificadas pelo execute
+   * Em produção, isso chamaria updateScreenplay() do ProjectContext
+   *
+   * @param {Object} results - Resultado do execute (removidos, contagens)
+   * @param {Object} api - API context
+   * @param {Array} api.screenplay - Lista de elementos do screenplay
+   * @param {Function} api.log - Função para logs
+   * @param {Function} api.notify - Função para notificações
+   * @returns {Object} Resultado da aplicação
+   * @returns {boolean} result.success - true se bem-sucedido
+   * @returns {number} result.removedCount - número de blocos removidos
+   *
+   * @example
+   * const results = await applyChanges({ removedCount: 5 }, { screenplay, log, notify })
+   * // Simulação - em produção, isso atualizaria o screenplay
+   */
   applyChanges: async (results, api) => {
     const { screenplay, log, notify } = api
 
