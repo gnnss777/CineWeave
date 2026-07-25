@@ -2,8 +2,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SyncProvider, useSync } from './context/SyncContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { ProjectProvider, useProject } from './context/ProjectContext';
-import { OnboardingProvider, useOnboarding } from './context/OnboardingContext';
+import { ProjectProvider } from './context/ProjectContext';
+import { OnboardingProvider } from './context/OnboardingContext';
 
 const BrainstormTab = React.lazy(() => import('./components/BrainstormTab'));
 const ScreenplayTab = React.lazy(() => import('./components/ScreenplayTab'));
@@ -12,6 +12,7 @@ const StoryboardTab = React.lazy(() => import('./components/StoryboardTab'));
 const AnalysisTab = React.lazy(() => import('./components/AnalysisTab'));
 const ConfigTab = React.lazy(() => import('./components/ConfigTab'));
 const VisualizationsTab = React.lazy(() => import('./components/VisualizationsTab'));
+import PluginManager from './components/PluginManager';
 import InstallPrompt from './components/InstallPrompt';
 import UserMenu from './components/UserMenu';
 import OnboardingOverlay from './components/OnboardingOverlay';
@@ -19,7 +20,7 @@ import ConfirmModal from './components/ConfirmModal';
 import LoginPage from './components/LoginPage';
 import InviteModal from './components/InviteModal';
 import GuideModal from './components/GuideModal';
-import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Hash, Users, Share2, Sun, Moon, Menu, Image, ClipboardList, LayoutGrid, Clock, Settings } from 'lucide-react';
+import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Users, Sun, Moon, Menu, Image, ClipboardList, Settings, Cpu } from 'lucide-react';
 import TagSelector from './components/TagSelector';
 
 function HelpButton() {
@@ -41,9 +42,8 @@ function TabLoader() {
 }
 
 function CineWeaveShell() {
-  const { user, profile } = useAuth();
   const { isOnline, pendingCount } = useSync();
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
   const {
     projects,
     currentProject,
@@ -52,11 +52,8 @@ function CineWeaveShell() {
     addProject,
     deleteProject,
     syncAllToCloud,
-    setProjectVisibility,
-    setProjectTags,
     tabNavigation,
   } = useProject();
-   const { startTour } = useOnboarding();
 
 const [activeTab, setActiveTab] = useState('brainstorm');
 const [showProjectDrawer, setShowProjectDrawer] = useState(false);
@@ -68,7 +65,8 @@ const TABS = [
   { key: 'storyboard', label: 'Storyboard', icon: Image },
   { key: 'config', label: 'Configuração', icon: Settings },
   { key: 'brainstorm', label: 'Ideias', icon: Sparkles },
-];
+  { key: 'plugins', label: 'Plugins', icon: Cpu },
+  ];
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [newProjTitle, setNewProjTitle] = useState('');
   const [newProjTagline, setNewProjTagline] = useState('');
@@ -145,6 +143,7 @@ const TABS = [
       case 'visualizations': return <VisualizationsTab />;
       case 'config': return <ConfigTab />;
       case 'brainstorm': return <BrainstormTab key={currentProject?.id} />;
+      case 'plugins': return <PluginManager projectId={currentProjectId} />;
       default: return <BrainstormTab key={currentProject?.id} />;
     }
   };
@@ -453,10 +452,7 @@ function AuthenticatedApp() {
       <ThemeProvider>
         <SyncProvider>
           <ProjectProvider>
-             <OnboardingProvider>
-                <CineWeaveShell />
-                <OnboardingOverlay />
-              </OnboardingProvider>
+            <CineWeaveShell />
           </ProjectProvider>
         </SyncProvider>
       </ThemeProvider>
