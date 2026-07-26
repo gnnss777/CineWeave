@@ -7,9 +7,42 @@
  */
 
 const pluginRegistry = new Map()
+// Source-of-truth for executable implementations, keyed by plugin id.
+// Populated by registerPlugin; never serialized. Used by hydratePlugins
+// to reattach execute/template/applyChanges onto restored metadata.
+const pluginImplRegistry = new Map()
 
 // Plugins já foram carregados
 let hydrated = false
+
+/**
+ * Extrai apenas os campos serializáveis de um plugin (metadata/config).
+ * Funções (execute, template, applyChanges) são intencionalmente
+ * descartadas — elas são reanexadas a partir do pluginImplRegistry
+ * durante a hidratação.
+ *
+ * @param {Object} plugin - Plugin completo
+ * @returns {Object} Metadata serializável ({id, name, description, version, type})
+ */
+function extractMetadata(plugin) {
+  return {
+    id: plugin.id,
+    name: plugin.name,
+    description: plugin.description,
+    version: plugin.version,
+    type: plugin.type
+  }
+}
+
+/**
+ * Persiste apenas metadata serializável no localStorage.
+ * Implementações (execute/template/applyChanges) vivem no
+ * pluginImplRegistry em runtime e são reanexadas no hydrate.
+ */
+function persistMetadata() {
+  const metadata = Array.from(pluginRegistry.values()).map(extractMetadata)
+  localStorage.setItem('cineweave_plugins', JSON.stringify(metadata))
+}
 
 /**
  * Registra um novo plugin no registry
@@ -35,8 +68,10 @@ let hydrated = false
  */
 export function registerPlugin(plugin) {
   pluginRegistry.set(plugin.id, plugin)
+  // Guarda a implementação executável em runtime (nunca serializada)
+  pluginImplRegistry.set(plugin.id, plugin)
   if (!hydrated) {
-    localStorage.setItem('cineweave_plugins', JSON.stringify([...pluginRegistry]))
+    persistMetadata()
   }
 }
 
@@ -132,12 +167,18 @@ export function getPluginMetadata(pluginId) {
  */
 export function unregisterPlugin(pluginId) {
   pluginRegistry.delete(pluginId)
-  localStorage.setItem('cineweave_plugins', JSON.stringify([...pluginRegistry]))
+  pluginImplRegistry.delete(pluginId)
+  persistMetadata()
 }
 
 /**
  * Hydrate plugins do localStorage ao iniciar a aplicação
- * Carrega plugins salvos e popula o pluginRegistry
+ *
+ * Lê apenas a metadata persistida e reanexa as implementações
+ * executáveis (execute/template/applyChanges) a partir do
+ * pluginImplRegistry populado pelas chamadas registerPlugin.
+ * Plugins cuja implementação não foi registrada em runtime
+ * ficam de fora do registry (não podem executar).
  *
  * @example
  * hydratePlugins()
@@ -146,10 +187,14 @@ export function hydratePlugins() {
   const stored = localStorage.getItem('cineweave_plugins')
   if (stored) {
     try {
-      const plugins = JSON.parse(stored)
+      const metadataList = JSON.parse(stored)
       pluginRegistry.clear()
-      plugins.forEach(p => {
-        pluginRegistry.set(p.id, p)
+      metadataList.forEach(meta => {
+        const impl = pluginImplRegistry.get(meta.id)
+        if (impl) {
+          // Reanexa implementação executável sobre a metadata persistida
+          pluginRegistry.set(meta.id, { ...meta, ...impl })
+        }
       })
       hydrated = true
     } catch (error) {

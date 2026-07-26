@@ -2,13 +2,19 @@
  * Bechdel Test Plugin - Diversity Analyzer
  * Analisa diversidade de personagens femininos usando o Teste de Bechdel-Wallace
  *
- * O Teste de Bechdel-Wallace verifica se:
+ * HEURÍSTICA (não é o teste completo):
+ * O Teste de Bechdel-Wallace canônico exige três critérios:
  * 1. Existem pelo menos duas personagens femininas com nomes diferentes
  * 2. Elas conversam entre si
  * 3. A conversação não é sobre um homem
  *
- * Este plugin usa lógica determinística baseada em dialogues reais
- * do screenplay, sem valores aleatórios.
+ * Esta implementação cobre apenas o critério (1) e parte do (2):
+ * conta falantes femininos distintos e, quando há 2+ diálogos
+ * consecutivos envolvendo mulheres, marca como PASSED. Os critérios
+ * (3) e a verificação estrita de "conversa entre si" não são
+ * implementados — análise de tópico exigiria NLP.
+ *
+ * Trate o resultado como sinalização aproximada, não como veredito.
  *
  * @module plugins/BechdelPlugin
  * @author CodeRabbit
@@ -43,7 +49,9 @@ export default {
    * @returns {Array<string>} result.suggestions - sugestões de melhoria
    *
    * @example
-   * const results = await executePlugin('bechdel', { screenplay, entities, log, notify })
+   * const results = await executePlugin('bechdel', {
+   *   api: { screenplay, entities, log, notify }
+   * })
    * console.log(results.bechdelPassed) // true ou false
    */
   execute: async (params, api) => {
@@ -128,8 +136,8 @@ export default {
     }
 
     if (!bechdelPassed) {
-      issues.push('Não há diálogos entre duas personagens femininas')
-      suggestions.push('Adicione um diálogo entre duas personagens femininas')
+      issues.push('Menos de duas falantes femininas detectadas em sequência')
+      suggestions.push('Adicione diálogos envolvendo duas personagens femininas')
     }
 
     const results = {

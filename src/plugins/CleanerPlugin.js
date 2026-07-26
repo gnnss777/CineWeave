@@ -41,7 +41,9 @@ export default {
    * @returns {string} result.message - mensagem resumida
    *
    * @example
-   * const results = await executePlugin('cleaner', { screenplay, log, notify })
+   * const results = await executePlugin('cleaner', {
+   *   api: { screenplay, log, notify }
+   * })
    * console.log(results.removedCount) // 5
    */
   execute: async (params, api) => {
@@ -118,7 +120,10 @@ export default {
    * @returns {number} result.removedCount - número de blocos removidos
    *
    * @example
-   * const results = await applyChanges({ removedCount: 5 }, { screenplay, log, notify })
+   * const results = await applyChanges(
+   *   { removedCount: 5 },
+   *   { api: { screenplay, log, notify } }
+   * )
    * // Simulação - em produção, isso atualizaria o screenplay
    */
   applyChanges: async (results, api) => {
