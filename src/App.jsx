@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SyncProvider, useSync } from './context/SyncContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { ProjectProvider } from './context/ProjectContext';
+import { ProjectProvider, useProject } from './context/ProjectContext';
 
 const BrainstormTab = React.lazy(() => import('./components/BrainstormTab'));
 const ScreenplayTab = React.lazy(() => import('./components/ScreenplayTab'));
@@ -51,6 +51,7 @@ function CineWeaveShell() {
     deleteProject,
     syncAllToCloud,
     tabNavigation,
+    setProjectVisibility,
   } = useProject();
 
 const [activeTab, setActiveTab] = useState('brainstorm');
