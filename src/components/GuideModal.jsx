@@ -3,10 +3,13 @@ import { useOnboarding } from '../context/OnboardingContext';
 import { Projector, Brain, Compass, FileText, BookOpen, Sparkles, Layers, Globe, Target, MessageSquare, Feather, Plus, CircleCheck } from 'lucide-react';
 
 export default function GuideModal({ isOpen, onClose }) {
-  if (!isOpen) return null;
-
   const { startTour, hasCompleted } = useOnboarding();
   const [activeTour, setActiveTour] = useState(null);
+
+  // Early-return AFTER all hooks to respect rules-of-hooks.
+  // Returning before hooks would change hook call order between renders
+  // when `isOpen` toggles, causing a runtime crash.
+  if (!isOpen) return null;
 
   const tours = [
     {
