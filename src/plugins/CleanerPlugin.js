@@ -122,7 +122,7 @@ export default {
    * @example
    * const results = await applyChanges(
    *   { removedCount: 5 },
-   *   { api: { screenplay, log, notify } }
+   *   { screenplay, log, notify }
    * )
    * // Simulação - em produção, isso atualizaria o screenplay
    */

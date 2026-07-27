@@ -70,7 +70,11 @@ export function registerPlugin(plugin) {
   pluginRegistry.set(plugin.id, plugin)
   // Guarda a implementação executável em runtime (nunca serializada)
   pluginImplRegistry.set(plugin.id, plugin)
-  if (!hydrated) {
+  // Só persiste depois do hydrate. Antes disso, persistMetadata()
+  // sobrescreveria o localStorage com um subset dos plugins,
+  // apagando permanentemente os não-registrados (ex: [A,B]
+  // persistido → registerPlugin(A) reescreve como [A] → B perdido).
+  if (hydrated) {
     persistMetadata()
   }
 }
@@ -196,11 +200,14 @@ export function hydratePlugins() {
           pluginRegistry.set(meta.id, { ...meta, ...impl })
         }
       })
-      hydrated = true
     } catch (error) {
       console.error('[Plugin System] Erro ao hydrate plugins:', error)
     }
   }
+  // Marca hydrate completo em todos os caminhos (incluindo storage
+  // ausente/vazio): isHydrated() precisa refletir que o boot já passou
+  // pela fase de hydrate, independente de ter encontrado dados.
+  hydrated = true
 }
 
 /**
