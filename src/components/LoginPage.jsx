@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Film, Loader2, Mail, Lock, User } from 'lucide-react';
 
-export default function LoginPage() {
+export default function LoginPage({ initialMode = 'login', onBack }) {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
@@ -88,6 +88,22 @@ export default function LoginPage() {
         }}>
           {mode === 'login' ? 'Entre para continuar' : 'Crie sua conta gratuita'}
         </p>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="btn-secondary"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              margin: '0 auto 24px', padding: '6px 14px',
+              fontSize: '12px', borderRadius: '8px',
+              border: '1px solid rgba(204,238,0,0.15)',
+              background: 'transparent', color: '#a3a3a3', cursor: 'pointer',
+            }}
+          >
+            ← Voltar para a home
+          </button>
+        )}
 
         {/* Card */}
         <div className="login-card" style={{

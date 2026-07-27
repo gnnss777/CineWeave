@@ -42,3 +42,8 @@ e2e/test-import.fdx
 docs/
 tests/
 beat/
+
+# Open Design (gerador de UI local) — artefatos e skills de sessão
+.od-skills/
+*.html.artifact.json
+landing-brief*.md

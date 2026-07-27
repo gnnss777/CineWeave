@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SyncProvider, useSync } from './context/SyncContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { ProjectProvider, useProject } from './context/ProjectContext';
+import { OnboardingProvider } from './context/OnboardingContext';
 
 const BrainstormTab = React.lazy(() => import('./components/BrainstormTab'));
 const ScreenplayTab = React.lazy(() => import('./components/ScreenplayTab'));
@@ -16,6 +17,7 @@ import InstallPrompt from './components/InstallPrompt';
 import UserMenu from './components/UserMenu';
 import ConfirmModal from './components/ConfirmModal';
 import LoginPage from './components/LoginPage';
+import Landing from './components/Landing';
 import InviteModal from './components/InviteModal';
 import GuideModal from './components/GuideModal';
 import { FileText, BookOpen, Compass, Sparkles, Film, Plus, Trash2, HelpCircle, Cloud, Loader2, Globe, Lock, Users, Sun, Moon, Menu, Image, ClipboardList, Settings, Cpu } from 'lucide-react';
@@ -432,6 +434,9 @@ class ErrorBoundary extends React.Component {
 
 function AuthenticatedApp() {
   const { loading, isAuthenticated } = useAuth();
+  // 'landing' = página pública; 'login' = LoginPage (em modo login ou signup)
+  const [view, setView] = useState('landing');
+  const [loginMode, setLoginMode] = useState('login');
 
   if (loading) {
     return (
@@ -443,7 +448,15 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    if (view === 'landing') {
+      return (
+        <Landing
+          onGetStarted={() => { setLoginMode('signup'); setView('login'); }}
+          onLogin={() => { setLoginMode('login'); setView('login'); }}
+        />
+      );
+    }
+    return <LoginPage initialMode={loginMode} onBack={() => setView('landing')} />;
   }
 
   return (
@@ -451,7 +464,9 @@ function AuthenticatedApp() {
       <ThemeProvider>
         <SyncProvider>
           <ProjectProvider>
-            <CineWeaveShell />
+            <OnboardingProvider>
+              <CineWeaveShell />
+            </OnboardingProvider>
           </ProjectProvider>
         </SyncProvider>
       </ThemeProvider>
