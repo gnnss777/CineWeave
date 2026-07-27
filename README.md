@@ -1,6 +1,8 @@
 # CineWeave
 
-Aplicação de roteirismo colaborativo com unificação de dados entre Brainstorm, Enciclopédia, Roteiro, Análise Técnica, Visualizações, Storyboard e Configuração.
+Aplicação de roteirismo colaborativo com unificação de dados entre Brainstorm, Enciclopédia, Roteiro, Análise Técnica, Visualizações, Storyboard, Configuração e **Plugin System**.
+
+> See [CHANGELOG.md](./CHANGELOG.md) for release history and [ARCHITECTURE.md](./ARCHITECTURE.md) for the system overview.
 
 ## 🆕 Sistema de Revisões
 
@@ -66,10 +68,15 @@ project.mediaUploads[] ← concept art, referências
 - ✅ **Fase 2**: Linkagem bidirecional `screenplay ↔ entities`
 - ✅ **Fase 3**: Mind Map como view pura de `entities`
 - ✅ **Fase 4**: Limpeza de arrays legados
-- ✅ **Fase 5**: Navegação cruzada entre abas
+- ✅ **Fase 5**: Navegação cruzada entre abas (basic cross-tab navigation)
 - ✅ **Fase 6**: Sistema de Revisões com persistência de cores
-- ✅ **Fase 7**: Tabs adicionais (Análise, Visualizações, Configuração)
-- ⏳ **Fase 8**: Navegação cruzada entre abas
+- ✅ **Fase 7**: Tabs adicionais (Análise, Visualizações, Configuração, Storyboard, Plugins)
+- ⏳ **Fase 8**: Navegação cruzada entre abas (deep linking: abrir ficha direto no roteiro, etc.)
+
+> **Note on Fase 5 vs Fase 8**: both are about cross-tab navigation. Fase 5
+> delivered the basic mechanism (the `tabNavigation` redirect in
+> `CineWeaveShell`). Fase 8 covers the deeper work (entity→block deep
+> links, two-way state sync) and is still pending.
 
 ## Navegação Cruzada
 
@@ -80,10 +87,24 @@ project.mediaUploads[] ← concept art, referências
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run dev      # Vite dev server (default port 5173)
+npm run build    # Production build
+npm run lint     # oxlint
+npm run format   # oxlint --fix
+npm run test:e2e # Playwright
 ```
+
+## Plugin System
+
+CineWeave ships a BeatPlugins-style plugin system. Built-in plugins:
+- **Slugline Linter** — normalizes scene headings to UPPERCASE
+- **Diversity Analyzer (Bechdel Test)** — heuristic Bechdel-Wallace check
+- **Markup Cleaner** — removes empty blocks, hidden notes, stray tags
+
+> ⚠️ **Known issue (#5):** the plugins are implemented but not yet wired at
+> app boot — the Plugin Store currently shows "Nenhum plugin instalado".
+> See `src/lib/pluginSystem/` for the API.
 
 ## Backend
 
-O aplicativo usa Supabase para sincronização de dados. Consulte `supabase/migration.sql` para o esquema.
+O aplicativo usa Supabase para sincronização de dados. Consulte `supabase/migration.sql` para o esquema. O LLM proxy para a NVIDIA API vive em `api/nvidia/[...path].js` (Web Handler signature).
