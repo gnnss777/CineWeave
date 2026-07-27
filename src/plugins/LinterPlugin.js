@@ -36,7 +36,9 @@ export default {
    * @returns {string} result.suggestions - sugestão resumida
    *
    * @example
-   * const results = await executePlugin('linter', { screenplay, log, notify })
+   * const results = await executePlugin('linter', {
+   *   api: { screenplay, log, notify }
+   * })
    * console.log(results.modifiedCount) // 5
    */
   execute: async (params, api) => {

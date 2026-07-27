@@ -15,7 +15,7 @@ export default function PluginManager({ projectId, onClose }) {
   const [pluginResults, setPluginResults] = useState(null)
   const [pluginRunning, setPluginRunning] = useState(false)
 
-  const { screenplay, log } = useCineWeaveAPI()
+  const { screenplay, entities, log, notify } = useCineWeaveAPI()
 
   useEffect(() => {
     const loadedPlugins = listPlugins()
@@ -44,7 +44,7 @@ export default function PluginManager({ projectId, onClose }) {
       const results = await executePlugin(plugin.id, {
         screenplay,
         projectId,
-        api: { screenplay, log }
+        api: { screenplay, entities, log, notify }
       })
 
       logMessage(`[Plugin] Plugin executado com sucesso`)
